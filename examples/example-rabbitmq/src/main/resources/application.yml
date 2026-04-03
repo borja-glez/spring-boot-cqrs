@@ -1,11 +1,10 @@
 spring:
   application:
     name: example-rabbitmq
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+  docker:
+    compose:
+      file: examples/example-rabbitmq/compose.yml
+      lifecycle-management: start-and-stop
 
 server:
   port: 8081

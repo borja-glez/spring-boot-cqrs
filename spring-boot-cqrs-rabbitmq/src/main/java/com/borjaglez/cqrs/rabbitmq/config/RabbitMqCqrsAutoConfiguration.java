@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -27,6 +28,12 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 @EnableConfigurationProperties(RabbitMqCqrsProperties.class)
 @ImportRuntimeHints(RabbitMqCqrsRuntimeHints.class)
 public class RabbitMqCqrsAutoConfiguration {
+
+  @Bean
+  @ConditionalOnMissingBean
+  public Jackson2JsonMessageConverter cqrsMessageConverter() {
+    return new Jackson2JsonMessageConverter();
+  }
 
   @Bean
   @ConditionalOnMissingBean

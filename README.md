@@ -328,20 +328,7 @@ cqrs:
       concurrent-consumers: 5
 ```
 
-Start RabbitMQ with Docker:
-
-```yaml
-# docker-compose.yml
-services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-```
+RabbitMQ starts automatically via [Spring Boot Docker Compose](https://docs.spring.io/spring-boot/reference/features/docker-compose.html) when running `./gradlew :examples:example-rabbitmq:bootRun` — no manual `docker compose up` is needed. Connection properties are auto-configured from the running container.
 
 The RabbitMQ event bus automatically falls back to the local Spring event bus if the AMQP connection is unavailable.
 

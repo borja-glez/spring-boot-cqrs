@@ -216,15 +216,17 @@ The bus auto-configurations use `@Value("${spring.application.name:cqrs-app}")` 
 
 ## Docker Setup
 
-Minimal `docker-compose.yml` for local development:
+The `example-rabbitmq` application uses [Spring Boot Docker Compose](https://docs.spring.io/spring-boot/reference/features/docker-compose.html) to automatically start and stop RabbitMQ when running the application. No manual `docker compose up` is needed.
+
+Minimal `compose.yml` for local development:
 
 ```yaml
 services:
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672"
+      - "15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -234,13 +236,12 @@ Spring Boot configuration:
 
 ```yaml
 spring:
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+  docker:
+    compose:
+      file: examples/example-rabbitmq/compose.yml
+      lifecycle-management: start-and-stop
 ```
 
-The RabbitMQ Management UI is available at `http://localhost:15672` with the configured credentials. You can use it to inspect exchanges, queues, bindings, and messages.
+Spring Boot Docker Compose auto-configures `spring.rabbitmq.*` properties (host, port, username, password) from the running container — no manual connection configuration is required.
 
 See the [example-rabbitmq](../examples/example-rabbitmq) application for a complete working setup.

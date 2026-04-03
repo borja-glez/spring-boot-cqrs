@@ -46,10 +46,12 @@ class CqrsSerializationAutoConfigurationTest {
   }
 
   @Test
-  void contextFailsWhenObjectMapperClassPresentButNoBeanExists() {
+  void serializerIsNotCreatedWhenObjectMapperClassPresentButNoBeanExists() {
     contextRunner.run(
         context -> {
-          assertThat(context).hasFailed();
+          assertThat(context).hasNotFailed();
+          assertThat(context).doesNotHaveBean(JacksonMessageSerializer.class);
+          assertThat(context).doesNotHaveBean(MessageSerializer.class);
         });
   }
 
