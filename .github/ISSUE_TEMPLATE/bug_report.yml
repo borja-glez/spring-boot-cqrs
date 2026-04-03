@@ -1,0 +1,19 @@
+name: Bug report
+description: Report a problem in the library
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the bug clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide steps or a minimal sample.
+    validations:
+      required: true

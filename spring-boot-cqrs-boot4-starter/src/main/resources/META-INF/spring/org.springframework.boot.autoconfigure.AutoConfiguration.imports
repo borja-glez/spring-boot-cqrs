@@ -1,0 +1,4 @@
+com.borjaglez.cqrs.autoconfigure.CqrsAutoConfiguration
+com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration
+com.borjaglez.cqrs.autoconfigure.CqrsValidationAutoConfiguration
+com.borjaglez.cqrs.autoconfigure.CqrsObservabilityAutoConfiguration

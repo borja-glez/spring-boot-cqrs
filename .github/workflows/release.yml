@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0, 1.0.0-beta.1, 1.0.0-rc.1)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to release from (default: main)'
+        required: false
+        type: string
+        default: 'main'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          # Check stable: X.Y.Z
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "type=stable" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "Release type: stable"
+            exit 0
+          fi
+
+          # Check pre-release: X.Y.Z-{alpha|beta|rc}.N
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$ ]]; then
+            echo "type=prerelease" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "Release type: pre-release"
+            exit 0
+          fi
+
+          echo "::error::Invalid version format. Use X.Y.Z or X.Y.Z-{alpha|beta|rc}.N"
+          exit 1
+
+      - name: Check tag does not exist
+        run: |
+          if git rev-parse "v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "::error::Tag v${{ inputs.version }} already exists"
+            exit 1
+          fi
+
+      - name: Run quality checks
+        run: ./gradlew quality --no-configuration-cache
+
+      - name: Generate changelog
+        if: steps.validate.outputs.type == 'stable'
+        uses: orhun/git-cliff-action@v4
+        id: changelog
+        with:
+          config: cliff.toml
+          args: --tag v${{ inputs.version }} --strip header
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Update CHANGELOG.md
+        if: steps.validate.outputs.type == 'stable'
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --tag v${{ inputs.version }}
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Commit CHANGELOG and tag release
+        if: steps.validate.outputs.type == 'stable'
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: 'CHANGELOG.md'
+          message: 'release: v${{ inputs.version }}'
+          tag: 'v${{ inputs.version }} -a -m "Release v${{ inputs.version }}"'
+          push: true
+
+      - name: Tag pre-release
+        if: steps.validate.outputs.type == 'prerelease'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "Pre-release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Compute next snapshot version
+        if: steps.validate.outputs.type == 'stable'
+        id: bump
+        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ inputs.version }}"
+          NEXT_SNAPSHOT="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+          sed -i "s/^version=.*/version=${NEXT_SNAPSHOT}/" gradle.properties
+          echo "next_snapshot=${NEXT_SNAPSHOT}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        if: steps.validate.outputs.type == 'stable'
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: 'gradle.properties'
+          message: 'chore: bump version to ${{ steps.bump.outputs.next_snapshot }}'
+          push: true
+
+      - name: Publish to Maven Central
+        run: ./gradlew publish -Pversion=${{ inputs.version }} --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
+          CI: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          body: ${{ steps.validate.outputs.type == 'stable' && steps.changelog.outputs.content || format('Pre-release {0}', inputs.version) }}
+          generate_release_notes: false
+          prerelease: ${{ steps.validate.outputs.is_prerelease }}

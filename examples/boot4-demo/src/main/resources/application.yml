@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: boot4-demo
+server:
+  port: 8083
+cqrs:
+  naming:
+    prefix: boot4-demo

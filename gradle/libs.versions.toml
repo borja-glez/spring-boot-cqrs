@@ -1,0 +1,55 @@
+[versions]
+spring-boot = "3.5.12"
+spring-boot4 = "4.0.4"
+spring-dependency-management = "1.1.7"
+lombok = "9.2.0"
+spotless = "8.4.0"
+maven-publish = "0.36.0"
+testcontainers = "2.0.4"
+awaitility = "4.3.0"
+jackson-boot4 = "2.19.4"
+micrometer-boot4 = "1.15.10"
+
+[libraries]
+spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+spring-boot-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
+spring-boot-autoconfigure-processor = { module = "org.springframework.boot:spring-boot-autoconfigure-processor" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+
+spring-boot4-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot4" }
+spring-boot4-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot4" }
+spring-boot4-starter-web = { module = "org.springframework.boot:spring-boot-starter-web", version.ref = "spring-boot4" }
+spring-boot4-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation", version.ref = "spring-boot4" }
+spring-boot4-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor", version.ref = "spring-boot4" }
+spring-boot4-autoconfigure-processor = { module = "org.springframework.boot:spring-boot-autoconfigure-processor", version.ref = "spring-boot4" }
+
+reactor-core = { module = "io.projectreactor:reactor-core" }
+reactor-test = { module = "io.projectreactor:reactor-test" }
+
+micrometer-core = { module = "io.micrometer:micrometer-core" }
+micrometer-observation = { module = "io.micrometer:micrometer-observation" }
+micrometer-core-versioned = { module = "io.micrometer:micrometer-core", version.ref = "micrometer-boot4" }
+micrometer-observation-versioned = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer-boot4" }
+
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" }
+jackson-databind-versioned = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-boot4" }
+jackson-datatype-jsr310-versioned = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson-boot4" }
+
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
+testcontainers-rabbitmq = { module = "org.testcontainers:rabbitmq" }
+
+awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+lombok = { id = "io.freefair.lombok", version.ref = "lombok" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

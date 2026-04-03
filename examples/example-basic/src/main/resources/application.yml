@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: example-basic
+server:
+  port: 8080
+cqrs:
+  naming:
+    prefix: example

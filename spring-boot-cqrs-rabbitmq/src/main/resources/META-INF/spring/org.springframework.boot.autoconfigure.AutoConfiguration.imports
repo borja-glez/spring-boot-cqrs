@@ -1,0 +1,4 @@
+com.borjaglez.cqrs.rabbitmq.config.RabbitMqCqrsAutoConfiguration
+com.borjaglez.cqrs.rabbitmq.config.RabbitMqCommandBusAutoConfiguration
+com.borjaglez.cqrs.rabbitmq.config.RabbitMqEventBusAutoConfiguration
+com.borjaglez.cqrs.rabbitmq.config.RabbitMqQueryBusAutoConfiguration

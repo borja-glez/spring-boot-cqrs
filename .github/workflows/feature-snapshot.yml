@@ -1,0 +1,51 @@
+name: Feature Snapshot
+
+on:
+  push:
+    branches: ['feat/**', 'feature/**']
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve feature snapshot version
+        id: version
+        run: |
+          # Base version from gradle.properties
+          BASE=$(grep '^version=' gradle.properties | cut -d= -f2)
+          BASE=${BASE%-SNAPSHOT}
+
+          # Branch name sanitized (feat/my-feature -> my-feature)
+          BRANCH="${GITHUB_REF_NAME#feat/}"
+          BRANCH="${BRANCH#feature/}"
+          BRANCH=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-')
+
+          VERSION="${BASE}-${BRANCH}-SNAPSHOT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing feature snapshot: $VERSION"
+
+      - name: Run quality checks
+        run: ./gradlew quality --no-configuration-cache
+
+      - name: Publish feature snapshot
+        run: ./gradlew publish -Pversion=${{ steps.version.outputs.version }} --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
+          CI: true

@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: example-rabbitmq
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+server:
+  port: 8081
+
+cqrs:
+  naming:
+    prefix: order-service
+  rabbitmq:
+    enabled: true
+    prefix: order-service
+    commands:
+      exchange: commands
+      concurrent-consumers: 5
+    events:
+      exchange: events
+      concurrent-consumers: 5
+    queries:
+      exchange: queries
+      concurrent-consumers: 5

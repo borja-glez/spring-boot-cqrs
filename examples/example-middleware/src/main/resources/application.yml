@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: example-middleware
+server:
+  port: 8082
+cqrs:
+  naming:
+    prefix: middleware-demo
+logging:
+  level:
+    com.borjaglez.cqrs.example.middleware: DEBUG
