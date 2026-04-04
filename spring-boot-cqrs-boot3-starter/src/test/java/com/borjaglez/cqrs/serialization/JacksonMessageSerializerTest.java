@@ -7,10 +7,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.UncheckedIOException;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
-import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,9 +21,9 @@ class JacksonMessageSerializerTest {
 
   @Test
   void serializeDeserializeRoundTrip() {
-    TestCommand command = new TestCommand("hello");
+    TestMessage command = new TestMessage("hello", UUID.randomUUID().toString());
     byte[] bytes = serializer.serialize(command);
-    TestCommand deserialized = serializer.deserialize(bytes, TestCommand.class);
+    TestMessage deserialized = serializer.deserialize(bytes, TestMessage.class);
 
     assertThat(deserialized.getData()).isEqualTo("hello");
     assertThat(deserialized.getCommandId()).isEqualTo(command.getCommandId());
@@ -31,7 +31,7 @@ class JacksonMessageSerializerTest {
 
   @Test
   void serializeProducesValidJson() {
-    TestCommand command = new TestCommand("test-data");
+    TestMessage command = new TestMessage("test-data", UUID.randomUUID().toString());
     byte[] bytes = serializer.serialize(command);
     String json = new String(bytes);
 
@@ -40,7 +40,7 @@ class JacksonMessageSerializerTest {
 
   @Test
   void deserializeWithWrongClassThrows() {
-    TestCommand command = new TestCommand("hello");
+    TestMessage command = new TestMessage("hello", UUID.randomUUID().toString());
     byte[] bytes = serializer.serialize(command);
 
     assertThatThrownBy(() -> serializer.deserialize(bytes, Integer.class))
@@ -57,5 +57,25 @@ class JacksonMessageSerializerTest {
 
     assertThatThrownBy(() -> brokenSerializer.serialize("anything"))
         .isInstanceOf(UncheckedIOException.class);
+  }
+
+  static class TestMessage {
+    private String data;
+    private String commandId;
+
+    TestMessage() {}
+
+    TestMessage(String data, String commandId) {
+      this.data = data;
+      this.commandId = commandId;
+    }
+
+    public String getData() {
+      return data;
+    }
+
+    public String getCommandId() {
+      return commandId;
+    }
   }
 }

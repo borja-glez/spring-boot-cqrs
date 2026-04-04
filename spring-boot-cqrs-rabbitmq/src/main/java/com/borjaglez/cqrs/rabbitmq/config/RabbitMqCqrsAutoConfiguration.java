@@ -1,7 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -13,6 +13,7 @@ import org.springframework.context.annotation.ImportRuntimeHints;
 
 import com.borjaglez.cqrs.rabbitmq.aot.RabbitMqCqrsRuntimeHints;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.DefaultRabbitMqNamingStrategy;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.JsonMessageConverterFactory;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -30,9 +31,9 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 public class RabbitMqCqrsAutoConfiguration {
 
   @Bean
-  @ConditionalOnMissingBean
-  public Jackson2JsonMessageConverter cqrsMessageConverter() {
-    return new Jackson2JsonMessageConverter();
+  @ConditionalOnMissingBean(name = "cqrsMessageConverter")
+  public MessageConverter cqrsMessageConverter() {
+    return JsonMessageConverterFactory.create();
   }
 
   @Bean

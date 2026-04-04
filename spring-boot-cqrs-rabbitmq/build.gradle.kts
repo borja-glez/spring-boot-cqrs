@@ -7,7 +7,6 @@ plugins {
 dependencies {
     api(project(":spring-boot-cqrs-core"))
     api(libs.spring.boot.starter.amqp)
-    implementation(libs.jackson.databind)
 
     annotationProcessor(libs.spring.boot.configuration.processor)
     annotationProcessor(libs.spring.boot.autoconfigure.processor)
@@ -20,6 +19,5 @@ dependencies {
     testImplementation(libs.awaitility)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.spring.boot.starter.validation)
-    testImplementation(libs.jackson.databind)
-    testImplementation(libs.jackson.datatype.jsr310)
+    testRuntimeOnly(libs.jackson.databind)
 }

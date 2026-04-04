@@ -7,7 +7,8 @@ import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -65,14 +66,14 @@ public class RabbitMqQueryBusAutoConfiguration {
       RabbitMqCqrsProperties properties,
       QueryHandlerRegistry registry,
       RabbitTemplate rabbitTemplate,
+      @Qualifier("cqrsMessageConverter") MessageConverter messageConverter,
       RabbitMqNamingStrategy rabbitNaming,
       @Value("${spring.application.name:cqrs-app}") String appName) {
     RabbitMqQueryConsumer consumer =
         new RabbitMqQueryConsumer(registry, rabbitTemplate, rabbitNaming);
 
-    Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
     ExtendedMessageListenerAdapter adapter =
-        new ExtendedMessageListenerAdapter(consumer, converter, "consume");
+        new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");
 
     SimpleMessageListenerContainer container =
         new SimpleMessageListenerContainer(connectionFactory);

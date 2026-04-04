@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 
 import com.rabbitmq.client.Channel;
@@ -23,7 +22,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void buildListenerArgumentsShouldReturnMessageAndExtractedObject() {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     TestDelegate delegate = new TestDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");
@@ -41,7 +40,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void onMessageShouldDelegateToSuper() throws Exception {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     TestDelegate delegate = new TestDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");
@@ -60,7 +59,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void onMessageShouldSendErrorResponseWhenReplyToIsSetAndExceptionOccurs() throws Exception {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     FailingDelegate delegate = new FailingDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");
@@ -80,7 +79,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void onMessageShouldRethrowWhenNoReplyTo() throws Exception {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     FailingDelegate delegate = new FailingDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");
@@ -95,7 +94,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void onMessageShouldHandleErrorResponsePublishFailure() throws Exception {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     FailingDelegate delegate = new FailingDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");
@@ -115,7 +114,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void onMessageShouldHandleEmptyReplyTo() throws Exception {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     FailingDelegate delegate = new FailingDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");
@@ -141,7 +140,7 @@ class ExtendedMessageListenerAdapterTest {
 
   @Test
   void sendErrorResponseShouldUseClassNameWhenErrorMessageIsNull() throws Exception {
-    MessageConverter converter = new Jackson2JsonMessageConverter();
+    MessageConverter converter = JsonMessageConverterFactory.create();
     TestDelegate delegate = new TestDelegate();
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(delegate, converter, "handle");

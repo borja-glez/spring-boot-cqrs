@@ -6,8 +6,8 @@ import java.io.UncheckedIOException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Default {@link MessageSerializer} implementation backed by Jackson. This serializer is intended
- * to be used when Jackson is available on the classpath.
+ * {@link MessageSerializer} implementation backed by Jackson 2. This serializer uses {@link
+ * ObjectMapper} and is intended for use with Spring Boot 3.
  */
 public class JacksonMessageSerializer implements MessageSerializer {
 

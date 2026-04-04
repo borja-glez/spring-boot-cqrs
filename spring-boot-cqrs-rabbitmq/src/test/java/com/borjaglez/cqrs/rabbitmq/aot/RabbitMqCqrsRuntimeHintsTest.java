@@ -12,6 +12,7 @@ import com.borjaglez.cqrs.rabbitmq.consumer.RabbitMqCommandConsumer;
 import com.borjaglez.cqrs.rabbitmq.consumer.RabbitMqEventConsumer;
 import com.borjaglez.cqrs.rabbitmq.consumer.RabbitMqQueryConsumer;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.ExtendedMessageListenerAdapter;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.JsonMessageConverterFactory;
 
 class RabbitMqCqrsRuntimeHintsTest {
 
@@ -32,6 +33,11 @@ class RabbitMqCqrsRuntimeHintsTest {
     assertThat(
             RuntimeHintsPredicates.reflection()
                 .onType(ExtendedMessageListenerAdapter.class)
+                .test(hints))
+        .isTrue();
+    assertThat(
+            RuntimeHintsPredicates.reflection()
+                .onType(JsonMessageConverterFactory.class)
                 .test(hints))
         .isTrue();
   }

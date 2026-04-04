@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.rabbitmq.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -27,9 +28,13 @@ class RabbitMqCqrsAutoConfigurationTest {
           assertThat(context).hasSingleBean(RabbitMqNamingStrategy.class);
           assertThat(context).hasSingleBean(RabbitMqPublisher.class);
           assertThat(context).hasSingleBean(RabbitMqBusDeclarationBuilder.class);
+          assertThat(context).hasBean("cqrsMessageConverter");
 
           RabbitMqNamingStrategy namingStrategy = context.getBean(RabbitMqNamingStrategy.class);
+          MessageConverter converter =
+              context.getBean("cqrsMessageConverter", MessageConverter.class);
           assertThat(namingStrategy).isInstanceOf(DefaultRabbitMqNamingStrategy.class);
+          assertThat(converter).isNotNull();
         });
   }
 
