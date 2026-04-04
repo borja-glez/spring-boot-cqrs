@@ -1,0 +1,132 @@
+{
+  "info": {
+    "name": "CQRS RabbitMQ Demo",
+    "description": "Test collection for the spring-boot-cqrs example-rabbitmq API.\n\nRequires RabbitMQ running (docker compose -f examples/example-rabbitmq/compose.yml up -d).\nThen start example-rabbitmq (port 8081):\n./gradlew :examples:example-rabbitmq:bootRun\n\nDemonstrates distributed CQRS with RabbitMQ for commands, queries and events.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Create orders",
+      "item": [
+        {
+          "name": "Create first order",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns order ID', () => {",
+            "    const id = pm.response.text();",
+            "    pm.expect(id).to.be.a('string').and.not.be.empty;",
+            "    pm.collectionVariables.set('orderId1', id);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/orders",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"product\": \"Laptop\",\n  \"quantity\": 2\n}" }
+          }
+        },
+        {
+          "name": "Create second order",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns order ID', () => {",
+            "    const id = pm.response.text();",
+            "    pm.expect(id).to.be.a('string').and.not.be.empty;",
+            "    pm.collectionVariables.set('orderId2', id);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/orders",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"product\": \"Monitor\",\n  \"quantity\": 1\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Query orders",
+      "item": [
+        {
+          "name": "Get all orders",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array with 2 orders', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data).to.be.an('array').with.lengthOf(2);",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders" }
+        },
+        {
+          "name": "Get order by ID",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns correct order with PENDING status', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.id).to.eql(pm.collectionVariables.get('orderId1'));",
+            "    pm.expect(data.product).to.eql('Laptop');",
+            "    pm.expect(data.quantity).to.eql(2);",
+            "    pm.expect(data.status).to.eql('PENDING');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId1}}" }
+        },
+        {
+          "name": "Get second order",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns Monitor order', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.product).to.eql('Monitor');",
+            "    pm.expect(data.quantity).to.eql(1);",
+            "    pm.expect(data.status).to.eql('PENDING');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId2}}" }
+        }
+      ]
+    },
+    {
+      "name": "Confirm order (command + event)",
+      "item": [
+        {
+          "name": "Confirm first order",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": { "method": "PUT", "url": "{{baseUrl}}/api/orders/{{orderId1}}/confirm" }
+        },
+        {
+          "name": "Verify order is confirmed",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Order status is CONFIRMED', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.status).to.eql('CONFIRMED');",
+            "    pm.expect(data.product).to.eql('Laptop');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId1}}" }
+        },
+        {
+          "name": "Verify other order still PENDING",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Second order still PENDING', () => {",
+            "    pm.expect(pm.response.json().status).to.eql('PENDING');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId2}}" }
+        }
+      ]
+    }
+  ]
+}

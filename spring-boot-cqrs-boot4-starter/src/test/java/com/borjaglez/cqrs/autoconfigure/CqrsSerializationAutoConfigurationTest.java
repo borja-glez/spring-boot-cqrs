@@ -9,9 +9,10 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.borjaglez.cqrs.serialization.JacksonMessageSerializer;
+import com.borjaglez.cqrs.serialization.Jackson3MessageSerializer;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
+import tools.jackson.databind.json.JsonMapper;
 
 class CqrsSerializationAutoConfigurationTest {
 
@@ -22,35 +23,35 @@ class CqrsSerializationAutoConfigurationTest {
                   CqrsAutoConfiguration.class, CqrsSerializationAutoConfiguration.class));
 
   @Test
-  void jacksonMessageSerializerIsCreatedWhenObjectMapperIsAvailable() {
+  void jacksonMessageSerializerIsCreatedWhenJsonMapperIsAvailable() {
     contextRunner
-        .withUserConfiguration(ObjectMapperConfiguration.class)
+        .withUserConfiguration(JsonMapperConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(JacksonMessageSerializer.class);
+              assertThat(context).hasSingleBean(Jackson3MessageSerializer.class);
               assertThat(context).hasSingleBean(MessageSerializer.class);
               assertThat(context.getBean(MessageSerializer.class))
-                  .isInstanceOf(JacksonMessageSerializer.class);
+                  .isInstanceOf(Jackson3MessageSerializer.class);
             });
   }
 
   @Test
-  void jacksonMessageSerializerIsNotCreatedWhenObjectMapperClassIsMissing() {
+  void jacksonMessageSerializerIsNotCreatedWhenJsonMapperClassIsMissing() {
     contextRunner
-        .withClassLoader(new FilteredClassLoader(ObjectMapper.class))
+        .withClassLoader(new FilteredClassLoader(JsonMapper.class))
         .run(
             context -> {
-              assertThat(context).doesNotHaveBean(JacksonMessageSerializer.class);
+              assertThat(context).doesNotHaveBean(Jackson3MessageSerializer.class);
               assertThat(context).doesNotHaveBean(MessageSerializer.class);
             });
   }
 
   @Test
-  void serializerIsNotCreatedWhenObjectMapperClassPresentButNoBeanExists() {
+  void serializerIsNotCreatedWhenJsonMapperClassPresentButNoBeanExists() {
     contextRunner.run(
         context -> {
           assertThat(context).hasNotFailed();
-          assertThat(context).doesNotHaveBean(JacksonMessageSerializer.class);
+          assertThat(context).doesNotHaveBean(Jackson3MessageSerializer.class);
           assertThat(context).doesNotHaveBean(MessageSerializer.class);
         });
   }
@@ -58,14 +59,14 @@ class CqrsSerializationAutoConfigurationTest {
   @Test
   void customMessageSerializerReplacesJacksonSerializer() {
     contextRunner
-        .withUserConfiguration(ObjectMapperConfiguration.class)
+        .withUserConfiguration(JsonMapperConfiguration.class)
         .withUserConfiguration(CustomSerializerConfiguration.class)
         .run(
             context -> {
               assertThat(context).hasSingleBean(MessageSerializer.class);
               assertThat(context.getBean(MessageSerializer.class))
                   .isInstanceOf(CustomMessageSerializer.class);
-              assertThat(context).doesNotHaveBean(JacksonMessageSerializer.class);
+              assertThat(context).doesNotHaveBean(Jackson3MessageSerializer.class);
             });
   }
 
@@ -82,10 +83,10 @@ class CqrsSerializationAutoConfigurationTest {
   }
 
   @Configuration(proxyBeanMethods = false)
-  static class ObjectMapperConfiguration {
+  static class JsonMapperConfiguration {
     @Bean
-    ObjectMapper objectMapper() {
-      return new ObjectMapper();
+    JsonMapper jsonMapper() {
+      return JsonMapper.builder().build();
     }
   }
 

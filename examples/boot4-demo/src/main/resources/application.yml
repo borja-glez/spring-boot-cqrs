@@ -1,8 +1,26 @@
 spring:
   application:
     name: boot4-demo
+  docker:
+    compose:
+      file: examples/boot4-demo/compose.yml
+      lifecycle-management: start-and-stop
+
 server:
   port: 8083
+
 cqrs:
   naming:
-    prefix: boot4-demo
+    prefix: order-service
+  rabbitmq:
+    enabled: true
+    prefix: order-service
+    commands:
+      exchange: commands
+      concurrent-consumers: 5
+    events:
+      exchange: events
+      concurrent-consumers: 5
+    queries:
+      exchange: queries
+      concurrent-consumers: 5

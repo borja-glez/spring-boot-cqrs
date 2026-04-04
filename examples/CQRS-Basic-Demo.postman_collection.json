@@ -1,0 +1,137 @@
+{
+  "info": {
+    "name": "CQRS Basic Demo",
+    "description": "Test collection for the spring-boot-cqrs example-basic API.\n\nStart example-basic (port 8080) before running:\n./gradlew :examples:example-basic:bootRun\n\nDemonstrates CommandBus and QueryBus usage with a simple Task domain.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Create tasks",
+      "item": [
+        {
+          "name": "Create first task",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns task with id, title and completed=false', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.id).to.be.a('string').and.not.be.empty;",
+            "    pm.expect(data.title).to.eql('Buy groceries');",
+            "    pm.expect(data.description).to.eql('Milk, eggs, bread');",
+            "    pm.expect(data.completed).to.be.false;",
+            "    pm.collectionVariables.set('taskId1', data.id);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/tasks",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Buy groceries\",\n  \"description\": \"Milk, eggs, bread\"\n}" }
+          }
+        },
+        {
+          "name": "Create second task",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns task with correct fields', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.title).to.eql('Write report');",
+            "    pm.expect(data.completed).to.be.false;",
+            "    pm.collectionVariables.set('taskId2', data.id);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/tasks",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Write report\",\n  \"description\": \"Quarterly sales report\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Query tasks",
+      "item": [
+        {
+          "name": "Get all tasks",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array with 2 tasks', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data).to.be.an('array').with.lengthOf(2);",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks" }
+        },
+        {
+          "name": "Get task by ID (exists)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns correct task', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.id).to.eql(pm.collectionVariables.get('taskId1'));",
+            "    pm.expect(data.title).to.eql('Buy groceries');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId1}}" }
+        },
+        {
+          "name": "Get task by ID (second task)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns second task', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.title).to.eql('Write report');",
+            "    pm.expect(data.description).to.eql('Quarterly sales report');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId2}}" }
+        }
+      ]
+    },
+    {
+      "name": "Complete task (command)",
+      "item": [
+        {
+          "name": "Complete first task",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns success message', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.message).to.eql('Task completed successfully');",
+            "});"
+          ]}}],
+          "request": { "method": "PUT", "url": "{{baseUrl}}/api/tasks/{{taskId1}}/complete" }
+        },
+        {
+          "name": "Verify task is completed",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Task is now completed', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.completed).to.be.true;",
+            "    pm.expect(data.title).to.eql('Buy groceries');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId1}}" }
+        },
+        {
+          "name": "Verify other task still pending",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Second task still not completed', () => {",
+            "    pm.expect(pm.response.json().completed).to.be.false;",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId2}}" }
+        }
+      ]
+    }
+  ]
+}

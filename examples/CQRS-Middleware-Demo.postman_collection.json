@@ -1,0 +1,66 @@
+{
+  "info": {
+    "name": "CQRS Middleware Demo",
+    "description": "Test collection for the spring-boot-cqrs example-middleware API.\n\nStart example-middleware (port 8082) before running:\n./gradlew :examples:example-middleware:bootRun\n\nDemonstrates middleware pipeline (authorization, logging, transactional) with CommandBus and QueryBus.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8082",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Command - greet",
+      "item": [
+        {
+          "name": "Greet Alice",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns greeting for Alice', () => {",
+            "    pm.expect(pm.response.text()).to.include('Alice');",
+            "});"
+          ]}}],
+          "request": { "method": "POST", "url": "{{baseUrl}}/api/greetings/Alice" }
+        },
+        {
+          "name": "Greet Bob",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns greeting for Bob', () => {",
+            "    pm.expect(pm.response.text()).to.include('Bob');",
+            "});"
+          ]}}],
+          "request": { "method": "POST", "url": "{{baseUrl}}/api/greetings/Bob" }
+        }
+      ]
+    },
+    {
+      "name": "Query - get greeting",
+      "item": [
+        {
+          "name": "Get greeting for Alice",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns greeting containing Alice', () => {",
+            "    pm.expect(pm.response.text()).to.include('Alice');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/greetings/Alice" }
+        },
+        {
+          "name": "Get greeting for World",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns greeting containing World', () => {",
+            "    pm.expect(pm.response.text()).to.include('World');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/greetings/World" }
+        }
+      ]
+    }
+  ]
+}

@@ -7,7 +7,7 @@ spotless = "8.4.0"
 maven-publish = "0.36.0"
 testcontainers = "2.0.4"
 awaitility = "4.3.0"
-jackson-boot4 = "2.19.4"
+jackson-boot4 = "3.0.1"
 micrometer-boot4 = "1.15.10"
 
 [libraries]
@@ -28,6 +28,9 @@ spring-boot4-starter-web = { module = "org.springframework.boot:spring-boot-star
 spring-boot4-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation", version.ref = "spring-boot4" }
 spring-boot4-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor", version.ref = "spring-boot4" }
 spring-boot4-autoconfigure-processor = { module = "org.springframework.boot:spring-boot-autoconfigure-processor", version.ref = "spring-boot4" }
+spring-boot4-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp", version.ref = "spring-boot4" }
+spring-boot4-docker-compose = { module = "org.springframework.boot:spring-boot-docker-compose", version.ref = "spring-boot4" }
+spring-boot4-devtools = { module = "org.springframework.boot:spring-boot-devtools", version.ref = "spring-boot4" }
 
 reactor-core = { module = "io.projectreactor:reactor-core" }
 reactor-test = { module = "io.projectreactor:reactor-test" }
@@ -39,8 +42,7 @@ micrometer-observation-versioned = { module = "io.micrometer:micrometer-observat
 
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
 jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" }
-jackson-databind-versioned = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-boot4" }
-jackson-datatype-jsr310-versioned = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson-boot4" }
+jackson-databind-versioned = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson-boot4" }
 
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }

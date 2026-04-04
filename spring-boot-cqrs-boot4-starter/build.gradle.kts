@@ -11,7 +11,6 @@ dependencies {
     compileOnly(libs.micrometer.core.versioned)
     compileOnly(libs.micrometer.observation.versioned)
     compileOnly(libs.jackson.databind.versioned)
-    compileOnly(libs.jackson.datatype.jsr310.versioned)
 
     annotationProcessor(libs.spring.boot4.configuration.processor)
     annotationProcessor(libs.spring.boot4.autoconfigure.processor)
@@ -21,5 +20,4 @@ dependencies {
     testImplementation(libs.micrometer.core.versioned)
     testImplementation(libs.micrometer.observation.versioned)
     testImplementation(libs.jackson.databind.versioned)
-    testImplementation(libs.jackson.datatype.jsr310.versioned)
 }

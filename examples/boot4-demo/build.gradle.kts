@@ -4,7 +4,12 @@ plugins {
 
 dependencies {
     implementation(project(":spring-boot-cqrs-boot4-starter"))
+    implementation(project(":spring-boot-cqrs-rabbitmq"))
     implementation(libs.spring.boot4.starter.web)
+    implementation(libs.spring.boot4.starter.amqp)
+    implementation(libs.spring.boot4.starter.validation)
+    implementation(libs.jackson.databind.versioned)
+    implementation(libs.spring.boot4.docker.compose)
     testImplementation(libs.spring.boot4.starter.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
