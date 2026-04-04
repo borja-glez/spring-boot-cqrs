@@ -61,34 +61,6 @@ implementation("com.borjaglez:spring-boot-cqrs-boot4-starter:0.1.0")
 </dependency>
 ```
 
-**Maven**
-
-```xml
-<dependency>
-    <groupId>com.borjaglez</groupId>
-    <artifactId>spring-boot-cqrs-boot3-starter</artifactId>
-    <version>0.1.0</version>
-</dependency>
-```
-
-### Spring Boot 4
-
-**Gradle**
-
-```kotlin
-implementation("com.borjaglez:spring-boot-cqrs-boot4-starter:0.1.0")
-```
-
-**Maven**
-
-```xml
-<dependency>
-    <groupId>com.borjaglez</groupId>
-    <artifactId>spring-boot-cqrs-boot4-starter</artifactId>
-    <version>0.1.0</version>
-</dependency>
-```
-
 ### Minimal Example
 
 **1. Define a command:**

@@ -130,6 +130,42 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
           CI: true
 
+      - name: Update README.md to released version
+        if: steps.validate.outputs.type == 'stable'
+        run: |
+          python <<'PY'
+          import pathlib
+          import re
+
+          version = "${{ inputs.version }}"
+          readme_path = pathlib.Path("README.md")
+          original = readme_path.read_text(encoding="utf-8")
+
+          updated = re.sub(
+              r'(com\.borjaglez:spring-boot-cqrs(?:-[a-z0-9]+)+:)([^"\s)]+)',
+              rf'\g<1>{version}',
+              original,
+          )
+          updated = re.sub(
+              r'(<artifactId>spring-boot-cqrs(?:-[a-z0-9]+)+</artifactId>\s*<version>)([^<]+)(</version>)',
+              rf'\g<1>{version}\g<3>',
+              updated,
+          )
+
+          if updated == original:
+              raise SystemExit("README.md was not updated; expected Maven/Gradle coordinates were not found.")
+
+          readme_path.write_text(updated, encoding="utf-8")
+          PY
+
+      - name: Commit README update
+        if: steps.validate.outputs.type == 'stable'
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: 'README.md'
+          message: 'docs: update README for v${{ inputs.version }}'
+          push: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
