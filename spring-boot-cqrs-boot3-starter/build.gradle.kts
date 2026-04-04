@@ -1,11 +1,12 @@
 plugins {
-    id("cqrs-library-conventions")
+    id("cqrs-boot3-library-conventions")
     id("cqrs-publish-conventions")
     id("cqrs-test-conventions")
 }
 
 dependencies {
     api(project(":spring-boot-cqrs-core"))
+    api(libs.spring.boot.autoconfigure)
 
     compileOnly(libs.spring.boot.starter.validation)
     compileOnly(libs.micrometer.core)
@@ -16,6 +17,7 @@ dependencies {
     annotationProcessor(libs.spring.boot.configuration.processor)
     annotationProcessor(libs.spring.boot.autoconfigure.processor)
 
+    testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.boot.starter.validation)
     testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.observation)
