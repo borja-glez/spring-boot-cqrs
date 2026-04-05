@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.springframework.amqp.core.Declarables;
@@ -8,6 +9,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -17,6 +19,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
@@ -68,9 +71,14 @@ public class RabbitMqQueryBusAutoConfiguration {
       RabbitTemplate rabbitTemplate,
       @Qualifier("cqrsMessageConverter") MessageConverter messageConverter,
       RabbitMqNamingStrategy rabbitNaming,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider,
       @Value("${spring.application.name:cqrs-app}") String appName) {
     RabbitMqQueryConsumer consumer =
-        new RabbitMqQueryConsumer(registry, rabbitTemplate, rabbitNaming);
+        new RabbitMqQueryConsumer(
+            registry,
+            middlewaresProvider.getIfAvailable(Collections::emptyList),
+            rabbitTemplate,
+            rabbitNaming);
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");

@@ -6,6 +6,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
@@ -14,6 +17,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 
@@ -30,7 +34,8 @@ class RabbitMqCommandConsumerTest {
     rabbitTemplate = mock(RabbitTemplate.class);
     namingStrategy = mock(RabbitMqNamingStrategy.class);
     consumer =
-        new RabbitMqCommandConsumer(registry, rabbitTemplate, namingStrategy, "commands", "app");
+        new RabbitMqCommandConsumer(
+            registry, Collections.emptyList(), rabbitTemplate, namingStrategy, "commands", "app");
   }
 
   private Message createMessage(String messageType) {
@@ -118,6 +123,88 @@ class RabbitMqCommandConsumerTest {
 
     Message message = createMessage("command");
     Object result = consumer.consume(message, command);
+
+    assertThat(result).isNull();
+    verify(rabbitTemplate).send("cqrs.commands.retry", "#", message);
+  }
+
+  @Test
+  void consumeShouldExecuteMiddlewareChain() {
+    java.util.concurrent.atomic.AtomicBoolean middlewareCalled =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          middlewareCalled.set(true);
+          return chain.proceed(msg);
+        };
+
+    RabbitMqCommandConsumer consumerWithMiddleware =
+        new RabbitMqCommandConsumer(
+            registry, List.of(middleware), rabbitTemplate, namingStrategy, "commands", "app");
+
+    TestCommand command = new TestCommand("test-data");
+    when(registry.handle(command)).thenReturn("result");
+
+    Message message = createMessage("command_reply");
+    Object result = consumerWithMiddleware.consume(message, command);
+
+    assertThat(result).isEqualTo("result");
+    assertThat(middlewareCalled).isTrue();
+  }
+
+  @Test
+  void consumeShouldWrapCheckedExceptionForCommandReply() {
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          throw new Exception("checked error");
+        };
+
+    RabbitMqCommandConsumer consumerWithMiddleware =
+        new RabbitMqCommandConsumer(
+            registry, List.of(middleware), rabbitTemplate, namingStrategy, "commands", "app");
+
+    TestCommand command = new TestCommand("test-data");
+    Message message = createMessage("command_reply");
+
+    assertThatThrownBy(() -> consumerWithMiddleware.consume(message, command))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
+  void consumeShouldWrapCheckedExceptionForCommandWait() {
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          throw new Exception("checked error");
+        };
+
+    RabbitMqCommandConsumer consumerWithMiddleware =
+        new RabbitMqCommandConsumer(
+            registry, List.of(middleware), rabbitTemplate, namingStrategy, "commands", "app");
+
+    TestCommand command = new TestCommand("test-data");
+    Message message = createMessage("command_wait");
+
+    assertThatThrownBy(() -> consumerWithMiddleware.consume(message, command))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
+  void consumeShouldRetryOnCheckedExceptionForFireAndForget() {
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          throw new Exception("checked error");
+        };
+    when(namingStrategy.exchangeRetry("commands")).thenReturn("cqrs.commands.retry");
+
+    RabbitMqCommandConsumer consumerWithMiddleware =
+        new RabbitMqCommandConsumer(
+            registry, List.of(middleware), rabbitTemplate, namingStrategy, "commands", "app");
+
+    TestCommand command = new TestCommand("test-data");
+    Message message = createMessage("command");
+    Object result = consumerWithMiddleware.consume(message, command);
 
     assertThat(result).isNull();
     verify(rabbitTemplate).send("cqrs.commands.retry", "#", message);

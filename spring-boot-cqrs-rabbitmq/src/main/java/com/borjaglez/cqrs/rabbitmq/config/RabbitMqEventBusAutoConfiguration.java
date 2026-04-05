@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.springframework.amqp.core.Declarables;
@@ -8,6 +9,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -19,6 +21,7 @@ import org.springframework.context.annotation.Bean;
 
 import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
 import com.borjaglez.cqrs.rabbitmq.consumer.RabbitMqEventConsumer;
@@ -75,10 +78,16 @@ public class RabbitMqEventBusAutoConfiguration {
       RabbitTemplate rabbitTemplate,
       @Qualifier("cqrsMessageConverter") MessageConverter messageConverter,
       RabbitMqNamingStrategy rabbitNaming,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider,
       @Value("${spring.application.name:cqrs-app}") String appName) {
     RabbitMqEventConsumer consumer =
         new RabbitMqEventConsumer(
-            registry, rabbitTemplate, rabbitNaming, properties.getEvents().getExchange(), appName);
+            registry,
+            middlewaresProvider.getIfAvailable(Collections::emptyList),
+            rabbitTemplate,
+            rabbitNaming,
+            properties.getEvents().getExchange(),
+            appName);
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");
