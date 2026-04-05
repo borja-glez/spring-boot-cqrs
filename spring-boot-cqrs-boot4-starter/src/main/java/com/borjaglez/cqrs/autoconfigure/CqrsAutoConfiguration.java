@@ -4,12 +4,15 @@ import java.util.Collections;
 import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Role;
+import org.springframework.core.env.Environment;
 
 import com.borjaglez.cqrs.aot.CqrsRuntimeHintsRegistrar;
 import com.borjaglez.cqrs.command.CommandBus;
@@ -33,31 +36,37 @@ public class CqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean
-  public MessageNamingStrategy messageNamingStrategy(CqrsProperties properties) {
-    return new DefaultMessageNamingStrategy(properties.getNaming().getPrefix());
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public static MessageNamingStrategy messageNamingStrategy(Environment environment) {
+    String prefix = environment.getProperty("cqrs.naming.prefix", "");
+    return new DefaultMessageNamingStrategy(prefix);
   }
 
   @Bean
   @ConditionalOnMissingBean
-  public CommandHandlerRegistry commandHandlerRegistry() {
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public static CommandHandlerRegistry commandHandlerRegistry() {
     return new CommandHandlerRegistry();
   }
 
   @Bean
   @ConditionalOnMissingBean
-  public EventHandlerRegistry eventHandlerRegistry() {
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public static EventHandlerRegistry eventHandlerRegistry() {
     return new EventHandlerRegistry();
   }
 
   @Bean
   @ConditionalOnMissingBean
-  public QueryHandlerRegistry queryHandlerRegistry() {
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public static QueryHandlerRegistry queryHandlerRegistry() {
     return new QueryHandlerRegistry();
   }
 
   @Bean
   @ConditionalOnMissingBean
-  public BeanPostProcessorHandlerDiscoverer beanPostProcessorHandlerDiscoverer(
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public static BeanPostProcessorHandlerDiscoverer beanPostProcessorHandlerDiscoverer(
       CommandHandlerRegistry commandHandlerRegistry,
       EventHandlerRegistry eventHandlerRegistry,
       QueryHandlerRegistry queryHandlerRegistry,

@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: multi-service-notification
+  docker:
+    compose:
+      file: examples/multi-service/order-service/compose.yml
+      lifecycle-management: start-only
+  rabbitmq:
+    host: localhost
+    port: 5672
+
+server:
+  port: 8092
+
+cqrs:
+  naming:
+    prefix: ecommerce
+  rabbitmq:
+    enabled: true
+    prefix: ecommerce
+    commands:
+      exchange: commands
+      concurrent-consumers: 5
+    events:
+      exchange: events
+      concurrent-consumers: 5
+    queries:
+      exchange: queries
+      concurrent-consumers: 5

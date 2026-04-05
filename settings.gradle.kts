@@ -25,5 +25,9 @@ include(
     ":examples:example-basic",
     ":examples:example-rabbitmq",
     ":examples:example-middleware",
-    ":examples:boot4-demo"
+    ":examples:boot4-demo",
+    ":examples:multi-service:shared",
+    ":examples:multi-service:order-service",
+    ":examples:multi-service:inventory-service",
+    ":examples:multi-service:notification-service"
 )

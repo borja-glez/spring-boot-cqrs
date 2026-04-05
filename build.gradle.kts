@@ -61,7 +61,11 @@ tasks.register("spotlessCheckAll") {
         ":examples:example-basic:spotlessCheck",
         ":examples:example-rabbitmq:spotlessCheck",
         ":examples:example-middleware:spotlessCheck",
-        ":examples:boot4-demo:spotlessCheck"
+        ":examples:boot4-demo:spotlessCheck",
+        ":examples:multi-service:shared:spotlessCheck",
+        ":examples:multi-service:order-service:spotlessCheck",
+        ":examples:multi-service:inventory-service:spotlessCheck",
+        ":examples:multi-service:notification-service:spotlessCheck"
     )
 }
 
@@ -76,6 +80,10 @@ tasks.register("spotlessApplyAll") {
         ":examples:example-basic:spotlessApply",
         ":examples:example-rabbitmq:spotlessApply",
         ":examples:example-middleware:spotlessApply",
-        ":examples:boot4-demo:spotlessApply"
+        ":examples:boot4-demo:spotlessApply",
+        ":examples:multi-service:shared:spotlessApply",
+        ":examples:multi-service:order-service:spotlessApply",
+        ":examples:multi-service:inventory-service:spotlessApply",
+        ":examples:multi-service:notification-service:spotlessApply"
     )
 }

@@ -1,0 +1,336 @@
+{
+  "info": {
+    "name": "CQRS Multi-Service Demo",
+    "description": "Test collection for the spring-boot-cqrs multi-service example (Spring Boot 4).\n\nRequires RabbitMQ running. Start all 3 services:\n\n./gradlew :examples:multi-service:order-service:bootRun\n./gradlew :examples:multi-service:inventory-service:bootRun\n./gradlew :examples:multi-service:notification-service:bootRun\n\nDemonstrates cross-service CQRS with commands, events, and queries over RabbitMQ.\n\nFlows:\n- Cross-service QUERY: Order Service queries stock from Inventory Service\n- Cross-service COMMAND: Order Service sends ReserveInventoryCommand to Inventory Service\n- Cross-service EVENTS: OrderPlacedEvent, InventoryReservedEvent, InventoryRejectedEvent fan out to multiple services\n- AggregateRoot: Order uses record() and pullEvents() for domain event sourcing\n- Validation middleware: PlaceOrderCommand validated with JSR-380\n- Custom middleware: LoggingMiddleware in Order Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "orderBaseUrl", "value": "http://localhost:8090", "type": "string" },
+    { "key": "inventoryBaseUrl", "value": "http://localhost:8091", "type": "string" },
+    { "key": "notificationBaseUrl", "value": "http://localhost:8092", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Setup - Verify pre-seeded inventory",
+      "item": [
+        {
+          "name": "Get LAPTOP-001 stock",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock is 10', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.productId).to.eql('LAPTOP-001');",
+            "    pm.expect(body.productName).to.eql('Gaming Laptop');",
+            "    pm.expect(body.availableStock).to.eql(10);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/LAPTOP-001"
+          }
+        },
+        {
+          "name": "Get KEYBOARD-001 stock",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock is 50', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.productId).to.eql('KEYBOARD-001');",
+            "    pm.expect(body.availableStock).to.eql(50);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/KEYBOARD-001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Cross-service QUERY - Check stock from Order Service",
+      "description": "Order Service sends GetProductStockQuery via RabbitMQ to Inventory Service and receives the response via RPC.",
+      "item": [
+        {
+          "name": "Check LAPTOP-001 stock via Order Service",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns stock from Inventory Service via RabbitMQ', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.productId).to.eql('LAPTOP-001');",
+            "    pm.expect(body.productName).to.eql('Gaming Laptop');",
+            "    pm.expect(body.availableStock).to.eql(10);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{orderBaseUrl}}/api/orders/stock/LAPTOP-001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Place order - SUCCESS flow (command + event cross-service)",
+      "description": "POST /api/orders triggers:\n1. PlaceOrderCommand handled locally (AggregateRoot creates Order, records OrderPlacedEvent)\n2. OrderPlacedEvent published cross-service via RabbitMQ → Inventory + Notification receive it\n3. ReserveInventoryCommand sent cross-service via RabbitMQ → Inventory Service reserves stock\n4. InventoryReservedEvent published cross-service → Order confirms, Notification records it",
+      "item": [
+        {
+          "name": "Place order for LAPTOP-001 (triggers cross-service command + events)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns order ID', () => {",
+            "    const id = pm.response.text();",
+            "    pm.expect(id).to.be.a('string').and.not.be.empty;",
+            "    pm.collectionVariables.set('orderId1', id);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{orderBaseUrl}}/api/orders",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"LAPTOP-001\",\n  \"quantity\": 2,\n  \"customerEmail\": \"test@example.com\"\n}" }
+          }
+        },
+        {
+          "name": "Verify stock decreased (cross-service command worked)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock decreased to 8', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.availableStock).to.eql(8);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/LAPTOP-001"
+          }
+        },
+        {
+          "name": "Verify order is CONFIRMED (cross-service event received)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": [
+              "// Brief wait for async event processing via RabbitMQ",
+              "setTimeout(() => {}, 1500);"
+            ]}},
+            { "listen": "test", "script": { "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Order is CONFIRMED', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.status).to.eql('CONFIRMED');",
+              "    pm.expect(body.productId).to.eql('LAPTOP-001');",
+              "    pm.expect(body.quantity).to.eql(2);",
+              "});"
+            ]}}
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{orderBaseUrl}}/api/orders/{{orderId1}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Check notifications (cross-service events received)",
+      "item": [
+        {
+          "name": "Get all notifications",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Contains ORDER_PLACED notification', () => {",
+            "    const body = pm.response.json();",
+            "    const orderPlaced = body.find(n => n.type === 'ORDER_PLACED');",
+            "    pm.expect(orderPlaced).to.not.be.undefined;",
+            "});",
+            "pm.test('Contains INVENTORY_RESERVED notification', () => {",
+            "    const body = pm.response.json();",
+            "    const reserved = body.find(n => n.type === 'INVENTORY_RESERVED');",
+            "    pm.expect(reserved).to.not.be.undefined;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{notificationBaseUrl}}/api/notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Place order - REJECTION flow (insufficient stock)",
+      "description": "Same flow as success, but Inventory Service rejects due to insufficient stock.\nOrder transitions to REJECTED via cross-service InventoryRejectedEvent.",
+      "item": [
+        {
+          "name": "Place order for KEYBOARD-001 (quantity exceeds stock)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns order ID', () => {",
+            "    const id = pm.response.text();",
+            "    pm.expect(id).to.be.a('string').and.not.be.empty;",
+            "    pm.collectionVariables.set('orderId2', id);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{orderBaseUrl}}/api/orders",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"KEYBOARD-001\",\n  \"quantity\": 100,\n  \"customerEmail\": \"reject@test.com\"\n}" }
+          }
+        },
+        {
+          "name": "Verify order is REJECTED",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": [
+              "setTimeout(() => {}, 1500);"
+            ]}},
+            { "listen": "test", "script": { "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Order is REJECTED', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.status).to.eql('REJECTED');",
+              "});"
+            ]}}
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{orderBaseUrl}}/api/orders/{{orderId2}}"
+          }
+        },
+        {
+          "name": "Verify KEYBOARD-001 stock unchanged",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock unchanged at 50', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.availableStock).to.eql(50);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/KEYBOARD-001"
+          }
+        },
+        {
+          "name": "Verify INVENTORY_REJECTED notification",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Contains INVENTORY_REJECTED notification', () => {",
+            "    const body = pm.response.json();",
+            "    const rejected = body.find(n => n.type === 'INVENTORY_REJECTED');",
+            "    pm.expect(rejected).to.not.be.undefined;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{notificationBaseUrl}}/api/notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Cross-service COMMAND with sync response (dispatchAndReceive)",
+      "description": "Demonstrates dispatchAndReceive() via RabbitMQ RPC.\nOrder Service sends ReserveInventoryCommand to Inventory Service and waits for the synchronous RESERVED/REJECTED response.",
+      "item": [
+        {
+          "name": "Reserve MONITOR-001 via Order Service (sync cross-service command)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns RESERVED from Inventory Service', () => {",
+            "    pm.expect(pm.response.text()).to.eql('RESERVED');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{orderBaseUrl}}/api/orders/order-sync-test/reserve",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"MONITOR-001\",\n  \"quantity\": 1\n}" }
+          }
+        },
+        {
+          "name": "Verify MONITOR-001 stock decreased",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock decreased to 4', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.availableStock).to.eql(4);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/MONITOR-001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Validation middleware",
+      "description": "PlaceOrderCommand uses @NotBlank, @Min, @Email annotations.\nCommandValidationInterceptor (built-in middleware) validates before the handler runs.",
+      "item": [
+        {
+          "name": "Place order with invalid data (400)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 - validation error', () => {",
+            "    pm.response.to.have.status(400);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{orderBaseUrl}}/api/orders",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"\",\n  \"quantity\": 0,\n  \"customerEmail\": \"invalid\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Add product (local command in Inventory Service)",
+      "item": [
+        {
+          "name": "Add MOUSE-001 product",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Returns product ID', () => {",
+            "    pm.expect(pm.response.text()).to.eql('MOUSE-001');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"MOUSE-001\",\n  \"name\": \"Wireless Mouse\",\n  \"initialStock\": 25\n}" }
+          }
+        },
+        {
+          "name": "Verify MOUSE-001 stock",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock is 25', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.productId).to.eql('MOUSE-001');",
+            "    pm.expect(body.availableStock).to.eql(25);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/MOUSE-001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. List all orders",
+      "item": [
+        {
+          "name": "Get all orders",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array with orders', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body).to.be.an('array').and.have.length.at.least(2);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{orderBaseUrl}}/api/orders"
+          }
+        }
+      ]
+    }
+  ]
+}
