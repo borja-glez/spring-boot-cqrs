@@ -1,5 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq;
 
+import org.springframework.core.ParameterizedTypeReference;
+
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.CommandBus;
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
@@ -52,6 +54,21 @@ public class RabbitMqCommandBus implements CommandBus {
     String routingKey = messageNaming.commandName(command.getClass());
     try {
       return (R) publisher.publishAndReceive(exchange, routingKey, command, "command_reply");
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new CommandHandlerExecutionException(e);
+    }
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <R> R dispatchAndReceive(Command command, ParameterizedTypeReference<R> responseType) {
+    String exchange = rabbitNaming.exchange(exchangeName);
+    String routingKey = messageNaming.commandName(command.getClass());
+    try {
+      return (R)
+          publisher.publishAndReceive(exchange, routingKey, command, "command_reply", responseType);
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {

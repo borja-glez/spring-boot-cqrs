@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.example.multiservice.order.controller;
 
 import java.util.List;
 
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -93,6 +94,38 @@ public class OrderController {
     remoteCommandBus.dispatchAndWait(
         new ReserveInventoryCommand(id, request.productId(), request.quantity()));
     return ResponseEntity.ok().build();
+  }
+
+  @GetMapping("/typed")
+  public ResponseEntity<List<Order>> getAllOrdersTyped() {
+    // Typed query: ParameterizedTypeReference preserves generic type for deserialization
+    List<Order> orders =
+        localQueryBus.ask(
+            new GetAllOrdersQuery(), new ParameterizedTypeReference<List<Order>>() {});
+    return ResponseEntity.ok(orders);
+  }
+
+  @GetMapping("/stock/{productId}/typed")
+  public ResponseEntity<ProductStockDto> checkStockTyped(@PathVariable String productId) {
+    // Cross-service typed query: ParameterizedTypeReference ensures correct deserialization over
+    // RabbitMQ
+    ProductStockDto stock =
+        remoteQueryBus.ask(
+            new GetProductStockQuery(productId),
+            new ParameterizedTypeReference<ProductStockDto>() {});
+    return ResponseEntity.ok(stock);
+  }
+
+  @PostMapping("/{id}/reserve/typed")
+  public ResponseEntity<String> reserveInventoryTyped(
+      @PathVariable String id, @RequestBody ReserveRequest request) {
+    // Cross-service typed command: ParameterizedTypeReference ensures correct deserialization over
+    // RabbitMQ
+    String result =
+        remoteCommandBus.dispatchAndReceive(
+            new ReserveInventoryCommand(id, request.productId(), request.quantity()),
+            new ParameterizedTypeReference<String>() {});
+    return ResponseEntity.ok(result);
   }
 
   public record PlaceOrderRequest(String productId, int quantity, String customerEmail) {}

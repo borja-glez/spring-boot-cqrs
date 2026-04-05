@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -127,6 +128,55 @@ class RabbitMqCommandBusTest {
             });
 
     assertThatThrownBy(() -> commandBus.dispatchAndReceive(command))
+        .isInstanceOf(CommandHandlerExecutionException.class)
+        .hasCause(checkedException);
+  }
+
+  @Test
+  void dispatchAndReceiveWithTypeShouldPassTypeToPublisher() {
+    TestCommand command = new TestCommand("test-data");
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
+    when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
+    when(publisher.publishAndReceive(
+            "cqrs.commands", "test.order.create", command, "command_reply", typeRef))
+        .thenReturn("typed-result");
+
+    String result = commandBus.dispatchAndReceive(command, typeRef);
+
+    assertThat(result).isEqualTo("typed-result");
+  }
+
+  @Test
+  void dispatchAndReceiveWithTypeShouldRethrowRuntimeException() {
+    TestCommand command = new TestCommand("test-data");
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
+    when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
+    when(publisher.publishAndReceive(
+            "cqrs.commands", "test.order.create", command, "command_reply", typeRef))
+        .thenThrow(new RuntimeException("remote error"));
+
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, typeRef))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("remote error");
+  }
+
+  @Test
+  void dispatchAndReceiveWithTypeShouldWrapCheckedException() {
+    TestCommand command = new TestCommand("test-data");
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
+    when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
+    Exception checkedException = new Exception("checked error");
+    when(publisher.publishAndReceive(
+            "cqrs.commands", "test.order.create", command, "command_reply", typeRef))
+        .thenAnswer(
+            invocation -> {
+              throw checkedException;
+            });
+
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, typeRef))
         .isInstanceOf(CommandHandlerExecutionException.class)
         .hasCause(checkedException);
   }

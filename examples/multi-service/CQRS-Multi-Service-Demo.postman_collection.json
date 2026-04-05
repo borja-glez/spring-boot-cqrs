@@ -366,6 +366,57 @@
           }
         }
       ]
+    },
+    {
+      "name": "11. Typed queries (ParameterizedTypeReference)",
+      "description": "Demonstrates typed bus methods using ParameterizedTypeReference.\nThese endpoints use the overloaded ask() and dispatchAndReceive() methods that accept a ParameterizedTypeReference<R> parameter, ensuring correct generic type deserialization over RabbitMQ.",
+      "item": [
+        {
+          "name": "Get all orders (typed local query)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array with orders (typed)', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body).to.be.an('array').and.have.length.at.least(2);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{orderBaseUrl}}/api/orders/typed"
+          }
+        },
+        {
+          "name": "Check stock via Order Service (typed cross-service query)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns stock from Inventory Service via typed RabbitMQ query', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.productId).to.eql('LAPTOP-001');",
+            "    pm.expect(body.productName).to.eql('Gaming Laptop');",
+            "    pm.expect(body.availableStock).to.be.a('number');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{orderBaseUrl}}/api/orders/stock/LAPTOP-001/typed"
+          }
+        },
+        {
+          "name": "Reserve MONITOR-001 (typed cross-service command)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns RESERVED from Inventory Service (typed)', () => {",
+            "    pm.expect(pm.response.text()).to.eql('RESERVED');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{orderBaseUrl}}/api/orders/order-typed-test/reserve/typed",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"MONITOR-001\",\n  \"quantity\": 1\n}" }
+          }
+        }
+      ]
     }
   ]
 }

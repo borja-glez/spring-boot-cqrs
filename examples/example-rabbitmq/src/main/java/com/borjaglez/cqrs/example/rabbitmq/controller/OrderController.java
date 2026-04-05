@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.example.rabbitmq.controller;
 
 import java.util.List;
 
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,6 +62,14 @@ public class OrderController {
   @GetMapping
   public ResponseEntity<List<Order>> getAllOrders() {
     List<Order> orders = queryBus.ask(new GetAllOrdersQuery());
+    return ResponseEntity.ok(orders);
+  }
+
+  @GetMapping("/typed")
+  public ResponseEntity<List<Order>> getAllOrdersTyped() {
+    // Typed query: ParameterizedTypeReference preserves generic type for deserialization
+    List<Order> orders =
+        queryBus.ask(new GetAllOrdersQuery(), new ParameterizedTypeReference<List<Order>>() {});
     return ResponseEntity.ok(orders);
   }
 

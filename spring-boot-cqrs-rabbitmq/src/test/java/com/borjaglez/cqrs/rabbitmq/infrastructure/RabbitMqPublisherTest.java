@@ -17,6 +17,8 @@ import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.amqp.support.converter.SmartMessageConverter;
+import org.springframework.core.ParameterizedTypeReference;
 
 class RabbitMqPublisherTest {
 
@@ -142,5 +144,121 @@ class RabbitMqPublisherTest {
     Message message = MessageBuilder.withBody("data".getBytes()).andProperties(props).build();
 
     publisher.checkError(message); // should not throw
+  }
+
+  @Test
+  void publishAndReceiveWithTypeReferenceShouldUseSmartConverter() {
+    SmartMessageConverter converter = mock(SmartMessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+
+    MessageProperties requestProps = new MessageProperties();
+    Message requestMessage =
+        MessageBuilder.withBody("request".getBytes()).andProperties(requestProps).build();
+    when(converter.toMessage(any(), any())).thenReturn(requestMessage);
+
+    MessageProperties replyProps = new MessageProperties();
+    Message replyMessage =
+        MessageBuilder.withBody("reply".getBytes()).andProperties(replyProps).build();
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any())).thenReturn(replyMessage);
+
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    when(converter.fromMessage(replyMessage, typeRef)).thenReturn("typed-result");
+
+    Object result = publisher.publishAndReceive("exchange", "key", "payload", "query", typeRef);
+
+    assertThat(result).isEqualTo("typed-result");
+    verify(converter).fromMessage(replyMessage, typeRef);
+  }
+
+  @Test
+  void publishAndReceiveWithTypeReferenceFallsBackWhenNotSmart() {
+    MessageConverter converter = mock(MessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+
+    MessageProperties requestProps = new MessageProperties();
+    Message requestMessage =
+        MessageBuilder.withBody("request".getBytes()).andProperties(requestProps).build();
+    when(converter.toMessage(any(), any())).thenReturn(requestMessage);
+
+    MessageProperties replyProps = new MessageProperties();
+    Message replyMessage =
+        MessageBuilder.withBody("reply".getBytes()).andProperties(replyProps).build();
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any())).thenReturn(replyMessage);
+
+    when(converter.fromMessage(replyMessage)).thenReturn("fallback-result");
+
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    Object result = publisher.publishAndReceive("exchange", "key", "payload", "query", typeRef);
+
+    assertThat(result).isEqualTo("fallback-result");
+    verify(converter).fromMessage(replyMessage);
+  }
+
+  @Test
+  void publishAndReceiveWithNullTypeReferenceShouldFallBack() {
+    SmartMessageConverter converter = mock(SmartMessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+
+    MessageProperties requestProps = new MessageProperties();
+    Message requestMessage =
+        MessageBuilder.withBody("request".getBytes()).andProperties(requestProps).build();
+    when(converter.toMessage(any(), any())).thenReturn(requestMessage);
+
+    MessageProperties replyProps = new MessageProperties();
+    Message replyMessage =
+        MessageBuilder.withBody("reply".getBytes()).andProperties(replyProps).build();
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any())).thenReturn(replyMessage);
+
+    when(converter.fromMessage(replyMessage)).thenReturn("untyped-result");
+
+    Object result = publisher.publishAndReceive("exchange", "key", "payload", "query", null);
+
+    assertThat(result).isEqualTo("untyped-result");
+    verify(converter).fromMessage(replyMessage);
+  }
+
+  @Test
+  void publishAndReceiveWithTypeReferenceShouldReturnNullWhenNoReply() {
+    MessageConverter converter = mock(MessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+
+    MessageProperties requestProps = new MessageProperties();
+    Message requestMessage =
+        MessageBuilder.withBody("request".getBytes()).andProperties(requestProps).build();
+    when(converter.toMessage(any(), any())).thenReturn(requestMessage);
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any(Message.class)))
+        .thenReturn(null);
+
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    Object result = publisher.publishAndReceive("exchange", "key", "payload", "query", typeRef);
+
+    assertThat(result).isNull();
+  }
+
+  @Test
+  void publishAndReceiveWithTypeReferenceShouldThrowOnErrorReply() {
+    MessageConverter converter = mock(MessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+
+    MessageProperties requestProps = new MessageProperties();
+    Message requestMessage =
+        MessageBuilder.withBody("request".getBytes()).andProperties(requestProps).build();
+    when(converter.toMessage(any(), any())).thenReturn(requestMessage);
+
+    MessageProperties replyProps = new MessageProperties();
+    replyProps.setHeader("cqrs.error", true);
+    Message errorReply =
+        MessageBuilder.withBody("Something went wrong".getBytes())
+            .andProperties(replyProps)
+            .build();
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any(Message.class)))
+        .thenReturn(errorReply);
+
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    assertThatThrownBy(
+            () ->
+                publisher.publishAndReceive("exchange", "key", "payload", "command_reply", typeRef))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("Remote handler error: Something went wrong");
   }
 }

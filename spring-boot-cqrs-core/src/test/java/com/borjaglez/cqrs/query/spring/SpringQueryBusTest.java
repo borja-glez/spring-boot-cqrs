@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.fixtures.TestQuery;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
@@ -74,5 +75,17 @@ class SpringQueryBusTest {
     assertThatThrownBy(() -> bus.ask(new TestQuery("data")))
         .isInstanceOf(QueryHandlerExecutionException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
+  void askWithTypeReferenceDelegatesToUntyped() {
+    QueryHandlerRegistry registry = mock(QueryHandlerRegistry.class);
+    TestQuery query = new TestQuery("data");
+    when(registry.handle(query)).thenReturn("answer");
+
+    SpringQueryBus bus = new SpringQueryBus(registry, List.of());
+    String result = bus.ask(query, new ParameterizedTypeReference<String>() {});
+
+    assertThat(result).isEqualTo("answer");
   }
 }

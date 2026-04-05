@@ -1,5 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq;
 
+import org.springframework.core.ParameterizedTypeReference;
+
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.QueryBus;
@@ -32,6 +34,20 @@ public class RabbitMqQueryBus implements QueryBus {
     String routingKey = messageNaming.queryName(query.getClass());
     try {
       return (R) publisher.publishAndReceive(exchange, routingKey, query, "query");
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new QueryHandlerExecutionException(e);
+    }
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <R> R ask(Query query, ParameterizedTypeReference<R> responseType) {
+    String exchange = rabbitNaming.exchange(exchangeName);
+    String routingKey = messageNaming.queryName(query.getClass());
+    try {
+      return (R) publisher.publishAndReceive(exchange, routingKey, query, "query", responseType);
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {

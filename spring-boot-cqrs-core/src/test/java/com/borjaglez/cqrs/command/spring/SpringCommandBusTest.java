@@ -11,6 +11,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
@@ -154,5 +155,17 @@ class SpringCommandBusTest {
     assertThatThrownBy(() -> bus.dispatchAndReceive(new TestCommand("data")))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("runtime");
+  }
+
+  @Test
+  void dispatchAndReceiveWithTypeReferenceDelegatesToUntyped() {
+    CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
+    TestCommand command = new TestCommand("data");
+    when(registry.handle(command)).thenReturn("result");
+
+    SpringCommandBus bus = new SpringCommandBus(registry, List.of());
+    String result = bus.dispatchAndReceive(command, new ParameterizedTypeReference<String>() {});
+
+    assertThat(result).isEqualTo("result");
   }
 }

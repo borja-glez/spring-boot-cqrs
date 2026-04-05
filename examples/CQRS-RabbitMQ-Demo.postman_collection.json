@@ -151,6 +151,23 @@
           "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId2}}" }
         }
       ]
+    },
+    {
+      "name": "Typed query (ParameterizedTypeReference)",
+      "description": "Demonstrates typed query using ParameterizedTypeReference to preserve generic type info during RabbitMQ deserialization.",
+      "item": [
+        {
+          "name": "Get all orders (typed)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array with 2 orders (typed)', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data).to.be.an('array').with.lengthOf(2);",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/typed" }
+        }
+      ]
     }
   ]
 }
