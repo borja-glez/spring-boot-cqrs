@@ -259,7 +259,42 @@
       ]
     },
     {
-      "name": "7. Validation middleware",
+      "name": "7. Cross-service COMMAND with dispatchAndWait (no return value)",
+      "description": "Demonstrates dispatchAndWait() via RabbitMQ RPC.\nOrder Service sends ReserveInventoryCommand to Inventory Service and waits for handler completion, but discards the return value.\nUseful when the caller needs to know if the command succeeded (to handle exceptions) but doesn't need the result.",
+      "item": [
+        {
+          "name": "Reserve MONITOR-001 via Order Service (dispatchAndWait)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Empty response body (dispatchAndWait returns no content)', () => {",
+            "    pm.expect(pm.response.text()).to.be.empty;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{orderBaseUrl}}/api/orders/order-wait-test/reserve-and-wait",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"MONITOR-001\",\n  \"quantity\": 1\n}" }
+          }
+        },
+        {
+          "name": "Verify MONITOR-001 stock decreased",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Stock decreased to 3', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.availableStock).to.eql(3);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{inventoryBaseUrl}}/api/inventory/products/MONITOR-001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Validation middleware",
       "description": "PlaceOrderCommand uses @NotBlank, @Min, @Email annotations.\nCommandValidationInterceptor (built-in middleware) validates before the handler runs.",
       "item": [
         {
@@ -279,7 +314,7 @@
       ]
     },
     {
-      "name": "8. Add product (local command in Inventory Service)",
+      "name": "9. Add product (local command in Inventory Service)",
       "item": [
         {
           "name": "Add MOUSE-001 product",
@@ -314,7 +349,7 @@
       ]
     },
     {
-      "name": "9. List all orders",
+      "name": "10. List all orders",
       "item": [
         {
           "name": "Get all orders",

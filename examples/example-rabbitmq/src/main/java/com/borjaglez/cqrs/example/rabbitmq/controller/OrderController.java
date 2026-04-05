@@ -46,6 +46,12 @@ public class OrderController {
     return ResponseEntity.ok().build();
   }
 
+  @PutMapping("/{id}/confirm-and-wait")
+  public ResponseEntity<Void> confirmOrderAndWait(@PathVariable String id) {
+    commandBus.dispatchAndWait(new ConfirmOrderCommand(id));
+    return ResponseEntity.ok().build();
+  }
+
   @GetMapping("/{id}")
   public ResponseEntity<Order> getOrder(@PathVariable String id) {
     Order order = queryBus.ask(new GetOrderQuery(id));

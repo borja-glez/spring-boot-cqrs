@@ -184,6 +184,9 @@ class CqrsAutoConfigurationTest {
     public void dispatch(Command command) {}
 
     @Override
+    public void dispatchAndWait(Command command) {}
+
+    @Override
     public <R> R dispatchAndReceive(Command command) {
       return null;
     }

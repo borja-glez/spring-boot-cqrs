@@ -95,7 +95,7 @@
       ]
     },
     {
-      "name": "Confirm order (command + event)",
+      "name": "Confirm order (dispatch - fire and forget)",
       "item": [
         {
           "name": "Confirm first order",
@@ -122,6 +122,30 @@
             "pm.test('Status 200', () => pm.response.to.have.status(200));",
             "pm.test('Second order still PENDING', () => {",
             "    pm.expect(pm.response.json().status).to.eql('PENDING');",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId2}}" }
+        }
+      ]
+    },
+    {
+      "name": "Confirm order (dispatchAndWait - wait for handler completion)",
+      "item": [
+        {
+          "name": "Confirm second order (dispatchAndWait)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": { "method": "PUT", "url": "{{baseUrl}}/api/orders/{{orderId2}}/confirm-and-wait" }
+        },
+        {
+          "name": "Verify second order is confirmed",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Order status is CONFIRMED', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.status).to.eql('CONFIRMED');",
+            "    pm.expect(data.product).to.eql('Monitor');",
             "});"
           ]}}],
           "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId2}}" }

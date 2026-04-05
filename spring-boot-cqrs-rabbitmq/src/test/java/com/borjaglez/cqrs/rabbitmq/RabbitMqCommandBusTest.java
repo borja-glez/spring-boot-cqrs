@@ -42,6 +42,50 @@ class RabbitMqCommandBusTest {
   }
 
   @Test
+  void dispatchAndWaitShouldPublishWithCommandWaitType() {
+    TestCommand command = new TestCommand("test-data");
+    when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
+    when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
+    when(publisher.publishAndReceive("cqrs.commands", "test.order.create", command, "command_wait"))
+        .thenReturn("");
+
+    commandBus.dispatchAndWait(command);
+
+    verify(publisher)
+        .publishAndReceive("cqrs.commands", "test.order.create", command, "command_wait");
+  }
+
+  @Test
+  void dispatchAndWaitShouldRethrowRuntimeException() {
+    TestCommand command = new TestCommand("test-data");
+    when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
+    when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
+    when(publisher.publishAndReceive("cqrs.commands", "test.order.create", command, "command_wait"))
+        .thenThrow(new RuntimeException("remote error"));
+
+    assertThatThrownBy(() -> commandBus.dispatchAndWait(command))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("remote error");
+  }
+
+  @Test
+  void dispatchAndWaitShouldWrapCheckedExceptionInCommandHandlerExecutionException() {
+    TestCommand command = new TestCommand("test-data");
+    when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
+    when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
+    Exception checkedException = new Exception("checked error");
+    when(publisher.publishAndReceive("cqrs.commands", "test.order.create", command, "command_wait"))
+        .thenAnswer(
+            invocation -> {
+              throw checkedException;
+            });
+
+    assertThatThrownBy(() -> commandBus.dispatchAndWait(command))
+        .isInstanceOf(CommandHandlerExecutionException.class)
+        .hasCause(checkedException);
+  }
+
+  @Test
   void dispatchAndReceiveShouldReturnResult() {
     TestCommand command = new TestCommand("test-data");
     when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");

@@ -85,6 +85,16 @@ public class OrderController {
     return ResponseEntity.ok(result);
   }
 
+  @PostMapping("/{id}/reserve-and-wait")
+  public ResponseEntity<Void> reserveInventoryAndWait(
+      @PathVariable String id, @RequestBody ReserveRequest request) {
+    // Cross-service command: waits for completion but ignores return value (dispatchAndWait via
+    // RabbitMQ RPC)
+    remoteCommandBus.dispatchAndWait(
+        new ReserveInventoryCommand(id, request.productId(), request.quantity()));
+    return ResponseEntity.ok().build();
+  }
+
   public record PlaceOrderRequest(String productId, int quantity, String customerEmail) {}
 
   public record ReserveRequest(String productId, int quantity) {}

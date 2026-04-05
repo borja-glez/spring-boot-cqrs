@@ -4,5 +4,7 @@ public interface CommandBus {
 
   void dispatch(Command command);
 
+  void dispatchAndWait(Command command);
+
   <R> R dispatchAndReceive(Command command);
 }

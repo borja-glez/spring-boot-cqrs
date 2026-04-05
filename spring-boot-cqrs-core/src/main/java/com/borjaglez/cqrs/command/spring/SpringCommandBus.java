@@ -38,6 +38,11 @@ public class SpringCommandBus implements CommandBus {
   }
 
   @Override
+  public void dispatchAndWait(Command command) {
+    dispatch(command);
+  }
+
+  @Override
   @SuppressWarnings("unchecked")
   public <R> R dispatchAndReceive(Command command) {
     try {

@@ -96,7 +96,7 @@
       ]
     },
     {
-      "name": "Complete task (command)",
+      "name": "Complete task (dispatch - fire and forget)",
       "item": [
         {
           "name": "Complete first task",
@@ -127,6 +127,34 @@
             "pm.test('Status 200', () => pm.response.to.have.status(200));",
             "pm.test('Second task still not completed', () => {",
             "    pm.expect(pm.response.json().completed).to.be.false;",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId2}}" }
+        }
+      ]
+    },
+    {
+      "name": "Complete task (dispatchAndWait - wait for handler completion)",
+      "item": [
+        {
+          "name": "Complete second task (dispatchAndWait)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns success message', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.message).to.eql('Task completed successfully');",
+            "});"
+          ]}}],
+          "request": { "method": "PUT", "url": "{{baseUrl}}/api/tasks/{{taskId2}}/complete-and-wait" }
+        },
+        {
+          "name": "Verify second task is completed",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Task is now completed', () => {",
+            "    const data = pm.response.json();",
+            "    pm.expect(data.completed).to.be.true;",
+            "    pm.expect(data.title).to.eql('Write report');",
             "});"
           ]}}],
           "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId2}}" }

@@ -33,6 +33,19 @@ public class RabbitMqCommandBus implements CommandBus {
   }
 
   @Override
+  public void dispatchAndWait(Command command) {
+    String exchange = rabbitNaming.exchange(exchangeName);
+    String routingKey = messageNaming.commandName(command.getClass());
+    try {
+      publisher.publishAndReceive(exchange, routingKey, command, "command_wait");
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new CommandHandlerExecutionException(e);
+    }
+  }
+
+  @Override
   @SuppressWarnings("unchecked")
   public <R> R dispatchAndReceive(Command command) {
     String exchange = rabbitNaming.exchange(exchangeName);

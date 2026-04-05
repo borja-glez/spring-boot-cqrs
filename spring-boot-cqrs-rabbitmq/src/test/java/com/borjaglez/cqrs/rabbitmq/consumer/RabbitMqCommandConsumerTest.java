@@ -77,7 +77,7 @@ class RabbitMqCommandConsumerTest {
     Message message = createMessage("command_wait");
     Object result = consumer.consume(message, command);
 
-    assertThat(result).isEqualTo("OK");
+    assertThat(result).isEqualTo("");
   }
 
   @Test

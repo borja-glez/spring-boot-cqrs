@@ -46,7 +46,7 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
         return result;
       }
       if ("command_wait".equals(messageType)) {
-        return "OK";
+        return "";
       }
       return null;
     } catch (RuntimeException e) {

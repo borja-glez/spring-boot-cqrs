@@ -32,6 +32,45 @@ class SpringCommandBusTest {
   }
 
   @Test
+  void dispatchAndWaitCallsRegistry() {
+    CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
+    SpringCommandBus bus = new SpringCommandBus(registry, List.of());
+
+    TestCommand command = new TestCommand("data");
+    bus.dispatchAndWait(command);
+
+    verify(registry).handle(command);
+  }
+
+  @Test
+  void dispatchAndWaitRuntimeExceptionPropagated() {
+    CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
+    when(registry.handle(any())).thenThrow(new IllegalArgumentException("bad"));
+
+    SpringCommandBus bus = new SpringCommandBus(registry, List.of());
+
+    assertThatThrownBy(() -> bus.dispatchAndWait(new TestCommand("data")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("bad");
+  }
+
+  @Test
+  void dispatchAndWaitCheckedExceptionWrapped() {
+    CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
+
+    BusMiddleware throwingMiddleware =
+        (msg, chain) -> {
+          throw new Exception("checked");
+        };
+
+    SpringCommandBus bus = new SpringCommandBus(registry, List.of(throwingMiddleware));
+
+    assertThatThrownBy(() -> bus.dispatchAndWait(new TestCommand("data")))
+        .isInstanceOf(CommandHandlerExecutionException.class)
+        .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
   void dispatchAndReceiveReturnsResult() {
     CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
     TestCommand command = new TestCommand("data");

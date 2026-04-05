@@ -48,6 +48,12 @@ public class TaskController {
     return ResponseEntity.ok(Map.of("message", "Task completed successfully"));
   }
 
+  @PutMapping("/{id}/complete-and-wait")
+  public ResponseEntity<Map<String, String>> completeTaskAndWait(@PathVariable String id) {
+    commandBus.dispatchAndWait(new CompleteTaskCommand(id));
+    return ResponseEntity.ok(Map.of("message", "Task completed successfully"));
+  }
+
   @GetMapping("/{id}")
   public ResponseEntity<Task> getTask(@PathVariable String id) {
     Task task = queryBus.ask(new GetTaskQuery(id));
