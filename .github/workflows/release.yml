@@ -68,7 +68,6 @@ jobs:
         run: ./gradlew quality --no-configuration-cache
 
       - name: Generate changelog
-        if: steps.validate.outputs.type == 'stable'
         uses: orhun/git-cliff-action@v4
         id: changelog
         with:
@@ -171,6 +170,6 @@ jobs:
         with:
           tag_name: v${{ inputs.version }}
           name: v${{ inputs.version }}
-          body: ${{ steps.validate.outputs.type == 'stable' && steps.changelog.outputs.content || format('Pre-release {0}', inputs.version) }}
+          body: ${{ steps.changelog.outputs.content }}
           generate_release_notes: false
           prerelease: ${{ steps.validate.outputs.is_prerelease }}
