@@ -32,11 +32,19 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
 @AutoConfigureAfter(KafkaCqrsAutoConfiguration.class)
 @ConditionalOnClass(KafkaTemplate.class)
 @ConditionalOnBean(EventHandlerRegistry.class)
-@ConditionalOnProperty(prefix = "cqrs.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "cqrs.kafka",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = true)
 public class KafkaEventBusAutoConfiguration {
 
   @Bean(name = "cqrsEventsTopic")
-  @ConditionalOnProperty(prefix = "cqrs.kafka", name = "auto-create-topics", havingValue = "true", matchIfMissing = true)
+  @ConditionalOnProperty(
+      prefix = "cqrs.kafka",
+      name = "auto-create-topics",
+      havingValue = "true",
+      matchIfMissing = true)
   public NewTopic cqrsEventsTopic(
       KafkaCqrsProperties properties, KafkaTopicNamingStrategy kafkaTopicNamingStrategy) {
     return new NewTopic(
@@ -78,8 +86,10 @@ public class KafkaEventBusAutoConfiguration {
       @Value("${spring.application.name:cqrs-app}") String applicationName) {
     ContainerProperties containerProperties =
         new ContainerProperties(kafkaTopicNamingStrategy.topic(properties.getEvents().getTopic()));
-    containerProperties.setGroupId(resolveGroupId(properties.getEvents().getGroupId(), applicationName, "events"));
-    containerProperties.setMessageListener((MessageListener<String, byte[]>) kafkaEventConsumer::consume);
+    containerProperties.setGroupId(
+        resolveGroupId(properties.getEvents().getGroupId(), applicationName, "events"));
+    containerProperties.setMessageListener(
+        (MessageListener<String, byte[]>) kafkaEventConsumer::consume);
     ConcurrentMessageListenerContainer<String, byte[]> container =
         new ConcurrentMessageListenerContainer<>(cqrsKafkaConsumerFactory, containerProperties);
     container.setConcurrency(properties.getEvents().getConcurrency());

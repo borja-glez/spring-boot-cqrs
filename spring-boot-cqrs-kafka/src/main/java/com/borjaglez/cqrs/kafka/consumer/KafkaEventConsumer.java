@@ -16,7 +16,9 @@ public class KafkaEventConsumer extends AbstractKafkaConsumer {
   private final List<BusMiddleware> middlewares;
 
   public KafkaEventConsumer(
-      EventHandlerRegistry registry, List<BusMiddleware> middlewares, MessageSerializer serializer) {
+      EventHandlerRegistry registry,
+      List<BusMiddleware> middlewares,
+      MessageSerializer serializer) {
     super(serializer);
     this.registry = registry;
     this.middlewares = middlewares;

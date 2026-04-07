@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -17,7 +18,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -40,7 +40,11 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
 @AutoConfiguration
 @AutoConfigureAfter(name = "com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration")
 @ConditionalOnClass(KafkaTemplate.class)
-@ConditionalOnProperty(prefix = "cqrs.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "cqrs.kafka",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = true)
 @EnableConfigurationProperties(KafkaCqrsProperties.class)
 public class KafkaCqrsAutoConfiguration {
 
@@ -114,7 +118,11 @@ public class KafkaCqrsAutoConfiguration {
   }
 
   @Bean(name = "cqrsRepliesTopic")
-  @ConditionalOnProperty(prefix = "cqrs.kafka", name = "auto-create-topics", havingValue = "true", matchIfMissing = true)
+  @ConditionalOnProperty(
+      prefix = "cqrs.kafka",
+      name = "auto-create-topics",
+      havingValue = "true",
+      matchIfMissing = true)
   public NewTopic cqrsRepliesTopic(
       KafkaCqrsProperties properties,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
@@ -134,7 +142,8 @@ public class KafkaCqrsAutoConfiguration {
       @Value("${spring.application.name:cqrs-app}") String applicationName) {
     ContainerProperties containerProperties =
         new ContainerProperties(
-            kafkaTopicNamingStrategy.replyTopic(applicationName, properties.getReplies().getTopic()));
+            kafkaTopicNamingStrategy.replyTopic(
+                applicationName, properties.getReplies().getTopic()));
     containerProperties.setGroupId(
         applicationName + ".cqrs.replies." + UUID.randomUUID().toString().replace('-', '.'));
     containerProperties.setMessageListener(

@@ -26,7 +26,8 @@ abstract class AbstractKafkaConsumer {
       Class<T> payloadClass = (Class<T>) Class.forName(payloadType);
       return serializer.deserialize(record.value(), payloadClass);
     } catch (ClassNotFoundException e) {
-      throw new IllegalStateException("Unable to resolve Kafka CQRS payload type " + payloadType, e);
+      throw new IllegalStateException(
+          "Unable to resolve Kafka CQRS payload type " + payloadType, e);
     }
   }
 

@@ -49,7 +49,8 @@ class KafkaMessagePublisherTest {
   void publishAddsHeadersForCommands() {
     TestCommand command = new TestCommand("value");
     byte[] payload = "command".getBytes(UTF_8);
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("command-key");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command))
+        .thenReturn("command-key");
     when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("sales.command.create");
     when(serializer.serialize(command)).thenReturn(payload);
 
@@ -112,7 +113,8 @@ class KafkaMessagePublisherTest {
 
     publisher.publishReply("cqrs.replies", "corr-1", "done");
 
-    assertThat(header(sentRecord(), KafkaMessageHeaders.PAYLOAD_TYPE)).isEqualTo(String.class.getName());
+    assertThat(header(sentRecord(), KafkaMessageHeaders.PAYLOAD_TYPE))
+        .isEqualTo(String.class.getName());
   }
 
   @Test
@@ -129,12 +131,14 @@ class KafkaMessagePublisherTest {
   @Test
   void publishRethrowsRuntimeCauseFromKafkaSend() {
     TestCommand command = new TestCommand("value");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("command-key");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command))
+        .thenReturn("command-key");
     when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("sales.command.create");
     when(serializer.serialize(command)).thenReturn("command".getBytes(UTF_8));
     CompletableFuture<Object> failedFuture = new CompletableFuture<>();
     failedFuture.completeExceptionally(new IllegalStateException("boom"));
-    when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn((CompletableFuture) failedFuture);
+    when(kafkaTemplate.send(any(ProducerRecord.class)))
+        .thenReturn((CompletableFuture) failedFuture);
 
     assertThatThrownBy(() -> publisher.publish("cqrs.commands", command))
         .isInstanceOf(IllegalStateException.class)
@@ -144,12 +148,14 @@ class KafkaMessagePublisherTest {
   @Test
   void publishWrapsNonRuntimeCauseFromKafkaSend() {
     TestCommand command = new TestCommand("value");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("command-key");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command))
+        .thenReturn("command-key");
     when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("sales.command.create");
     when(serializer.serialize(command)).thenReturn("command".getBytes(UTF_8));
     CompletableFuture<Object> failedFuture = new CompletableFuture<>();
     failedFuture.completeExceptionally(new IOException("boom"));
-    when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn((CompletableFuture) failedFuture);
+    when(kafkaTemplate.send(any(ProducerRecord.class)))
+        .thenReturn((CompletableFuture) failedFuture);
 
     assertThatThrownBy(() -> publisher.publish("cqrs.commands", command))
         .isInstanceOf(RuntimeException.class)

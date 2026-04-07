@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
-import com.borjaglez.cqrs.serialization.MessageSerializer;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 class KafkaEventConsumerTest {
 
@@ -75,8 +75,11 @@ class KafkaEventConsumerTest {
   private ConsumerRecord<String, byte[]> recordFor() {
     ConsumerRecord<String, byte[]> record =
         new ConsumerRecord<>("cqrs.events", 0, 0L, "key", "payload".getBytes(UTF_8));
-    record.headers()
-        .add(new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, TestEvent.class.getName().getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, TestEvent.class.getName().getBytes(UTF_8)));
     return record;
   }
 }

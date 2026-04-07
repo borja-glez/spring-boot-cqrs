@@ -66,7 +66,8 @@ class KafkaCqrsAutoConfigurationTest {
         .withPropertyValues("cqrs.kafka.prefix=custom")
         .run(
             context -> {
-              KafkaTopicNamingStrategy namingStrategy = context.getBean(KafkaTopicNamingStrategy.class);
+              KafkaTopicNamingStrategy namingStrategy =
+                  context.getBean(KafkaTopicNamingStrategy.class);
               assertThat(namingStrategy.topic("commands")).isEqualTo("custom.commands");
               assertThat(context.getBean(KafkaEventBus.class)).isNotNull();
               assertThat(context.getBean("springEventBus", EventBus.class)).isNotNull();

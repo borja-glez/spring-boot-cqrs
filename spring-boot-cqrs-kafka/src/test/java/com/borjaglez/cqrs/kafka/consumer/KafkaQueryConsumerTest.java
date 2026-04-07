@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
-import com.borjaglez.cqrs.middleware.BusMiddleware;
 
 class KafkaQueryConsumerTest {
 
@@ -82,7 +82,8 @@ class KafkaQueryConsumerTest {
         .publishErrorReply(
             org.mockito.Mockito.eq("reply-topic"),
             org.mockito.Mockito.eq("corr-1"),
-            argThat(error -> error.getCause() != null && error.getCause().getMessage().equals("boom")));
+            argThat(
+                error -> error.getCause() != null && error.getCause().getMessage().equals("boom")));
   }
 
   @Test
@@ -98,8 +99,11 @@ class KafkaQueryConsumerTest {
   private ConsumerRecord<String, byte[]> recordFor() {
     ConsumerRecord<String, byte[]> record =
         new ConsumerRecord<>("cqrs.queries", 0, 0L, "key", "payload".getBytes(UTF_8));
-    record.headers()
-        .add(new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, TestQuery.class.getName().getBytes(UTF_8)))
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, TestQuery.class.getName().getBytes(UTF_8)))
         .add(new RecordHeader(KafkaMessageHeaders.REPLY_TOPIC, "reply-topic".getBytes(UTF_8)))
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, "corr-1".getBytes(UTF_8)));
     return record;

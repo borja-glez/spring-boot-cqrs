@@ -31,11 +31,19 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
 @AutoConfigureAfter(KafkaCqrsAutoConfiguration.class)
 @ConditionalOnClass(KafkaTemplate.class)
 @ConditionalOnBean(CommandHandlerRegistry.class)
-@ConditionalOnProperty(prefix = "cqrs.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "cqrs.kafka",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = true)
 public class KafkaCommandBusAutoConfiguration {
 
   @Bean(name = "cqrsCommandsTopic")
-  @ConditionalOnProperty(prefix = "cqrs.kafka", name = "auto-create-topics", havingValue = "true", matchIfMissing = true)
+  @ConditionalOnProperty(
+      prefix = "cqrs.kafka",
+      name = "auto-create-topics",
+      havingValue = "true",
+      matchIfMissing = true)
   public NewTopic cqrsCommandsTopic(
       KafkaCqrsProperties properties, KafkaTopicNamingStrategy kafkaTopicNamingStrategy) {
     return new NewTopic(
@@ -78,9 +86,12 @@ public class KafkaCommandBusAutoConfiguration {
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
       @Value("${spring.application.name:cqrs-app}") String applicationName) {
     ContainerProperties containerProperties =
-        new ContainerProperties(kafkaTopicNamingStrategy.topic(properties.getCommands().getTopic()));
-    containerProperties.setGroupId(resolveGroupId(properties.getCommands().getGroupId(), applicationName, "commands"));
-    containerProperties.setMessageListener((MessageListener<String, byte[]>) kafkaCommandConsumer::consume);
+        new ContainerProperties(
+            kafkaTopicNamingStrategy.topic(properties.getCommands().getTopic()));
+    containerProperties.setGroupId(
+        resolveGroupId(properties.getCommands().getGroupId(), applicationName, "commands"));
+    containerProperties.setMessageListener(
+        (MessageListener<String, byte[]>) kafkaCommandConsumer::consume);
     ConcurrentMessageListenerContainer<String, byte[]> container =
         new ConcurrentMessageListenerContainer<>(cqrsKafkaConsumerFactory, containerProperties);
     container.setConcurrency(properties.getCommands().getConcurrency());

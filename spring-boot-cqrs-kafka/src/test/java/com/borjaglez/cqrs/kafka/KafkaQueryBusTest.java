@@ -32,7 +32,8 @@ class KafkaQueryBusTest {
   @Test
   void askShouldReturnReply() throws Exception {
     TestQuery query = new TestQuery("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
         .thenReturn("done");
 
     String result = queryBus.ask(query);
@@ -43,7 +44,8 @@ class KafkaQueryBusTest {
   @Test
   void askShouldWrapCheckedExceptions() throws Exception {
     TestQuery query = new TestQuery("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
         .thenAnswer(
             invocation -> {
               throw new Exception("boom");
@@ -57,7 +59,8 @@ class KafkaQueryBusTest {
   @Test
   void askShouldRethrowRuntimeExceptions() throws Exception {
     TestQuery query = new TestQuery("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
         .thenThrow(new IllegalStateException("boom"));
 
     assertThatThrownBy(() -> queryBus.ask(query))

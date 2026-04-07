@@ -61,7 +61,9 @@ class DefaultKafkaPartitionKeyStrategyTest {
 
   @Test
   void shouldUsePayloadTypeWhenConfigured() {
-    properties.getPartitionKey().setStrategy(KafkaCqrsProperties.PartitionKeyStrategyType.PAYLOAD_TYPE);
+    properties
+        .getPartitionKey()
+        .setStrategy(KafkaCqrsProperties.PartitionKeyStrategyType.PAYLOAD_TYPE);
 
     DefaultKafkaPartitionKeyStrategy strategy =
         new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);

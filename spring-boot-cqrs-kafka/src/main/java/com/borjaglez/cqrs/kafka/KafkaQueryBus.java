@@ -40,11 +40,7 @@ public class KafkaQueryBus implements QueryBus {
   public <R> R ask(Query query, ParameterizedTypeReference<R> responseType) {
     try {
       return requestReplyClient.sendAndReceive(
-          null,
-          topicNamingStrategy.topic(topicName),
-          query,
-          responseType,
-          KafkaRequestMode.REPLY);
+          null, topicNamingStrategy.topic(topicName), query, responseType, KafkaRequestMode.REPLY);
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {

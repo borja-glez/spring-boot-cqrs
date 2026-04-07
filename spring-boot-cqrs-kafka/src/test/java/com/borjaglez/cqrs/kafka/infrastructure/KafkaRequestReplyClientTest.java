@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,7 +73,8 @@ class KafkaRequestReplyClientTest {
       throws InterruptedException {
     TestQuery query = new TestQuery("abc");
     ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
     when(serializer.deserialize("response".getBytes(UTF_8), responseType)).thenReturn("done");
@@ -109,10 +110,14 @@ class KafkaRequestReplyClientTest {
     assertThat(correlationId).isNotBlank();
 
     ConsumerRecord<String, byte[]> reply =
-        new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, correlationId, "response".getBytes(UTF_8));
-    reply.headers()
+        new ConsumerRecord<>(
+            "cqrs.orders.replies", 0, 0L, correlationId, "response".getBytes(UTF_8));
+    reply
+        .headers()
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)))
-        .add(new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, String.class.getName().getBytes(UTF_8)));
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, String.class.getName().getBytes(UTF_8)));
     client.handleReply(reply);
 
     assertThat(invocation.join()).isEqualTo("done");
@@ -124,7 +129,8 @@ class KafkaRequestReplyClientTest {
     TestQuery query = new TestQuery("abc");
     ParameterizedTypeReference<List<String>> responseType =
         new ParameterizedTypeReference<List<String>>() {};
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
     when(serializer.deserialize("response".getBytes(UTF_8), responseType))
@@ -157,8 +163,11 @@ class KafkaRequestReplyClientTest {
             requestRecord.headers().lastHeader(KafkaMessageHeaders.CORRELATION_ID).value(), UTF_8);
 
     ConsumerRecord<String, byte[]> reply =
-        new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, correlationId, "response".getBytes(UTF_8));
-    reply.headers().add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
+        new ConsumerRecord<>(
+            "cqrs.orders.replies", 0, 0L, correlationId, "response".getBytes(UTF_8));
+    reply
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
     client.handleReply(reply);
 
     assertThat(invocation.join()).isEqualTo(List.of("done"));
@@ -171,10 +180,12 @@ class KafkaRequestReplyClientTest {
     ParameterizedTypeReference<Map<String, List<String>>> responseType =
         new ParameterizedTypeReference<Map<String, List<String>>>() {};
     Map<String, List<String>> expectedResponse = Map.of("items", List.of("done", "again"));
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
-    when(serializer.deserialize("response".getBytes(UTF_8), responseType)).thenReturn(expectedResponse);
+    when(serializer.deserialize("response".getBytes(UTF_8), responseType))
+        .thenReturn(expectedResponse);
     AtomicReference<ProducerRecord<String, byte[]>> recordReference = new AtomicReference<>();
     CountDownLatch sendLatch = new CountDownLatch(1);
     when(kafkaTemplate.send(any(ProducerRecord.class)))
@@ -203,8 +214,11 @@ class KafkaRequestReplyClientTest {
             requestRecord.headers().lastHeader(KafkaMessageHeaders.CORRELATION_ID).value(), UTF_8);
 
     ConsumerRecord<String, byte[]> reply =
-        new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, correlationId, "response".getBytes(UTF_8));
-    reply.headers().add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
+        new ConsumerRecord<>(
+            "cqrs.orders.replies", 0, 0L, correlationId, "response".getBytes(UTF_8));
+    reply
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
     client.handleReply(reply);
 
     assertThat(invocation.join()).isEqualTo(expectedResponse);
@@ -213,7 +227,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldRaiseRemoteErrorFromReplyHeader() throws InterruptedException {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
     AtomicReference<ProducerRecord<String, byte[]>> recordReference = new AtomicReference<>();
@@ -245,7 +260,8 @@ class KafkaRequestReplyClientTest {
 
     ConsumerRecord<String, byte[]> reply =
         new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, correlationId, "boom".getBytes(UTF_8));
-    reply.headers()
+    reply
+        .headers()
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)))
         .add(new RecordHeader(KafkaMessageHeaders.ERROR, "true".getBytes(UTF_8)));
     client.handleReply(reply);
@@ -259,12 +275,15 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldUseProvidedMessageNameWithoutCallingNamingStrategy() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
     CompletableFuture<Object> invocation =
         startRequest(
-            () -> client.sendAndReceive("custom.name", "cqrs.queries", query, null, KafkaRequestMode.REPLY));
+            () ->
+                client.sendAndReceive(
+                    "custom.name", "cqrs.queries", query, null, KafkaRequestMode.REPLY));
 
     ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
     assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_NAME)).isEqualTo("custom.name");
@@ -281,16 +300,19 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldResolveMessageNameWhenProvidedNameIsBlank() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
     CompletableFuture<Object> invocation =
         startRequest(
-            () -> client.sendAndReceive("   ", "cqrs.queries", query, null, KafkaRequestMode.REPLY));
+            () ->
+                client.sendAndReceive("   ", "cqrs.queries", query, null, KafkaRequestMode.REPLY));
 
     ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
-    assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_NAME)).isEqualTo("sales.order.find");
+    assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_NAME))
+        .isEqualTo("sales.order.find");
 
     ConsumerRecord<String, byte[]> reply =
         replyWithPayloadType(requestRecord, String.class.getName(), "response".getBytes(UTF_8));
@@ -310,11 +332,14 @@ class KafkaRequestReplyClientTest {
 
     CompletableFuture<Object> invocation =
         startRequest(
-            () -> client.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.REPLY));
+            () ->
+                client.sendAndReceive(
+                    null, "cqrs.commands", command, null, KafkaRequestMode.REPLY));
 
     ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
     assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_KIND)).isEqualTo("COMMAND");
-    assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_NAME)).isEqualTo("sales.order.create");
+    assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_NAME))
+        .isEqualTo("sales.order.create");
 
     ConsumerRecord<String, byte[]> reply =
         replyWithPayloadType(requestRecord, String.class.getName(), "response".getBytes(UTF_8));
@@ -327,7 +352,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldResolveEventMessageNameAndReturnNullForEmptyReply() throws Exception {
     TestEvent event = new TestEvent("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.EVENT, event)).thenReturn("sales.order.created");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.EVENT, event))
+        .thenReturn("sales.order.created");
     when(messageNamingStrategy.eventName(TestEvent.class)).thenReturn("sales.order.created");
     when(serializer.serialize(event)).thenReturn("request".getBytes(UTF_8));
 
@@ -347,7 +373,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldReturnNullWhenReplyPayloadIsNull() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
@@ -358,9 +385,11 @@ class KafkaRequestReplyClientTest {
     ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
     ConsumerRecord<String, byte[]> reply =
         new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, correlationId(requestRecord), null);
-    reply.headers().add(
-        new RecordHeader(
-            KafkaMessageHeaders.CORRELATION_ID, correlationId(requestRecord).getBytes(UTF_8)));
+    reply
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.CORRELATION_ID, correlationId(requestRecord).getBytes(UTF_8)));
     client.handleReply(reply);
 
     assertThat(invocation.join()).isNull();
@@ -369,7 +398,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldDefaultReplyPayloadTypeToStringWhenHeaderIsMissing() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
@@ -381,9 +411,11 @@ class KafkaRequestReplyClientTest {
     ConsumerRecord<String, byte[]> reply =
         new ConsumerRecord<>(
             "cqrs.orders.replies", 0, 0L, correlationId(requestRecord), "response".getBytes(UTF_8));
-    reply.headers().add(
-        new RecordHeader(
-            KafkaMessageHeaders.CORRELATION_ID, correlationId(requestRecord).getBytes(UTF_8)));
+    reply
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.CORRELATION_ID, correlationId(requestRecord).getBytes(UTF_8)));
     when(serializer.deserialize("response".getBytes(UTF_8), String.class)).thenReturn("done");
     client.handleReply(reply);
 
@@ -393,7 +425,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldFailWhenReplyPayloadTypeCannotBeResolved() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
@@ -403,19 +436,22 @@ class KafkaRequestReplyClientTest {
 
     ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
     client.handleReply(
-        replyWithPayloadType(requestRecord, "com.example.DoesNotExist", "response".getBytes(UTF_8)));
+        replyWithPayloadType(
+            requestRecord, "com.example.DoesNotExist", "response".getBytes(UTF_8)));
 
     Throwable thrown = catchThrowable(invocation::join);
     assertThat(thrown.getCause()).isInstanceOf(RuntimeException.class);
     assertThat(thrown.getCause().getCause())
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unable to resolve Kafka reply payload type: com.example.DoesNotExist");
+        .hasMessageContaining(
+            "Unable to resolve Kafka reply payload type: com.example.DoesNotExist");
   }
 
   @Test
   void shouldThrowTimeoutExceptionWithResolvedMessageName() {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
     KafkaRequestReplyClient timeoutClient =
@@ -428,7 +464,9 @@ class KafkaRequestReplyClientTest {
             Duration.ofMillis(10));
 
     assertThatThrownBy(
-            () -> timeoutClient.sendAndReceive(null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
+            () ->
+                timeoutClient.sendAndReceive(
+                    null, "cqrs.queries", query, null, KafkaRequestMode.REPLY))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Timed out waiting for Kafka reply for sales.order.find")
         .hasCauseInstanceOf(java.util.concurrent.TimeoutException.class);
@@ -437,7 +475,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldRethrowCheckedCauseFromPendingReplyFuture() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
@@ -446,7 +485,8 @@ class KafkaRequestReplyClientTest {
             () -> client.sendAndReceive(null, "cqrs.queries", query, null, KafkaRequestMode.REPLY));
 
     ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
-    completePendingReplyExceptionally(correlationId(requestRecord), new IllegalArgumentException("boom"));
+    completePendingReplyExceptionally(
+        correlationId(requestRecord), new IllegalArgumentException("boom"));
 
     assertThatThrownBy(invocation::join)
         .rootCause()
@@ -457,7 +497,8 @@ class KafkaRequestReplyClientTest {
   @Test
   void shouldWrapNonExceptionCauseFromPendingReplyFuture() throws Exception {
     TestQuery query = new TestQuery("abc");
-    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("sales.order.find");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query))
+        .thenReturn("sales.order.find");
     when(messageNamingStrategy.queryName(TestQuery.class)).thenReturn("sales.order.find");
     when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
 
@@ -486,7 +527,8 @@ class KafkaRequestReplyClientTest {
   void shouldIgnoreRepliesWithUnknownCorrelationId() {
     ConsumerRecord<String, byte[]> reply =
         new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, "unknown", "response".getBytes(UTF_8));
-    reply.headers()
+    reply
+        .headers()
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, "unknown".getBytes(UTF_8)));
 
     client.handleReply(reply);
@@ -525,9 +567,9 @@ class KafkaRequestReplyClientTest {
   private ConsumerRecord<String, byte[]> replyWithPayloadType(
       ProducerRecord<String, byte[]> requestRecord, String payloadType, byte[] value) {
     ConsumerRecord<String, byte[]> reply =
-        new ConsumerRecord<>(
-            "cqrs.orders.replies", 0, 0L, correlationId(requestRecord), value);
-    reply.headers()
+        new ConsumerRecord<>("cqrs.orders.replies", 0, 0L, correlationId(requestRecord), value);
+    reply
+        .headers()
         .add(
             new RecordHeader(
                 KafkaMessageHeaders.CORRELATION_ID, correlationId(requestRecord).getBytes(UTF_8)))
@@ -536,7 +578,8 @@ class KafkaRequestReplyClientTest {
   }
 
   @SuppressWarnings("unchecked")
-  private void completePendingReplyExceptionally(String correlationId, Throwable error) throws Exception {
+  private void completePendingReplyExceptionally(String correlationId, Throwable error)
+      throws Exception {
     Field repliesField = KafkaRequestReplyClient.class.getDeclaredField("replies");
     repliesField.setAccessible(true);
     Map<String, CompletableFuture<ConsumerRecord<String, byte[]>>> replies =

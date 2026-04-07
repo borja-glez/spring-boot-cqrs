@@ -28,7 +28,8 @@ class KafkaCommandBusTest {
     publisher = mock(KafkaMessagePublisher.class);
     requestReplyClient = mock(KafkaRequestReplyClient.class);
     topicNamingStrategy = mock(KafkaTopicNamingStrategy.class);
-    commandBus = new KafkaCommandBus(publisher, requestReplyClient, topicNamingStrategy, "commands");
+    commandBus =
+        new KafkaCommandBus(publisher, requestReplyClient, topicNamingStrategy, "commands");
     when(topicNamingStrategy.topic("commands")).thenReturn("cqrs.commands");
   }
 
@@ -54,7 +55,8 @@ class KafkaCommandBusTest {
   @Test
   void dispatchAndWaitShouldWrapCheckedExceptions() throws Exception {
     TestCommand command = new TestCommand("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.WAIT))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.commands", command, null, KafkaRequestMode.WAIT))
         .thenAnswer(
             invocation -> {
               throw new Exception("boom");
@@ -68,7 +70,8 @@ class KafkaCommandBusTest {
   @Test
   void dispatchAndWaitShouldRethrowRuntimeExceptions() throws Exception {
     TestCommand command = new TestCommand("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.WAIT))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.commands", command, null, KafkaRequestMode.WAIT))
         .thenThrow(new IllegalStateException("boom"));
 
     assertThatThrownBy(() -> commandBus.dispatchAndWait(command))
@@ -79,7 +82,8 @@ class KafkaCommandBusTest {
   @Test
   void dispatchAndReceiveShouldReturnReply() throws Exception {
     TestCommand command = new TestCommand("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.REPLY))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.commands", command, null, KafkaRequestMode.REPLY))
         .thenReturn("done");
 
     String result = commandBus.dispatchAndReceive(command);
@@ -90,7 +94,8 @@ class KafkaCommandBusTest {
   @Test
   void dispatchAndReceiveShouldWrapCheckedExceptions() throws Exception {
     TestCommand command = new TestCommand("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.REPLY))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.commands", command, null, KafkaRequestMode.REPLY))
         .thenAnswer(
             invocation -> {
               throw new Exception("boom");
@@ -104,7 +109,8 @@ class KafkaCommandBusTest {
   @Test
   void dispatchAndReceiveShouldRethrowRuntimeExceptions() throws Exception {
     TestCommand command = new TestCommand("test");
-    when(requestReplyClient.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.REPLY))
+    when(requestReplyClient.sendAndReceive(
+            null, "cqrs.commands", command, null, KafkaRequestMode.REPLY))
         .thenThrow(new IllegalStateException("boom"));
 
     assertThatThrownBy(() -> commandBus.dispatchAndReceive(command))

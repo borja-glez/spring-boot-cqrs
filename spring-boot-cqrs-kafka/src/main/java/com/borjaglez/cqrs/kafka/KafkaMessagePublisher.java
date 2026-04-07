@@ -39,13 +39,24 @@ public class KafkaMessagePublisher {
     KafkaMessageKind messageKind = inferKind(message);
     ProducerRecord<String, byte[]> record =
         new ProducerRecord<>(
-            topic, partitionKeyStrategy.partitionKey(messageKind, message), serializer.serialize(message));
-    record.headers().add(new RecordHeader(KafkaMessageHeaders.MESSAGE_KIND, messageKind.name().getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(
-            KafkaMessageHeaders.MESSAGE_NAME, resolveMessageName(messageKind, message).getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, message.getClass().getName().getBytes(UTF_8)));
+            topic,
+            partitionKeyStrategy.partitionKey(messageKind, message),
+            serializer.serialize(message));
+    record
+        .headers()
+        .add(
+            new RecordHeader(KafkaMessageHeaders.MESSAGE_KIND, messageKind.name().getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.MESSAGE_NAME,
+                resolveMessageName(messageKind, message).getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, message.getClass().getName().getBytes(UTF_8)));
     try {
       kafkaTemplate.send(record).join();
     } catch (CompletionException e) {
@@ -57,22 +68,30 @@ public class KafkaMessagePublisher {
     Object safePayload = payload == null ? "" : payload;
     ProducerRecord<String, byte[]> record =
         new ProducerRecord<>(topic, correlationId, serializer.serialize(safePayload));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(
-            KafkaMessageHeaders.PAYLOAD_TYPE, safePayload.getClass().getName().getBytes(UTF_8)));
+    record
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE,
+                safePayload.getClass().getName().getBytes(UTF_8)));
     kafkaTemplate.send(record).join();
   }
 
   public void publishErrorReply(String topic, String correlationId, RuntimeException error) {
     ProducerRecord<String, byte[]> record =
         new ProducerRecord<>(topic, correlationId, error.getMessage().getBytes(UTF_8));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
+    record
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
     record.headers().add(new RecordHeader(KafkaMessageHeaders.ERROR, "true".getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, String.class.getName().getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, String.class.getName().getBytes(UTF_8)));
     kafkaTemplate.send(record).join();
   }
 
@@ -86,7 +105,8 @@ public class KafkaMessagePublisher {
     if (message instanceof Query) {
       return KafkaMessageKind.QUERY;
     }
-    throw new IllegalArgumentException("Unsupported CQRS message type: " + message.getClass().getName());
+    throw new IllegalArgumentException(
+        "Unsupported CQRS message type: " + message.getClass().getName());
   }
 
   private String resolveMessageName(KafkaMessageKind messageKind, Object message) {

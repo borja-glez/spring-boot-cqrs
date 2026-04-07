@@ -7,14 +7,10 @@ import static org.mockito.Mockito.when;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.ConsumerFactory;
 
-import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
-import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.consumer.KafkaCommandConsumer;
 import com.borjaglez.cqrs.kafka.consumer.KafkaEventConsumer;
 import com.borjaglez.cqrs.kafka.consumer.KafkaQueryConsumer;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaTopicNamingStrategy;
-import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
-import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 class KafkaConfigurationCoverageTest {
 
@@ -45,7 +41,8 @@ class KafkaConfigurationCoverageTest {
                 namingStrategy,
                 "orders-service");
 
-    assertThat(container.getContainerProperties().getGroupId()).isEqualTo("orders-service.cqrs.commands");
+    assertThat(container.getContainerProperties().getGroupId())
+        .isEqualTo("orders-service.cqrs.commands");
   }
 
   @Test
@@ -83,7 +80,8 @@ class KafkaConfigurationCoverageTest {
                 namingStrategy,
                 "orders-service");
 
-    assertThat(container.getContainerProperties().getGroupId()).isEqualTo("orders-service.cqrs.queries");
+    assertThat(container.getContainerProperties().getGroupId())
+        .isEqualTo("orders-service.cqrs.queries");
   }
 
   @Test
@@ -121,7 +119,8 @@ class KafkaConfigurationCoverageTest {
                 namingStrategy,
                 "orders-service");
 
-    assertThat(container.getContainerProperties().getGroupId()).isEqualTo("orders-service.cqrs.events");
+    assertThat(container.getContainerProperties().getGroupId())
+        .isEqualTo("orders-service.cqrs.events");
   }
 
   @Test

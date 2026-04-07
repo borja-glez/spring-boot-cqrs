@@ -31,8 +31,8 @@ public class KafkaRequestReplyClient {
   private final MessageNamingStrategy messageNamingStrategy;
   private final String replyTopic;
   private final Duration timeout;
-  private final ConcurrentHashMap<String, CompletableFuture<ConsumerRecord<String, byte[]>>> replies =
-      new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, CompletableFuture<ConsumerRecord<String, byte[]>>>
+      replies = new ConcurrentHashMap<>();
 
   public KafkaRequestReplyClient(
       KafkaTemplate<String, byte[]> kafkaTemplate,
@@ -65,24 +65,41 @@ public class KafkaRequestReplyClient {
 
     ProducerRecord<String, byte[]> record =
         new ProducerRecord<>(
-            topic, partitionKeyStrategy.partitionKey(messageKind, payload), serializer.serialize(payload));
-    record.headers().add(new RecordHeader(KafkaMessageHeaders.MESSAGE_KIND, messageKind.name().getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.MESSAGE_NAME, resolvedMessageName.getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, payload.getClass().getName().getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
-    record.headers().add(new RecordHeader(KafkaMessageHeaders.REPLY_TOPIC, replyTopic.getBytes(UTF_8)));
-    record.headers().add(
-        new RecordHeader(KafkaMessageHeaders.REQUEST_MODE, requestMode.name().getBytes(UTF_8)));
+            topic,
+            partitionKeyStrategy.partitionKey(messageKind, payload),
+            serializer.serialize(payload));
+    record
+        .headers()
+        .add(
+            new RecordHeader(KafkaMessageHeaders.MESSAGE_KIND, messageKind.name().getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.MESSAGE_NAME, resolvedMessageName.getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, payload.getClass().getName().getBytes(UTF_8)));
+    record
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
+    record
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.REPLY_TOPIC, replyTopic.getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(KafkaMessageHeaders.REQUEST_MODE, requestMode.name().getBytes(UTF_8)));
 
     CompletableFuture<ConsumerRecord<String, byte[]>> future = new CompletableFuture<>();
     replies.put(correlationId, future);
     kafkaTemplate.send(record).join();
 
     try {
-      ConsumerRecord<String, byte[]> response = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      ConsumerRecord<String, byte[]> response =
+          future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       return deserializeResponse(response, responseType);
     } catch (ExecutionException e) {
       if (e.getCause() instanceof Exception exception) {
@@ -135,7 +152,8 @@ public class KafkaRequestReplyClient {
     try {
       return Class.forName(payloadType);
     } catch (ClassNotFoundException e) {
-      throw new IllegalStateException("Unable to resolve Kafka reply payload type: " + payloadType, e);
+      throw new IllegalStateException(
+          "Unable to resolve Kafka reply payload type: " + payloadType, e);
     }
   }
 
@@ -154,7 +172,8 @@ public class KafkaRequestReplyClient {
     if (payload instanceof Query) {
       return KafkaMessageKind.QUERY;
     }
-    throw new IllegalArgumentException("Unsupported CQRS message type: " + payload.getClass().getName());
+    throw new IllegalArgumentException(
+        "Unsupported CQRS message type: " + payload.getClass().getName());
   }
 
   private String resolveMessageName(KafkaMessageKind messageKind, Object payload) {
