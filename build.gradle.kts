@@ -13,6 +13,7 @@ tasks.register("coverage") {
     description = "Runs coverage verification for library modules."
     dependsOn(
         ":spring-boot-cqrs-core:jacocoTestCoverageVerification",
+        ":spring-boot-cqrs-kafka:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-rabbitmq:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-boot3-starter:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-boot4-starter:jacocoTestCoverageVerification"
@@ -24,6 +25,7 @@ tasks.register("quality") {
     description = "Runs tests, coverage verification, and formatting checks."
     dependsOn(
         ":spring-boot-cqrs-core:test",
+        ":spring-boot-cqrs-kafka:test",
         ":spring-boot-cqrs-rabbitmq:test",
         ":spring-boot-cqrs-boot3-starter:test",
         ":spring-boot-cqrs-boot4-starter:test",
@@ -55,6 +57,7 @@ tasks.register("spotlessCheckAll") {
     description = "Runs Spotless check on all modules that have the plugin applied."
     dependsOn(
         ":spring-boot-cqrs-core:spotlessCheck",
+        ":spring-boot-cqrs-kafka:spotlessCheck",
         ":spring-boot-cqrs-rabbitmq:spotlessCheck",
         ":spring-boot-cqrs-boot3-starter:spotlessCheck",
         ":spring-boot-cqrs-boot4-starter:spotlessCheck",
@@ -74,6 +77,7 @@ tasks.register("spotlessApplyAll") {
     description = "Runs Spotless apply on all modules that have the plugin applied."
     dependsOn(
         ":spring-boot-cqrs-core:spotlessApply",
+        ":spring-boot-cqrs-kafka:spotlessApply",
         ":spring-boot-cqrs-rabbitmq:spotlessApply",
         ":spring-boot-cqrs-boot3-starter:spotlessApply",
         ":spring-boot-cqrs-boot4-starter:spotlessApply",

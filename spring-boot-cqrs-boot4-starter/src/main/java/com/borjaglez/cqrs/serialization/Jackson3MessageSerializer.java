@@ -1,5 +1,7 @@
 package com.borjaglez.cqrs.serialization;
 
+import java.lang.reflect.Type;
+
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -22,5 +24,10 @@ public class Jackson3MessageSerializer implements MessageSerializer {
   @Override
   public <T> T deserialize(byte[] data, Class<T> type) {
     return jsonMapper.readValue(data, type);
+  }
+
+  @Override
+  public <T> T deserialize(byte[] data, Type type) {
+    return jsonMapper.readValue(data, jsonMapper.constructType(type));
   }
 }

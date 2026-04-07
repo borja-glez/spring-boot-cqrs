@@ -19,6 +19,7 @@ rootProject.name = "spring-boot-cqrs"
 
 include(
     ":spring-boot-cqrs-core",
+    ":spring-boot-cqrs-kafka",
     ":spring-boot-cqrs-rabbitmq",
     ":spring-boot-cqrs-boot3-starter",
     ":spring-boot-cqrs-boot4-starter",

@@ -3,7 +3,11 @@ package com.borjaglez.cqrs.serialization;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
+import org.springframework.core.ParameterizedTypeReference;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
@@ -30,6 +34,31 @@ class Jackson3MessageSerializerTest {
     String json = new String(bytes);
 
     assertThat(json).contains("\"name\"").contains("test-data").contains("\"value\"");
+  }
+
+  @Test
+  void deserializeSupportsParameterizedTypeReference() {
+    byte[] bytes = serializer.serialize(List.of(new TestData("hello", 42)));
+
+    List<TestData> deserialized =
+        serializer.deserialize(bytes, new ParameterizedTypeReference<List<TestData>>() {});
+
+    assertThat(deserialized).hasSize(1);
+    assertThat(deserialized.getFirst().name).isEqualTo("hello");
+  }
+
+  @Test
+  void deserializeSupportsNestedParameterizedTypeReference() {
+    byte[] bytes =
+        serializer.serialize(
+            Map.of("items", List.of(new TestData("hello", 42), new TestData("world", 84))));
+
+    Map<String, List<TestData>> deserialized =
+        serializer.deserialize(bytes, new ParameterizedTypeReference<Map<String, List<TestData>>>() {});
+
+    assertThat(deserialized).containsOnlyKeys("items");
+    assertThat(deserialized.get("items")).extracting(item -> item.name).containsExactly("hello", "world");
+    assertThat(deserialized.get("items")).extracting(item -> item.value).containsExactly(42, 84);
   }
 
   @Test

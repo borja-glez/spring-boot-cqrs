@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.serialization;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.io.UncheckedIOException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,15 @@ public class JacksonMessageSerializer implements MessageSerializer {
   public <T> T deserialize(byte[] data, Class<T> type) {
     try {
       return objectMapper.readValue(data, type);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  @Override
+  public <T> T deserialize(byte[] data, Type type) {
+    try {
+      return objectMapper.readValue(data, objectMapper.getTypeFactory().constructType(type));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

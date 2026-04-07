@@ -1,0 +1,4 @@
+com.borjaglez.cqrs.kafka.config.KafkaCqrsAutoConfiguration
+com.borjaglez.cqrs.kafka.config.KafkaCommandBusAutoConfiguration
+com.borjaglez.cqrs.kafka.config.KafkaEventBusAutoConfiguration
+com.borjaglez.cqrs.kafka.config.KafkaQueryBusAutoConfiguration
