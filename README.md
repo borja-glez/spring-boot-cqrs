@@ -11,13 +11,13 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 
 - **Command, Event, and Query buses** with in-process Spring implementations
 - **Middleware pipeline** for cross-cutting concerns (logging, validation, auth, transactions)
-- **RabbitMQ distributed messaging** as a drop-in adapter for all three buses
+- **RabbitMQ and Kafka distributed messaging** as drop-in adapters for all three buses
 - **GraalVM native image support** with automatic AOT hint registration
 - **Annotation-driven handler discovery** -- no manual wiring required
 - **Spring Boot auto-configuration** -- add the dependency and start coding
 - **Micrometer observability** middleware with per-message-type metrics
 - **JSR-380 Bean Validation** middleware for command validation
-- **Jackson-based serialization** SPI for message transport (core is Jackson-free; each starter brings the right version)
+- **Jackson-based serialization** SPI for message transport, including generic `ParameterizedTypeReference` support for distributed request/reply (core is Jackson-free; each starter brings the right version)
 - **AggregateRoot** base class with domain event recording
 - **Spring Boot 3 and 4 support** via dedicated starter modules
 - **100% JaCoCo coverage** (instructions + branches) enforced on every build
@@ -123,10 +123,11 @@ That is all you need. The starter auto-configures the bus, discovers your handle
 | `spring-boot-cqrs-core` | Bus interfaces, base types, annotations, middleware, serialization SPI, AOT support |
 | `spring-boot-cqrs-boot3-starter` | Spring Boot 3 auto-configuration |
 | `spring-boot-cqrs-boot4-starter` | Spring Boot 4 auto-configuration |
+| `spring-boot-cqrs-kafka` | Distributed messaging adapter for Kafka with request/reply support and configurable partition keys |
 | `spring-boot-cqrs-rabbitmq` | Distributed messaging adapter with retry and dead-letter queue support |
 | `examples` | Runnable sample applications |
 
-Most applications only need the **boot3-starter** or **boot4-starter** (pick the one matching your Spring Boot version). The core module does not depend on Jackson at runtime -- each starter brings the correct Jackson version for its Spring Boot generation. Add the **rabbitmq** module when you need inter-service messaging.
+Most applications only need the **boot3-starter** or **boot4-starter** (pick the one matching your Spring Boot version). The core module does not depend on Jackson at runtime -- each starter brings the correct Jackson version for its Spring Boot generation. Add the **rabbitmq** or **kafka** module when you need inter-service messaging.
 
 ## Usage
 
@@ -304,6 +305,60 @@ RabbitMQ starts automatically via [Spring Boot Docker Compose](https://docs.spri
 
 The RabbitMQ event bus automatically falls back to the local Spring event bus if the AMQP connection is unavailable.
 
+### Kafka
+
+Add the Kafka module to distribute commands, events, and queries across services (alongside your chosen starter):
+
+```kotlin
+implementation("com.borjaglez:spring-boot-cqrs-kafka:0.1.0")
+```
+
+Configure in `application.yml`:
+
+```yaml
+spring:
+  application:
+    name: my-service
+  kafka:
+    bootstrap-servers: localhost:9092
+
+cqrs:
+  naming:
+    prefix: my-service
+  kafka:
+    enabled: true
+    prefix: my-service
+    auto-create-topics: true
+    partition-key:
+      strategy: MESSAGE_NAME
+    replies:
+      topic: replies
+      timeout: 30s
+    commands:
+      topic: commands
+      partitions: 3
+      replicas: 1
+      concurrency: 1
+    events:
+      topic: events
+      partitions: 3
+      replicas: 1
+      concurrency: 1
+    queries:
+      topic: queries
+      partitions: 3
+      replicas: 1
+      concurrency: 1
+```
+
+Kafka request/reply supports `ParameterizedTypeReference`, so generic responses such as `List<OrderDto>` or nested wrapper types are preserved during deserialization.
+
+Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
+
+- `MESSAGE_NAME` -- route by CQRS message name (default)
+- `PAYLOAD_TYPE` -- route by Java payload type
+- `NONE` -- send records without a key
+
 ### Configuration Reference
 
 | Property | Default | Description |
@@ -311,6 +366,26 @@ The RabbitMQ event bus automatically falls back to the local Spring event bus if
 | `cqrs.naming.prefix` | `""` | Prefix for generated message names |
 | `cqrs.validation.enabled` | `true` | Enable JSR-380 command validation middleware |
 | `cqrs.observability.enabled` | `true` | Enable Micrometer observability middleware |
+| `cqrs.kafka.enabled` | `true` | Enable Kafka bus adapters |
+| `cqrs.kafka.prefix` | `"cqrs"` | Prefix for Kafka topic names |
+| `cqrs.kafka.auto-create-topics` | `true` | Auto-register CQRS topics through Spring Kafka |
+| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` | Strategy used to compute Kafka record keys |
+| `cqrs.kafka.replies.topic` | `"replies"` | Base reply topic name used for request/reply |
+| `cqrs.kafka.replies.partitions` | `1` | Reply topic partition count |
+| `cqrs.kafka.replies.replicas` | `1` | Reply topic replication factor |
+| `cqrs.kafka.replies.timeout` | `30s` | Timeout for distributed command/query replies |
+| `cqrs.kafka.commands.topic` | `"commands"` | Command topic name |
+| `cqrs.kafka.commands.partitions` | `3` | Command topic partition count |
+| `cqrs.kafka.commands.replicas` | `1` | Command topic replication factor |
+| `cqrs.kafka.commands.concurrency` | `1` | Command listener concurrency |
+| `cqrs.kafka.events.topic` | `"events"` | Event topic name |
+| `cqrs.kafka.events.partitions` | `3` | Event topic partition count |
+| `cqrs.kafka.events.replicas` | `1` | Event topic replication factor |
+| `cqrs.kafka.events.concurrency` | `1` | Event listener concurrency |
+| `cqrs.kafka.queries.topic` | `"queries"` | Query topic name |
+| `cqrs.kafka.queries.partitions` | `3` | Query topic partition count |
+| `cqrs.kafka.queries.replicas` | `1` | Query topic replication factor |
+| `cqrs.kafka.queries.concurrency` | `1` | Query listener concurrency |
 | `cqrs.rabbitmq.enabled` | `true` | Enable RabbitMQ bus adapters |
 | `cqrs.rabbitmq.prefix` | `"cqrs"` | Prefix for RabbitMQ exchange and queue names |
 | `cqrs.rabbitmq.retry.max-attempts` | `3` | Max retry attempts before dead-lettering |
@@ -340,6 +415,7 @@ The repository includes four example applications:
 
 - [Core Module](docs/core.md) -- Base types, annotations, registries, bus interfaces, serialization
 - [Middleware](docs/middleware.md) -- Pipeline, custom middleware, built-in interceptors
+- [Kafka Adapter](docs/kafka-adapter.md) -- Topics, request/reply, partition keys, consumers
 - [RabbitMQ Adapter](docs/rabbitmq-adapter.md) -- Exchanges, queues, retry, dead-letter, consumers
 - [Configuration Reference](docs/configuration.md) -- All properties with YAML examples
 - [GraalVM Native](docs/graalvm-native.md) -- AOT support, native image builds

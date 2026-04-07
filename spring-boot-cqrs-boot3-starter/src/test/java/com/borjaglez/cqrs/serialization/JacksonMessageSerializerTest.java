@@ -7,12 +7,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.UncheckedIOException;
+import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.core.ParameterizedTypeReference;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 class JacksonMessageSerializerTest {
 
@@ -39,6 +45,37 @@ class JacksonMessageSerializerTest {
   }
 
   @Test
+  void deserializeSupportsParameterizedTypeReference() {
+    byte[] bytes =
+        serializer.serialize(List.of(new TestMessage("hello", UUID.randomUUID().toString())));
+
+    List<TestMessage> deserialized =
+        serializer.deserialize(bytes, new ParameterizedTypeReference<List<TestMessage>>() {});
+
+    assertThat(deserialized).hasSize(1);
+    assertThat(deserialized.getFirst().getData()).isEqualTo("hello");
+  }
+
+  @Test
+  void deserializeSupportsNestedParameterizedTypeReference() {
+    TestMessage firstMessage = new TestMessage("hello", UUID.randomUUID().toString());
+    TestMessage secondMessage = new TestMessage("world", UUID.randomUUID().toString());
+    byte[] bytes = serializer.serialize(Map.of("items", List.of(firstMessage, secondMessage)));
+
+    Map<String, List<TestMessage>> deserialized =
+        serializer.deserialize(
+            bytes, new ParameterizedTypeReference<Map<String, List<TestMessage>>>() {});
+
+    assertThat(deserialized).containsOnlyKeys("items");
+    assertThat(deserialized.get("items"))
+        .extracting(TestMessage::getData)
+        .containsExactly("hello", "world");
+    assertThat(deserialized.get("items"))
+        .extracting(TestMessage::getCommandId)
+        .containsExactly(firstMessage.getCommandId(), secondMessage.getCommandId());
+  }
+
+  @Test
   void deserializeWithWrongClassThrows() {
     TestMessage command = new TestMessage("hello", UUID.randomUUID().toString());
     byte[] bytes = serializer.serialize(command);
@@ -56,6 +93,20 @@ class JacksonMessageSerializerTest {
     JacksonMessageSerializer brokenSerializer = new JacksonMessageSerializer(brokenMapper);
 
     assertThatThrownBy(() -> brokenSerializer.serialize("anything"))
+        .isInstanceOf(UncheckedIOException.class);
+  }
+
+  @Test
+  void deserializeByTypeThrowsUncheckedIOExceptionOnFailure() throws Exception {
+    ObjectMapper brokenMapper = mock(ObjectMapper.class);
+    Type targetType = new ParameterizedTypeReference<List<TestMessage>>() {}.getType();
+    when(brokenMapper.getTypeFactory()).thenReturn(TypeFactory.defaultInstance());
+    when(brokenMapper.readValue(any(byte[].class), any(JavaType.class)))
+        .thenThrow(new JsonProcessingException("deserialize fail") {});
+
+    JacksonMessageSerializer brokenSerializer = new JacksonMessageSerializer(brokenMapper);
+
+    assertThatThrownBy(() -> brokenSerializer.deserialize("[]".getBytes(), targetType))
         .isInstanceOf(UncheckedIOException.class);
   }
 
