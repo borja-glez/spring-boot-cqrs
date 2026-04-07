@@ -28,8 +28,7 @@ class MessageSerializerTest {
     MessageSerializer serializer = new ClassOnlyMessageSerializer();
     byte[] bytes = "payload".getBytes(UTF_8);
 
-    String result =
-        serializer.deserialize(bytes, new ParameterizedTypeReference<String>() {});
+    String result = serializer.deserialize(bytes, new ParameterizedTypeReference<String>() {});
 
     assertThat(result).isEqualTo("payload:String");
   }
