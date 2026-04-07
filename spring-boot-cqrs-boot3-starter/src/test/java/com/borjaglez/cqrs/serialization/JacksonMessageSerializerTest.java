@@ -46,7 +46,8 @@ class JacksonMessageSerializerTest {
 
   @Test
   void deserializeSupportsParameterizedTypeReference() {
-    byte[] bytes = serializer.serialize(List.of(new TestMessage("hello", UUID.randomUUID().toString())));
+    byte[] bytes =
+        serializer.serialize(List.of(new TestMessage("hello", UUID.randomUUID().toString())));
 
     List<TestMessage> deserialized =
         serializer.deserialize(bytes, new ParameterizedTypeReference<List<TestMessage>>() {});
@@ -59,8 +60,7 @@ class JacksonMessageSerializerTest {
   void deserializeSupportsNestedParameterizedTypeReference() {
     TestMessage firstMessage = new TestMessage("hello", UUID.randomUUID().toString());
     TestMessage secondMessage = new TestMessage("world", UUID.randomUUID().toString());
-    byte[] bytes =
-        serializer.serialize(Map.of("items", List.of(firstMessage, secondMessage)));
+    byte[] bytes = serializer.serialize(Map.of("items", List.of(firstMessage, secondMessage)));
 
     Map<String, List<TestMessage>> deserialized =
         serializer.deserialize(

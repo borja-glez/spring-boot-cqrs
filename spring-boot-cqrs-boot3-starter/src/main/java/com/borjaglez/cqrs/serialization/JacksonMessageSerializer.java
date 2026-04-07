@@ -1,8 +1,8 @@
 package com.borjaglez.cqrs.serialization;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Type;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

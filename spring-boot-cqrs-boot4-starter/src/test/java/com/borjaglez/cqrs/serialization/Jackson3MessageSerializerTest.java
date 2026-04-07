@@ -54,10 +54,13 @@ class Jackson3MessageSerializerTest {
             Map.of("items", List.of(new TestData("hello", 42), new TestData("world", 84))));
 
     Map<String, List<TestData>> deserialized =
-        serializer.deserialize(bytes, new ParameterizedTypeReference<Map<String, List<TestData>>>() {});
+        serializer.deserialize(
+            bytes, new ParameterizedTypeReference<Map<String, List<TestData>>>() {});
 
     assertThat(deserialized).containsOnlyKeys("items");
-    assertThat(deserialized.get("items")).extracting(item -> item.name).containsExactly("hello", "world");
+    assertThat(deserialized.get("items"))
+        .extracting(item -> item.name)
+        .containsExactly("hello", "world");
     assertThat(deserialized.get("items")).extracting(item -> item.value).containsExactly(42, 84);
   }
 
