@@ -131,8 +131,10 @@ jobs:
 
       - name: Update README.md to released version
         if: steps.validate.outputs.type == 'stable'
+        id: update_readme
         run: |
           python <<'PY'
+          import os
           import pathlib
           import re
 
@@ -140,25 +142,36 @@ jobs:
           readme_path = pathlib.Path("README.md")
           original = readme_path.read_text(encoding="utf-8")
 
+          gradle_pattern = r'(com\.borjaglez:spring-boot-cqrs(?:-[a-z0-9]+)+:)([^"\s)]+)'
+          maven_pattern = r'(<artifactId>spring-boot-cqrs(?:-[a-z0-9]+)+</artifactId>\s*<version>)([^<]+)(</version>)'
+
+          found_gradle = re.search(gradle_pattern, original)
+          found_maven = re.search(maven_pattern, original)
+
+          if not found_gradle and not found_maven:
+              raise SystemExit("README.md does not contain expected Maven/Gradle coordinates.")
+
           updated = re.sub(
-              r'(com\.borjaglez:spring-boot-cqrs(?:-[a-z0-9]+)+:)([^"\s)]+)',
+              gradle_pattern,
               rf'\g<1>{version}',
               original,
           )
           updated = re.sub(
-              r'(<artifactId>spring-boot-cqrs(?:-[a-z0-9]+)+</artifactId>\s*<version>)([^<]+)(</version>)',
+              maven_pattern,
               rf'\g<1>{version}\g<3>',
               updated,
           )
 
-          if updated == original:
-              raise SystemExit("README.md was not updated; expected Maven/Gradle coordinates were not found.")
-
+          changed = updated != original
           readme_path.write_text(updated, encoding="utf-8")
+
+          output_path = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+          with output_path.open("a", encoding="utf-8") as output:
+              output.write(f"changed={'true' if changed else 'false'}\n")
           PY
 
       - name: Commit README update
-        if: steps.validate.outputs.type == 'stable'
+        if: steps.validate.outputs.type == 'stable' && steps.update_readme.outputs.changed == 'true'
         uses: EndBug/add-and-commit@v10
         with:
           add: 'README.md'
