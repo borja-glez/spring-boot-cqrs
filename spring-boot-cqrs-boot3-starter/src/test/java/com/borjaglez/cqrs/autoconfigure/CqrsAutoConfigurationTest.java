@@ -19,6 +19,7 @@ import com.borjaglez.cqrs.event.Event;
 import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.event.spring.SpringEventBus;
+import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.Query;
@@ -67,12 +68,23 @@ class CqrsAutoConfigurationTest {
   }
 
   @Test
-  void defaultEventBusIsSpringEventBus() {
+  void defaultEventBusIsTransactionalEventBus() {
     contextRunner.run(
         context -> {
-          assertThat(context).hasSingleBean(SpringEventBus.class);
-          assertThat(context.getBean(EventBus.class)).isInstanceOf(SpringEventBus.class);
+          assertThat(context).doesNotHaveBean(SpringEventBus.class);
+          assertThat(context.getBean(EventBus.class)).isInstanceOf(TransactionalEventBus.class);
         });
+  }
+
+  @Test
+  void transactionalEventPublishingCanBeDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.events.transactional=false")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(SpringEventBus.class);
+              assertThat(context.getBean(EventBus.class)).isInstanceOf(SpringEventBus.class);
+            });
   }
 
   @Test
@@ -149,6 +161,17 @@ class CqrsAutoConfigurationTest {
             context -> {
               CqrsProperties properties = context.getBean(CqrsProperties.class);
               assertThat(properties.getNaming().getPrefix()).isEqualTo("myapp");
+            });
+  }
+
+  @Test
+  void transactionalEventsPropertyIsApplied() {
+    contextRunner
+        .withPropertyValues("cqrs.events.transactional=false")
+        .run(
+            context -> {
+              CqrsProperties properties = context.getBean(CqrsProperties.class);
+              assertThat(properties.getEvents().isTransactional()).isFalse();
             });
   }
 

@@ -206,6 +206,24 @@ List<Event> events = order.pullEvents();
 eventBus.publish(events);
 ```
 
+#### Transactional event publishing
+
+When a Spring transaction is active, the default `EventBus` created by the Boot starters queues events and publishes them **after commit**.
+
+- if the transaction commits, queued events are published
+- if the transaction rolls back, queued events are discarded
+- if no transaction is active, events are published immediately
+
+You can disable this behavior with:
+
+```yaml
+cqrs:
+  events:
+    transactional: false
+```
+
+This improves transactional consistency, but it is **not** a durable delivery mechanism for external brokers. If you need reliable broker publication, use the **Outbox Pattern**. See **[examples/example-outbox](examples/example-outbox)** for a complete optional example.
+
 ### Queries
 
 Queries represent read requests. Each query has exactly one handler.
@@ -364,6 +382,7 @@ Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
 | Property | Default | Description |
 |---|---|---|
 | `cqrs.naming.prefix` | `""` | Prefix for generated message names |
+| `cqrs.events.transactional` | `true` | Publish events after transaction commit when a Spring transaction is active |
 | `cqrs.validation.enabled` | `true` | Enable JSR-380 command validation middleware |
 | `cqrs.observability.enabled` | `true` | Enable Micrometer observability middleware |
 | `cqrs.kafka.enabled` | `true` | Enable Kafka bus adapters |
@@ -404,9 +423,10 @@ See [docs/configuration.md](docs/configuration.md) for full details with YAML ex
 
 ## Examples
 
-The repository includes four example applications:
+The repository includes five example applications:
 
 - **[example-basic](examples/example-basic)** -- Commands, events, queries, and a REST controller (Spring Boot 3)
+- **[example-outbox](examples/example-outbox)** -- Optional Outbox Pattern with JPA, H2, and scheduled publication (Spring Boot 3)
 - **[example-middleware](examples/example-middleware)** -- Custom logging, authorization, and transactional middleware (Spring Boot 3)
 - **[example-rabbitmq](examples/example-rabbitmq)** -- Distributed messaging with RabbitMQ (Spring Boot 3)
 - **[boot4-demo](examples/boot4-demo)** -- Minimal example running on Spring Boot 4
