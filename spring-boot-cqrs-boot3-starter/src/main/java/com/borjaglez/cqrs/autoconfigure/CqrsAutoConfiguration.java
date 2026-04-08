@@ -22,6 +22,7 @@ import com.borjaglez.cqrs.discovery.BeanPostProcessorHandlerDiscoverer;
 import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.event.spring.SpringEventBus;
+import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -87,21 +88,44 @@ public class CqrsAutoConfiguration {
 
   @Bean
   @Primary
-  @ConditionalOnMissingBean(EventBus.class)
-  public SpringEventBus springEventBus(
-      EventHandlerRegistry eventHandlerRegistry,
-      ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
-    return new SpringEventBus(
-        eventHandlerRegistry, middlewaresProvider.getIfAvailable(Collections::emptyList));
-  }
-
-  @Bean
-  @Primary
   @ConditionalOnMissingBean(QueryBus.class)
   public SpringQueryBus springQueryBus(
       QueryHandlerRegistry queryHandlerRegistry,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
     return new SpringQueryBus(
         queryHandlerRegistry, middlewaresProvider.getIfAvailable(Collections::emptyList));
+  }
+
+  @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+  @ConditionalOnMissingBean(EventBus.class)
+  static class EventBusConfiguration {
+
+    @Bean(name = "springEventBus")
+    @Primary
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        prefix = "cqrs.events",
+        name = "transactional",
+        havingValue = "true",
+        matchIfMissing = true)
+    public EventBus transactionalSpringEventBus(
+        EventHandlerRegistry eventHandlerRegistry,
+        ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
+      return new TransactionalEventBus(
+          new SpringEventBus(
+              eventHandlerRegistry, middlewaresProvider.getIfAvailable(Collections::emptyList)));
+    }
+
+    @Bean(name = "springEventBus")
+    @Primary
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        prefix = "cqrs.events",
+        name = "transactional",
+        havingValue = "false")
+    public SpringEventBus immediateSpringEventBus(
+        EventHandlerRegistry eventHandlerRegistry,
+        ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
+      return new SpringEventBus(
+          eventHandlerRegistry, middlewaresProvider.getIfAvailable(Collections::emptyList));
+    }
   }
 }

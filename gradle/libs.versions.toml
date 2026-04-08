@@ -23,6 +23,7 @@ spring-boot-starter-amqp = { module = "org.springframework.boot:spring-boot-star
 spring-kafka = { module = "org.springframework.kafka:spring-kafka" }
 spring-kafka-test = { module = "org.springframework.kafka:spring-kafka-test" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
@@ -44,6 +45,8 @@ spring-boot4-docker-compose = { module = "org.springframework.boot:spring-boot-d
 spring-boot4-devtools = { module = "org.springframework.boot:spring-boot-devtools", version.ref = "spring-boot4" }
 
 spring-context = { module = "org.springframework:spring-context", version.ref = "spring-framework" }
+spring-tx = { module = "org.springframework:spring-tx", version.ref = "spring-framework" }
+h2 = { module = "com.h2database:h2" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakarta-validation" }
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
 micrometer-observation = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer" }

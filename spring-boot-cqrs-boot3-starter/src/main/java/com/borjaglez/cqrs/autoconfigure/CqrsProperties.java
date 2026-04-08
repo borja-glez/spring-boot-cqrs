@@ -10,6 +10,7 @@ import lombok.Setter;
 @ConfigurationProperties(prefix = "cqrs")
 public class CqrsProperties {
   private NamingProperties naming = new NamingProperties();
+  private EventsProperties events = new EventsProperties();
   private ValidationProperties validation = new ValidationProperties();
   private ObservabilityProperties observability = new ObservabilityProperties();
 
@@ -17,6 +18,12 @@ public class CqrsProperties {
   @Setter
   public static class NamingProperties {
     private String prefix = "";
+  }
+
+  @Getter
+  @Setter
+  public static class EventsProperties {
+    private boolean transactional = true;
   }
 
   @Getter

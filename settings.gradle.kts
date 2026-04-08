@@ -24,6 +24,7 @@ include(
     ":spring-boot-cqrs-boot3-starter",
     ":spring-boot-cqrs-boot4-starter",
     ":examples:example-basic",
+    ":examples:example-outbox",
     ":examples:example-rabbitmq",
     ":examples:example-middleware",
     ":examples:boot4-demo",

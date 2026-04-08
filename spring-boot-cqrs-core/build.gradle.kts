@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     api(libs.spring.context)
+    api(libs.spring.tx)
 
     api(libs.jakarta.validation.api)
     compileOnly(libs.micrometer.core)
