@@ -7,8 +7,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Role;
@@ -96,13 +98,13 @@ public class CqrsAutoConfiguration {
         queryHandlerRegistry, middlewaresProvider.getIfAvailable(Collections::emptyList));
   }
 
-  @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+  @Configuration(proxyBeanMethods = false)
   @ConditionalOnMissingBean(EventBus.class)
   static class EventBusConfiguration {
 
     @Bean(name = "springEventBus")
     @Primary
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    @ConditionalOnProperty(
         prefix = "cqrs.events",
         name = "transactional",
         havingValue = "true",
@@ -117,10 +119,7 @@ public class CqrsAutoConfiguration {
 
     @Bean(name = "springEventBus")
     @Primary
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-        prefix = "cqrs.events",
-        name = "transactional",
-        havingValue = "false")
+    @ConditionalOnProperty(prefix = "cqrs.events", name = "transactional", havingValue = "false")
     public SpringEventBus immediateSpringEventBus(
         EventHandlerRegistry eventHandlerRegistry,
         ObjectProvider<List<BusMiddleware>> middlewaresProvider) {

@@ -15,6 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class OutboxPublisher {
 
+  private static final String ALLOWED_EVENT_PACKAGE =
+      "com.borjaglez.cqrs.example.outbox.event.";
   private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
 
   private final OutboxEventRepository outboxEventRepository;
@@ -43,14 +45,21 @@ public class OutboxPublisher {
         outboxEvent.markPublished();
       } catch (Exception e) {
         outboxEvent.markFailedAttempt();
-        log.warn("Failed to publish outbox event {}: {}", outboxEvent.getId(), e.getMessage());
+        log.warn("Failed to publish outbox event {}", outboxEvent.getId(), e);
       }
     }
   }
 
   private Event deserialize(OutboxEventEntity outboxEvent) {
     try {
-      Class<?> eventClass = Class.forName(outboxEvent.getEventType());
+      String eventType = outboxEvent.getEventType();
+      if (!eventType.startsWith(ALLOWED_EVENT_PACKAGE)) {
+        throw new IllegalStateException("Outbox event type is not allowed: " + eventType);
+      }
+      Class<?> eventClass = Class.forName(eventType);
+      if (!Event.class.isAssignableFrom(eventClass)) {
+        throw new IllegalStateException("Outbox event type must extend Event: " + eventType);
+      }
       return (Event) objectMapper.readValue(outboxEvent.getPayload(), eventClass);
     } catch (Exception e) {
       throw new IllegalStateException(
