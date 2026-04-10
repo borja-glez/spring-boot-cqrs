@@ -15,8 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class OutboxPublisher {
 
-  private static final String ALLOWED_EVENT_PACKAGE =
-      "com.borjaglez.cqrs.example.outbox.event.";
+  private static final String ALLOWED_EVENT_PACKAGE = "com.borjaglez.cqrs.example.outbox.event.";
   private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
 
   private final OutboxEventRepository outboxEventRepository;
@@ -24,9 +23,7 @@ public class OutboxPublisher {
   private final ObjectMapper objectMapper;
 
   public OutboxPublisher(
-      OutboxEventRepository outboxEventRepository,
-      EventBus eventBus,
-      ObjectMapper objectMapper) {
+      OutboxEventRepository outboxEventRepository, EventBus eventBus, ObjectMapper objectMapper) {
     this.outboxEventRepository = outboxEventRepository;
     this.eventBus = eventBus;
     this.objectMapper = objectMapper;

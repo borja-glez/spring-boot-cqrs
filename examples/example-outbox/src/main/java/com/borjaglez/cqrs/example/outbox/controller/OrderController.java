@@ -30,7 +30,8 @@ public class OrderController {
   @PostMapping
   public ResponseEntity<String> create(@RequestBody CreateOrderRequest request) {
     String orderId =
-        commandBus.dispatchAndReceive(new CreateOrderCommand(request.product(), request.quantity()));
+        commandBus.dispatchAndReceive(
+            new CreateOrderCommand(request.product(), request.quantity()));
     return ResponseEntity.created(URI.create("/api/orders/" + orderId)).body(orderId);
   }
 
