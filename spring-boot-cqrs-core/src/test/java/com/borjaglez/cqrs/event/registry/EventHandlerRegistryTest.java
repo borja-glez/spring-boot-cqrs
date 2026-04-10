@@ -78,6 +78,26 @@ class EventHandlerRegistryTest {
   }
 
   @Test
+  void getHandlerInfosReturnsList() throws Exception {
+    TestEventHandler handler1 = new TestEventHandler();
+    TestEventHandler handler2 = new TestEventHandler();
+    Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    registry.register(TestEvent.class, handler1, method, "test.event.1");
+    registry.register(TestEvent.class, handler2, method, "test.event.2");
+
+    var infos = registry.getHandlerInfos(TestEvent.class);
+
+    assertThat(infos).hasSize(2);
+    assertThat(infos.get(0).messageName()).isEqualTo("test.event.1");
+    assertThat(infos.get(1).messageName()).isEqualTo("test.event.2");
+  }
+
+  @Test
+  void getHandlerInfosReturnsEmptyForUnregistered() {
+    assertThat(registry.getHandlerInfos(TestEvent.class)).isEmpty();
+  }
+
+  @Test
   void handleWrapsCheckedExceptionInEventHandlerExecutionException() throws Exception {
     CheckedThrowingEventHandler handler = new CheckedThrowingEventHandler();
     Method method = CheckedThrowingEventHandler.class.getMethod("handle", TestEvent.class);

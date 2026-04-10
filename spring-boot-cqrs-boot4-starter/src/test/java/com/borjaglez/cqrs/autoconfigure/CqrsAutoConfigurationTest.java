@@ -20,6 +20,9 @@ import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.event.spring.SpringEventBus;
 import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
+import com.borjaglez.cqrs.introspection.CqrsIntrospection;
+import com.borjaglez.cqrs.introspection.CqrsIntrospectionLogger;
+import com.borjaglez.cqrs.introspection.DefaultCqrsIntrospection;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.Query;
@@ -146,6 +149,56 @@ class CqrsAutoConfigurationTest {
   }
 
   @Test
+  void introspectionBeanIsCreatedByDefault() {
+    contextRunner.run(
+        context -> {
+          assertThat(context).hasSingleBean(CqrsIntrospection.class);
+          assertThat(context.getBean(CqrsIntrospection.class))
+              .isInstanceOf(DefaultCqrsIntrospection.class);
+        });
+  }
+
+  @Test
+  void introspectionLoggerIsNotCreatedByDefault() {
+    contextRunner.run(
+        context -> {
+          assertThat(context).doesNotHaveBean(CqrsIntrospectionLogger.class);
+        });
+  }
+
+  @Test
+  void introspectionLoggerIsCreatedWhenEnabled() {
+    contextRunner
+        .withPropertyValues("cqrs.introspection.log-handlers-on-startup=true")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(CqrsIntrospectionLogger.class);
+            });
+  }
+
+  @Test
+  void customIntrospectionReplacesDefault() {
+    contextRunner
+        .withUserConfiguration(CustomIntrospectionConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(CqrsIntrospection.class);
+              assertThat(context).doesNotHaveBean(DefaultCqrsIntrospection.class);
+            });
+  }
+
+  @Test
+  void introspectionPropertyIsApplied() {
+    contextRunner
+        .withPropertyValues("cqrs.introspection.log-handlers-on-startup=true")
+        .run(
+            context -> {
+              CqrsProperties properties = context.getBean(CqrsProperties.class);
+              assertThat(properties.getIntrospection().isLogHandlersOnStartup()).isTrue();
+            });
+  }
+
+  @Test
   void cqrsPropertiesAreBound() {
     contextRunner.run(
         context -> {
@@ -251,6 +304,47 @@ class CqrsAutoConfigurationTest {
     @Bean
     QueryBus queryBus() {
       return new CustomQueryBus();
+    }
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class CustomIntrospectionConfiguration {
+    @Bean
+    CqrsIntrospection cqrsIntrospection() {
+      return new CqrsIntrospection() {
+        @Override
+        public java.util.List<com.borjaglez.cqrs.introspection.HandlerDescriptor> getHandlers() {
+          return java.util.Collections.emptyList();
+        }
+
+        @Override
+        public java.util.List<com.borjaglez.cqrs.introspection.HandlerDescriptor> getHandlers(
+            com.borjaglez.cqrs.introspection.HandlerType type) {
+          return java.util.Collections.emptyList();
+        }
+
+        @Override
+        public java.util.List<com.borjaglez.cqrs.introspection.HandlerDescriptor>
+            getHandlersForMessage(Class<?> messageType) {
+          return java.util.Collections.emptyList();
+        }
+
+        @Override
+        public java.util.List<com.borjaglez.cqrs.introspection.MiddlewareDescriptor>
+            getMiddleware() {
+          return java.util.Collections.emptyList();
+        }
+
+        @Override
+        public java.util.Set<Class<?>> getRegisteredMessageTypes() {
+          return java.util.Collections.emptySet();
+        }
+
+        @Override
+        public int getHandlerCount(com.borjaglez.cqrs.introspection.HandlerType type) {
+          return 0;
+        }
+      };
     }
   }
 }

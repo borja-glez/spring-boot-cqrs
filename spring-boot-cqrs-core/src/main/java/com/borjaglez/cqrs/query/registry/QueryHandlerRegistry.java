@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.query.registry;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -39,6 +40,10 @@ public class QueryHandlerRegistry {
     } catch (Throwable e) {
       throw new QueryHandlerExecutionException(e);
     }
+  }
+
+  public Optional<HandlerInfo> getHandlerInfo(Class<?> queryClass) {
+    return Optional.ofNullable(handlers.get(queryClass));
   }
 
   public Set<Class<?>> getRegisteredQueries() {
