@@ -77,6 +77,24 @@ class QueryHandlerRegistryTest {
   }
 
   @Test
+  void getHandlerInfoReturnsPresent() throws Exception {
+    TestQueryHandler handler = new TestQueryHandler();
+    Method method = TestQueryHandler.class.getMethod("handle", TestQuery.class);
+    registry.register(TestQuery.class, handler, method, "test.query");
+
+    var info = registry.getHandlerInfo(TestQuery.class);
+
+    assertThat(info).isPresent();
+    assertThat(info.get().messageName()).isEqualTo("test.query");
+    assertThat(info.get().bean()).isSameAs(handler);
+  }
+
+  @Test
+  void getHandlerInfoReturnsEmptyForUnregistered() {
+    assertThat(registry.getHandlerInfo(TestQuery.class)).isEmpty();
+  }
+
+  @Test
   void handleWrapsCheckedExceptionInQueryHandlerExecutionException() throws Exception {
     CheckedThrowingQueryHandler handler = new CheckedThrowingQueryHandler();
     Method method = CheckedThrowingQueryHandler.class.getMethod("handle", TestQuery.class);

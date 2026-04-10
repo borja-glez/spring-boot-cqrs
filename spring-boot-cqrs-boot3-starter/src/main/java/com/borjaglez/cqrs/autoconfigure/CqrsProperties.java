@@ -13,6 +13,7 @@ public class CqrsProperties {
   private EventsProperties events = new EventsProperties();
   private ValidationProperties validation = new ValidationProperties();
   private ObservabilityProperties observability = new ObservabilityProperties();
+  private IntrospectionProperties introspection = new IntrospectionProperties();
 
   @Getter
   @Setter
@@ -36,5 +37,11 @@ public class CqrsProperties {
   @Setter
   public static class ObservabilityProperties {
     private boolean enabled = true;
+  }
+
+  @Getter
+  @Setter
+  public static class IntrospectionProperties {
+    private boolean logHandlersOnStartup = false;
   }
 }

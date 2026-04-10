@@ -41,6 +41,11 @@ public class EventHandlerRegistry {
     }
   }
 
+  public List<HandlerInfo> getHandlerInfos(Class<?> eventClass) {
+    List<HandlerInfo> list = handlers.get(eventClass);
+    return list != null ? Collections.unmodifiableList(list) : Collections.emptyList();
+  }
+
   public Set<Class<?>> getRegisteredEvents() {
     return Collections.unmodifiableSet(handlers.keySet());
   }

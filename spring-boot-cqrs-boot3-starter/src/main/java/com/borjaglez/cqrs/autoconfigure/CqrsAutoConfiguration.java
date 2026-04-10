@@ -25,6 +25,9 @@ import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.event.spring.SpringEventBus;
 import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
+import com.borjaglez.cqrs.introspection.CqrsIntrospection;
+import com.borjaglez.cqrs.introspection.CqrsIntrospectionLogger;
+import com.borjaglez.cqrs.introspection.DefaultCqrsIntrospection;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -96,6 +99,29 @@ public class CqrsAutoConfiguration {
       ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
     return new SpringQueryBus(
         queryHandlerRegistry, middlewaresProvider.getIfAvailable(Collections::emptyList));
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public CqrsIntrospection cqrsIntrospection(
+      CommandHandlerRegistry commandHandlerRegistry,
+      EventHandlerRegistry eventHandlerRegistry,
+      QueryHandlerRegistry queryHandlerRegistry,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
+    return new DefaultCqrsIntrospection(
+        commandHandlerRegistry,
+        eventHandlerRegistry,
+        queryHandlerRegistry,
+        middlewaresProvider.getIfAvailable(Collections::emptyList));
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "cqrs.introspection",
+      name = "log-handlers-on-startup",
+      havingValue = "true")
+  public CqrsIntrospectionLogger cqrsIntrospectionLogger(CqrsIntrospection cqrsIntrospection) {
+    return new CqrsIntrospectionLogger(cqrsIntrospection);
   }
 
   @Configuration(proxyBeanMethods = false)
