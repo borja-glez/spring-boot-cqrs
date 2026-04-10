@@ -116,6 +116,7 @@ public class CqrsAutoConfiguration {
   }
 
   @Bean
+  @ConditionalOnMissingBean
   @ConditionalOnProperty(
       prefix = "cqrs.introspection",
       name = "log-handlers-on-startup",

@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.annotation.Order;
+import org.springframework.util.ClassUtils;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
@@ -45,14 +46,16 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
 
   @Override
   public List<HandlerDescriptor> getHandlers(HandlerType type) {
-    return handlers.stream().filter(h -> h.handlerType() == type).collect(Collectors.toList());
+    return List.copyOf(
+        handlers.stream().filter(h -> h.handlerType() == type).collect(Collectors.toList()));
   }
 
   @Override
   public List<HandlerDescriptor> getHandlersForMessage(Class<?> messageType) {
-    return handlers.stream()
-        .filter(h -> h.messageType().equals(messageType))
-        .collect(Collectors.toList());
+    return List.copyOf(
+        handlers.stream()
+            .filter(h -> h.messageType().equals(messageType))
+            .collect(Collectors.toList()));
   }
 
   @Override
@@ -86,7 +89,7 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
                           commandClass,
                           HandlerType.COMMAND,
                           info.messageName(),
-                          info.bean().getClass(),
+                          ClassUtils.getUserClass(info.bean()),
                           info.requiresValidation())));
     }
 
@@ -94,7 +97,11 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
       for (EventHandlerRegistry.HandlerInfo info : eventRegistry.getHandlerInfos(eventClass)) {
         result.add(
             new HandlerDescriptor(
-                eventClass, HandlerType.EVENT, info.messageName(), info.bean().getClass(), false));
+                eventClass,
+                HandlerType.EVENT,
+                info.messageName(),
+                ClassUtils.getUserClass(info.bean()),
+                false));
       }
     }
 
@@ -108,7 +115,7 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
                           queryClass,
                           HandlerType.QUERY,
                           info.messageName(),
-                          info.bean().getClass(),
+                          ClassUtils.getUserClass(info.bean()),
                           false)));
     }
 
