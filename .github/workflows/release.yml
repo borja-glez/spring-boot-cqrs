@@ -142,7 +142,7 @@ jobs:
           readme_path = pathlib.Path("README.md")
           original = readme_path.read_text(encoding="utf-8")
 
-          gradle_pattern = r'(com\.borjaglez:spring-boot-cqrs(?:-[a-z0-9]+)+:)([^"\s)]+)'
+          gradle_pattern = r'(com\.borjaglez\.cqrs:spring-boot-cqrs(?:-[a-z0-9]+)+:)([^"\s)]+)'
           maven_pattern = r'(<artifactId>spring-boot-cqrs(?:-[a-z0-9]+)+</artifactId>\s*<version>)([^<]+)(</version>)'
 
           found_gradle = re.search(gradle_pattern, original)

@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Changed
+- **BREAKING**: Maven group ID migrated from `com.borjaglez` to `com.borjaglez.cqrs` (#11).
+  Java package names are unchanged (`com.borjaglez.cqrs.*`).
+
+  Migration:
+  ```diff
+  - implementation("com.borjaglez:spring-boot-cqrs-boot3-starter:0.1.x")
+  + implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.2.0")
+  ```
+- Version bumped to `0.2.0-SNAPSHOT` to signal the breaking coordinate change.
+
 ## [0.1.0] - 2026-04-07
 
 ### Miscellaneous
