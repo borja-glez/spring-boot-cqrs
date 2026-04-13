@@ -10,6 +10,7 @@ Artifacts are published under group ID `com.borjaglez.cqrs` and configured for O
 | `spring-boot-cqrs-boot3-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter` |
 | `spring-boot-cqrs-boot4-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter` |
 | `spring-boot-cqrs-rabbitmq` | `com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq` |
+| `spring-boot-cqrs-kafka` | `com.borjaglez.cqrs:spring-boot-cqrs-kafka` |
 
 The `examples/*` modules are NOT published.
 
