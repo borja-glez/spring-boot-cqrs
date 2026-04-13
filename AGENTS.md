@@ -49,7 +49,7 @@ A production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring
 
 - JVM args: `-Xmx2048m`
 - Parallel builds, caching, and configuration cache are enabled
-- Group: `com.borjaglez`
+- Group: `com.borjaglez.cqrs`
 
 ## Code Style
 

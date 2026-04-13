@@ -1,15 +1,15 @@
 # Publishing
 
-Artifacts are published under group ID `com.borjaglez` and configured for OSSRH / Maven Central publication.
+Artifacts are published under group ID `com.borjaglez.cqrs` and configured for OSSRH / Maven Central publication.
 
 ## Published Modules
 
 | Module | Artifact |
 |---|---|
-| `spring-boot-cqrs-core` | `com.borjaglez:spring-boot-cqrs-core` |
-| `spring-boot-cqrs-boot3-starter` | `com.borjaglez:spring-boot-cqrs-boot3-starter` |
-| `spring-boot-cqrs-boot4-starter` | `com.borjaglez:spring-boot-cqrs-boot4-starter` |
-| `spring-boot-cqrs-rabbitmq` | `com.borjaglez:spring-boot-cqrs-rabbitmq` |
+| `spring-boot-cqrs-core` | `com.borjaglez.cqrs:spring-boot-cqrs-core` |
+| `spring-boot-cqrs-boot3-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter` |
+| `spring-boot-cqrs-boot4-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter` |
+| `spring-boot-cqrs-rabbitmq` | `com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq` |
 
 The `examples/*` modules are NOT published.
 
@@ -17,7 +17,7 @@ The `examples/*` modules are NOT published.
 
 ### 1. Sonatype Central Portal Account
 
-Create an account at [central.sonatype.org](https://central.sonatype.org/) and verify ownership of the `com.borjaglez` namespace.
+Create an account at [central.sonatype.org](https://central.sonatype.org/) and verify ownership of the `com.borjaglez` namespace. The `com.borjaglez.cqrs` sub-namespace inherits this verification automatically — no additional validation is required.
 
 ### 2. Generate a GPG Signing Key
 

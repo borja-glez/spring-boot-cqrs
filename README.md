@@ -1,6 +1,6 @@
 # spring-boot-cqrs
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.borjaglez/spring-boot-cqrs-boot3-starter)](https://central.sonatype.com/artifact/com.borjaglez/spring-boot-cqrs-boot3-starter)
+[![Maven Central](https://img.shields.io/maven-central/v/com.borjaglez.cqrs/spring-boot-cqrs-boot3-starter)](https://central.sonatype.com/artifact/com.borjaglez.cqrs/spring-boot-cqrs-boot3-starter)
 [![CI](https://github.com/borja-glez/spring-boot-cqrs/actions/workflows/ci.yml/badge.svg)](https://github.com/borja-glez/spring-boot-cqrs/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/borja-glez/spring-boot-cqrs)](LICENSE)
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)
@@ -30,16 +30,16 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 **Gradle**
 
 ```kotlin
-implementation("com.borjaglez:spring-boot-cqrs-boot3-starter:0.1.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.2.0")
 ```
 
 **Maven**
 
 ```xml
 <dependency>
-    <groupId>com.borjaglez</groupId>
+    <groupId>com.borjaglez.cqrs</groupId>
     <artifactId>spring-boot-cqrs-boot3-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -48,16 +48,16 @@ implementation("com.borjaglez:spring-boot-cqrs-boot3-starter:0.1.0")
 **Gradle**
 
 ```kotlin
-implementation("com.borjaglez:spring-boot-cqrs-boot4-starter:0.1.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.2.0")
 ```
 
 **Maven**
 
 ```xml
 <dependency>
-    <groupId>com.borjaglez</groupId>
+    <groupId>com.borjaglez.cqrs</groupId>
     <artifactId>spring-boot-cqrs-boot4-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -289,7 +289,7 @@ public class LoggingMiddleware implements BusMiddleware {
 Add the RabbitMQ module to distribute commands, events, and queries across services (alongside your chosen starter):
 
 ```kotlin
-implementation("com.borjaglez:spring-boot-cqrs-rabbitmq:0.1.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq:0.2.0")
 ```
 
 Configure in `application.yml`:
@@ -328,7 +328,7 @@ The RabbitMQ event bus automatically falls back to the local Spring event bus if
 Add the Kafka module to distribute commands, events, and queries across services (alongside your chosen starter):
 
 ```kotlin
-implementation("com.borjaglez:spring-boot-cqrs-kafka:0.1.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-kafka:0.2.0")
 ```
 
 Configure in `application.yml`:
