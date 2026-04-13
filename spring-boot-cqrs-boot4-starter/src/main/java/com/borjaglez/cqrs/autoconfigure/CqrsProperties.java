@@ -1,6 +1,11 @@
 package com.borjaglez.cqrs.autoconfigure;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import com.borjaglez.cqrs.context.MessageContext;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -14,6 +19,7 @@ public class CqrsProperties {
   private ValidationProperties validation = new ValidationProperties();
   private ObservabilityProperties observability = new ObservabilityProperties();
   private IntrospectionProperties introspection = new IntrospectionProperties();
+  private ContextProperties context = new ContextProperties();
 
   @Getter
   @Setter
@@ -43,5 +49,14 @@ public class CqrsProperties {
   @Setter
   public static class IntrospectionProperties {
     private boolean logHandlersOnStartup = false;
+  }
+
+  @Getter
+  @Setter
+  public static class ContextProperties {
+    private boolean enabled = true;
+    private boolean autoCorrelationId = true;
+    private List<String> mdcKeys = new ArrayList<>(List.of(MessageContext.CORRELATION_ID_KEY));
+    private String headerPrefix = "cqrs.context.";
   }
 }

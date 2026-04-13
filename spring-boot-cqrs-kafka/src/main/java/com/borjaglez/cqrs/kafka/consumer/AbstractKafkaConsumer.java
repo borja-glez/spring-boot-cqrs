@@ -2,18 +2,25 @@ package com.borjaglez.cqrs.kafka.consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 
+import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 abstract class AbstractKafkaConsumer {
 
   private final MessageSerializer serializer;
+  private final String contextHeaderPrefix;
 
-  protected AbstractKafkaConsumer(MessageSerializer serializer) {
+  protected AbstractKafkaConsumer(MessageSerializer serializer, String contextHeaderPrefix) {
     this.serializer = serializer;
+    this.contextHeaderPrefix = contextHeaderPrefix;
   }
 
   protected <T> T deserialize(ConsumerRecord<String, byte[]> record) {
@@ -34,5 +41,13 @@ abstract class AbstractKafkaConsumer {
   protected String header(ConsumerRecord<String, byte[]> record, String name) {
     Header header = record.headers().lastHeader(name);
     return header == null ? null : new String(header.value(), UTF_8);
+  }
+
+  protected MessageContext extractContext(ConsumerRecord<String, byte[]> record) {
+    Map<String, String> headers = new LinkedHashMap<>();
+    for (Header header : record.headers()) {
+      headers.put(header.key(), new String(header.value(), UTF_8));
+    }
+    return ContextPropagationMiddleware.fromHeaders(headers, contextHeaderPrefix);
   }
 }

@@ -17,6 +17,7 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 - **Spring Boot auto-configuration** -- add the dependency and start coding
 - **Micrometer observability** middleware with per-message-type metrics
 - **JSR-380 Bean Validation** middleware for command validation
+- **Message context propagation** with auto-generated correlation IDs, SLF4J MDC mirroring, and transport header propagation across RabbitMQ/Kafka
 - **Jackson-based serialization** SPI for message transport, including generic `ParameterizedTypeReference` support for distributed request/reply (core is Jackson-free; each starter brings the right version)
 - **AggregateRoot** base class with domain event recording
 - **Spring Boot 3 and 4 support** via dedicated starter modules
@@ -283,6 +284,45 @@ public class LoggingMiddleware implements BusMiddleware {
 |---|---|---|
 | `CommandValidationInterceptor` | Yes (when JSR-380 is on classpath) | `cqrs.validation.enabled` |
 | `MicrometerBusObservability` | Yes (when Micrometer is on classpath) | `cqrs.observability.enabled` |
+| `ContextPropagationMiddleware` | Yes (when SLF4J is on classpath) | `cqrs.context.enabled` |
+
+### Message Context & Correlation ID
+
+`MessageContext` is an immutable map of business metadata (`correlationId`, `tenantId`, `userId`, …) that flows through every bus dispatch via a `ThreadLocal`. The auto-configured `ContextPropagationMiddleware` runs with highest precedence on every bus and:
+
+- Generates a `correlationId` (UUID) when none is present.
+- Mirrors configured keys into SLF4J MDC so downstream logs carry them automatically.
+- Serializes the context into RabbitMQ and Kafka headers on publish, and rehydrates it on the consumer side — no application code needed to propagate context across services.
+
+Read the context inside any handler or middleware:
+
+```java
+@CommandHandler
+public class CreateOrderHandler {
+
+  @HandleCommand
+  public OrderId handle(CreateOrderCommand command) {
+    String correlationId = MessageContext.current().correlationId();
+    String tenantId = MessageContext.current().get("tenantId").orElse("-");
+    // ...
+  }
+}
+```
+
+Seed the context at a system boundary (web filter, scheduler, inbound adapter):
+
+```java
+MessageContext ctx =
+    MessageContext.empty()
+        .with(MessageContext.CORRELATION_ID_KEY, request.getHeader("X-Correlation-Id"))
+        .with("tenantId", resolvedTenant);
+
+try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+  commandBus.dispatch(command);
+}
+```
+
+See [docs/middleware.md](docs/middleware.md#message-context--correlation-id) for the full API and [docs/configuration.md](docs/configuration.md#context-propagation-properties) for tuning.
 
 ### RabbitMQ
 
@@ -385,6 +425,10 @@ Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
 | `cqrs.events.transactional` | `true` | Publish events after transaction commit when a Spring transaction is active |
 | `cqrs.validation.enabled` | `true` | Enable JSR-380 command validation middleware |
 | `cqrs.observability.enabled` | `true` | Enable Micrometer observability middleware |
+| `cqrs.context.enabled` | `true` | Enable `MessageContext` propagation + SLF4J MDC middleware |
+| `cqrs.context.auto-correlation-id` | `true` | Generate a UUID `correlationId` when none is present on dispatch entry |
+| `cqrs.context.mdc-keys` | `[correlationId]` | Context keys mirrored into SLF4J MDC during handler execution |
+| `cqrs.context.header-prefix` | `"cqrs.context."` | Prefix applied to RabbitMQ/Kafka headers when serializing context across services |
 | `cqrs.kafka.enabled` | `true` | Enable Kafka bus adapters |
 | `cqrs.kafka.prefix` | `"cqrs"` | Prefix for Kafka topic names |
 | `cqrs.kafka.auto-create-topics` | `true` | Auto-register CQRS topics through Spring Kafka |

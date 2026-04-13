@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
@@ -162,6 +163,42 @@ class KafkaMessagePublisherTest {
         .hasCauseInstanceOf(IOException.class)
         .rootCause()
         .hasMessage("boom");
+  }
+
+  @Test
+  void publishPropagatesCurrentContextAsHeaders() {
+    TestCommand command = new TestCommand("value");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command))
+        .thenReturn("command-key");
+    when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("sales.command.create");
+    when(serializer.serialize(command)).thenReturn("command".getBytes(UTF_8));
+
+    MessageContext ctx =
+        MessageContext.empty().with("correlationId", "cid").with("tenantId", "acme");
+    try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+      publisher.publish("cqrs.commands", command);
+    }
+
+    ProducerRecord<String, byte[]> record = sentRecord();
+    assertThat(header(record, "cqrs.context.correlationId")).isEqualTo("cid");
+    assertThat(header(record, "cqrs.context.tenantId")).isEqualTo("acme");
+  }
+
+  @Test
+  void publishUsesCustomContextHeaderPrefix() {
+    KafkaMessagePublisher custom =
+        new KafkaMessagePublisher(
+            kafkaTemplate, serializer, partitionKeyStrategy, messageNamingStrategy, null);
+    TestCommand command = new TestCommand("value");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("k");
+    when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("n");
+    when(serializer.serialize(command)).thenReturn(new byte[0]);
+
+    try (MessageContext.Scope ignored =
+        MessageContext.scope(MessageContext.empty().with("correlationId", "cid"))) {
+      custom.publish("topic", command);
+    }
+    assertThat(header(sentRecord(), "cqrs.context.correlationId")).isEqualTo("cid");
   }
 
   @Test

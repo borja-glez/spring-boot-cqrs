@@ -70,11 +70,13 @@ public class KafkaEventBusAutoConfiguration {
   public KafkaEventConsumer kafkaEventConsumer(
       EventHandlerRegistry eventHandlerRegistry,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider,
-      MessageSerializer messageSerializer) {
+      MessageSerializer messageSerializer,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     return new KafkaEventConsumer(
         eventHandlerRegistry,
         middlewaresProvider.getIfAvailable(Collections::emptyList),
-        messageSerializer);
+        messageSerializer,
+        contextHeaderPrefix);
   }
 
   @Bean(name = "cqrsEventListenerContainer")

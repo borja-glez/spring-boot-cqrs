@@ -14,6 +14,7 @@ import org.apache.kafka.common.header.internals.RecordHeader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
@@ -70,6 +71,27 @@ class KafkaEventConsumerTest {
         .hasCauseInstanceOf(Exception.class)
         .rootCause()
         .hasMessage("boom");
+  }
+
+  @Test
+  void shouldExposeContextFromHeaders() {
+    java.util.concurrent.atomic.AtomicReference<String> observed =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          observed.set(MessageContext.current().correlationId());
+          return chain.proceed(msg);
+        };
+    consumer = new KafkaEventConsumer(registry, List.of(middleware), serializer, "cqrs.context.");
+
+    TestEvent event = new TestEvent("value");
+    ConsumerRecord<String, byte[]> record = recordFor();
+    record.headers().add(new RecordHeader("cqrs.context.correlationId", "cid-ev".getBytes(UTF_8)));
+    when(serializer.deserialize(record.value(), TestEvent.class)).thenReturn(event);
+
+    consumer.consume(record);
+
+    org.assertj.core.api.Assertions.assertThat(observed.get()).isEqualTo("cid-ev");
   }
 
   private ConsumerRecord<String, byte[]> recordFor() {

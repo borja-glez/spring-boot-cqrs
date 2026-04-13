@@ -15,6 +15,7 @@ import org.apache.kafka.common.header.internals.RecordHeader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
@@ -84,6 +85,31 @@ class KafkaQueryConsumerTest {
             org.mockito.Mockito.eq("corr-1"),
             argThat(
                 error -> error.getCause() != null && error.getCause().getMessage().equals("boom")));
+  }
+
+  @Test
+  void shouldExposeContextFromHeaders() {
+    java.util.concurrent.atomic.AtomicReference<String> observed =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          observed.set(MessageContext.current().correlationId());
+          return chain.proceed(msg);
+        };
+    consumer =
+        new KafkaQueryConsumer(
+            registry, List.of(middleware), serializer, publisher, "cqrs.context.");
+
+    TestQuery query = new TestQuery("value");
+    ConsumerRecord<String, byte[]> record = recordFor();
+    record.headers().add(new RecordHeader("cqrs.context.correlationId", "cid-q".getBytes(UTF_8)));
+    when(serializer.deserialize(record.value(), TestQuery.class)).thenReturn(query);
+    when(registry.handle(query)).thenReturn("r");
+
+    consumer.consume(record);
+
+    org.assertj.core.api.Assertions.assertThat(observed.get()).isEqualTo("cid-q");
+    verify(publisher).publishReply("reply-topic", "corr-1", "r");
   }
 
   @Test

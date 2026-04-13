@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
@@ -23,7 +24,21 @@ public class KafkaQueryConsumer extends AbstractKafkaConsumer {
       List<BusMiddleware> middlewares,
       MessageSerializer serializer,
       KafkaMessagePublisher publisher) {
-    super(serializer);
+    this(
+        registry,
+        middlewares,
+        serializer,
+        publisher,
+        KafkaMessagePublisher.DEFAULT_CONTEXT_HEADER_PREFIX);
+  }
+
+  public KafkaQueryConsumer(
+      QueryHandlerRegistry registry,
+      List<BusMiddleware> middlewares,
+      MessageSerializer serializer,
+      KafkaMessagePublisher publisher,
+      String contextHeaderPrefix) {
+    super(serializer, contextHeaderPrefix);
     this.registry = registry;
     this.middlewares = middlewares;
     this.publisher = publisher;
@@ -33,6 +48,8 @@ public class KafkaQueryConsumer extends AbstractKafkaConsumer {
     Query query = deserialize(record);
     String replyTopic = header(record, KafkaMessageHeaders.REPLY_TOPIC);
     String correlationId = header(record, KafkaMessageHeaders.CORRELATION_ID);
+    MessageContext incoming = extractContext(record);
+    MessageContext.Scope scope = MessageContext.scope(incoming);
 
     try {
       DefaultMiddlewareChain chain =
@@ -43,6 +60,8 @@ public class KafkaQueryConsumer extends AbstractKafkaConsumer {
       publisher.publishErrorReply(replyTopic, correlationId, e);
     } catch (Exception e) {
       publisher.publishErrorReply(replyTopic, correlationId, new RuntimeException(e));
+    } finally {
+      scope.close();
     }
   }
 }

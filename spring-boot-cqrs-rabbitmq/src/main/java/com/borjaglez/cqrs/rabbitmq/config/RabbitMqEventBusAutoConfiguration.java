@@ -79,7 +79,8 @@ public class RabbitMqEventBusAutoConfiguration {
       @Qualifier("cqrsMessageConverter") MessageConverter messageConverter,
       RabbitMqNamingStrategy rabbitNaming,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider,
-      @Value("${spring.application.name:cqrs-app}") String appName) {
+      @Value("${spring.application.name:cqrs-app}") String appName,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     RabbitMqEventConsumer consumer =
         new RabbitMqEventConsumer(
             registry,
@@ -87,7 +88,8 @@ public class RabbitMqEventBusAutoConfiguration {
             rabbitTemplate,
             rabbitNaming,
             properties.getEvents().getExchange(),
-            appName);
+            appName,
+            contextHeaderPrefix);
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");

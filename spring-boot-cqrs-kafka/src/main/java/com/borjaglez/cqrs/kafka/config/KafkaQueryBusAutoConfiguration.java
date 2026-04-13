@@ -66,12 +66,14 @@ public class KafkaQueryBusAutoConfiguration {
       QueryHandlerRegistry queryHandlerRegistry,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider,
       MessageSerializer messageSerializer,
-      KafkaMessagePublisher kafkaMessagePublisher) {
+      KafkaMessagePublisher kafkaMessagePublisher,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     return new KafkaQueryConsumer(
         queryHandlerRegistry,
         middlewaresProvider.getIfAvailable(Collections::emptyList),
         messageSerializer,
-        kafkaMessagePublisher);
+        kafkaMessagePublisher,
+        contextHeaderPrefix);
   }
 
   @Bean(name = "cqrsQueryListenerContainer")

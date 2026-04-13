@@ -17,6 +17,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
@@ -188,6 +189,41 @@ class RabbitMqCommandConsumerTest {
     assertThatThrownBy(() -> consumerWithMiddleware.consume(message, command))
         .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
+  void consumeShouldExposeContextFromHeadersInsideMiddlewareChain() {
+    java.util.concurrent.atomic.AtomicReference<String> observed =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          observed.set(MessageContext.current().correlationId());
+          return chain.proceed(msg);
+        };
+
+    RabbitMqCommandConsumer consumerWithContext =
+        new RabbitMqCommandConsumer(
+            registry,
+            List.of(middleware),
+            rabbitTemplate,
+            namingStrategy,
+            "commands",
+            "app",
+            "cqrs.context.");
+
+    TestCommand command = new TestCommand("test-data");
+    when(registry.handle(command)).thenReturn("result");
+
+    MessageProperties props = new MessageProperties();
+    props.setHeader("cqrs.message.type", "command_reply");
+    props.setHeader("cqrs.context.correlationId", "cid-abc");
+    Message message = MessageBuilder.withBody("{}".getBytes()).andProperties(props).build();
+
+    Object result = consumerWithContext.consume(message, command);
+
+    assertThat(result).isEqualTo("result");
+    assertThat(observed.get()).isEqualTo("cid-abc");
+    assertThat(MessageContext.current().isEmpty()).isTrue();
   }
 
   @Test

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
@@ -254,6 +255,30 @@ class KafkaCommandConsumerTest {
         .hasCauseInstanceOf(Exception.class)
         .rootCause()
         .hasMessage("boom");
+  }
+
+  @Test
+  void shouldExposeContextFromHeadersInsideMiddleware() {
+    java.util.concurrent.atomic.AtomicReference<String> observed =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          observed.set(MessageContext.current().correlationId());
+          return chain.proceed(msg);
+        };
+    consumer =
+        new KafkaCommandConsumer(
+            registry, List.of(middleware), serializer, publisher, "cqrs.context.");
+
+    TestCommand command = new TestCommand("value");
+    ConsumerRecord<String, byte[]> record = recordFor(command, null, null);
+    record.headers().add(new RecordHeader("cqrs.context.correlationId", "cid-xyz".getBytes(UTF_8)));
+    when(serializer.deserialize(record.value(), TestCommand.class)).thenReturn(command);
+
+    consumer.consume(record);
+
+    org.assertj.core.api.Assertions.assertThat(observed.get()).isEqualTo("cid-xyz");
+    org.assertj.core.api.Assertions.assertThat(MessageContext.current().isEmpty()).isTrue();
   }
 
   @Test

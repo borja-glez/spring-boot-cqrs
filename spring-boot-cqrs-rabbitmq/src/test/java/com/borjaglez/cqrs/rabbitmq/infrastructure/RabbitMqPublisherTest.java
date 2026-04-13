@@ -20,6 +20,8 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.amqp.support.converter.SmartMessageConverter;
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.context.MessageContext;
+
 class RabbitMqPublisherTest {
 
   private RabbitTemplate rabbitTemplate;
@@ -260,5 +262,67 @@ class RabbitMqPublisherTest {
                 publisher.publishAndReceive("exchange", "key", "payload", "command_reply", typeRef))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("Remote handler error: Something went wrong");
+  }
+
+  @Test
+  void publishPropagatesCurrentContextAsHeaders() {
+    publisher = new RabbitMqPublisher(rabbitTemplate, "cqrs.context.");
+
+    MessageContext ctx =
+        MessageContext.empty().with("correlationId", "abc").with("tenantId", "acme");
+    try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+      publisher.publish("exchange", "key", "payload", "command");
+    }
+
+    ArgumentCaptor<MessagePostProcessor> captor =
+        ArgumentCaptor.forClass(MessagePostProcessor.class);
+    verify(rabbitTemplate)
+        .convertAndSend(eq("exchange"), eq("key"), eq("payload"), captor.capture());
+
+    Message processed =
+        captor
+            .getValue()
+            .postProcessMessage(
+                MessageBuilder.withBody("x".getBytes())
+                    .andProperties(new MessageProperties())
+                    .build());
+    assertThat((Object) processed.getMessageProperties().getHeader("cqrs.context.correlationId"))
+        .isEqualTo("abc");
+    assertThat((Object) processed.getMessageProperties().getHeader("cqrs.context.tenantId"))
+        .isEqualTo("acme");
+    assertThat((Object) processed.getMessageProperties().getHeader("cqrs.message.type"))
+        .isEqualTo("command");
+  }
+
+  @Test
+  void publishAndReceiveAddsContextHeadersOnRequest() {
+    publisher = new RabbitMqPublisher(rabbitTemplate, null);
+
+    MessageConverter converter = mock(MessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+
+    Message requestMessage =
+        MessageBuilder.withBody("req".getBytes()).andProperties(new MessageProperties()).build();
+    when(converter.toMessage(any(), any())).thenReturn(requestMessage);
+    when(rabbitTemplate.sendAndReceive(any(), any(), any(Message.class))).thenReturn(null);
+
+    MessageContext ctx = MessageContext.empty().with("correlationId", "cid-1");
+    ArgumentCaptor<MessageProperties> propsCaptor =
+        ArgumentCaptor.forClass(MessageProperties.class);
+    try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+      publisher.publishAndReceive("ex", "key", "payload", "command_reply");
+    }
+    verify(converter).toMessage(eq("payload"), propsCaptor.capture());
+    assertThat((Object) propsCaptor.getValue().getHeader("cqrs.context.correlationId"))
+        .isEqualTo("cid-1");
+
+    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    MessageContext ctx2 = MessageContext.empty().with("correlationId", "cid-2");
+    try (MessageContext.Scope ignored = MessageContext.scope(ctx2)) {
+      publisher.publishAndReceive("ex", "key", "payload", "query", typeRef);
+    }
+    verify(converter, org.mockito.Mockito.atLeastOnce()).toMessage(any(), propsCaptor.capture());
+    assertThat((Object) propsCaptor.getValue().getHeader("cqrs.context.correlationId"))
+        .isEqualTo("cid-2");
   }
 }
