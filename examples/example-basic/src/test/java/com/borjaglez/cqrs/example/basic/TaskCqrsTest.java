@@ -51,8 +51,7 @@ class TaskCqrsTest {
   @Test
   void inMemoryQueryBusAnswersStandaloneWithoutSpring() {
     Task task = new Task("id-1", "title", "desc");
-    InMemoryQueryBus standaloneBus =
-        new InMemoryQueryBus().register(GetTaskQuery.class, q -> task);
+    InMemoryQueryBus standaloneBus = new InMemoryQueryBus().register(GetTaskQuery.class, q -> task);
 
     Task result = standaloneBus.ask(new GetTaskQuery("id-1"));
 
