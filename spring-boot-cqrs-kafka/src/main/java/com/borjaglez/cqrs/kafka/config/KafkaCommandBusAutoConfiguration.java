@@ -70,12 +70,14 @@ public class KafkaCommandBusAutoConfiguration {
       CommandHandlerRegistry commandHandlerRegistry,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider,
       MessageSerializer messageSerializer,
-      KafkaMessagePublisher kafkaMessagePublisher) {
+      KafkaMessagePublisher kafkaMessagePublisher,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     return new KafkaCommandConsumer(
         commandHandlerRegistry,
         middlewaresProvider.getIfAvailable(Collections::emptyList),
         messageSerializer,
-        kafkaMessagePublisher);
+        kafkaMessagePublisher,
+        contextHeaderPrefix);
   }
 
   @Bean(name = "cqrsCommandListenerContainer")

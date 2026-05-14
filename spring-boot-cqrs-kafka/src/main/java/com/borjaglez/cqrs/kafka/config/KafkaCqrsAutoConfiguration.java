@@ -93,9 +93,14 @@ public class KafkaCqrsAutoConfiguration {
       KafkaTemplate<String, byte[]> cqrsKafkaTemplate,
       MessageSerializer messageSerializer,
       KafkaPartitionKeyStrategy kafkaPartitionKeyStrategy,
-      MessageNamingStrategy messageNamingStrategy) {
+      MessageNamingStrategy messageNamingStrategy,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     return new KafkaMessagePublisher(
-        cqrsKafkaTemplate, messageSerializer, kafkaPartitionKeyStrategy, messageNamingStrategy);
+        cqrsKafkaTemplate,
+        messageSerializer,
+        kafkaPartitionKeyStrategy,
+        messageNamingStrategy,
+        contextHeaderPrefix);
   }
 
   @Bean

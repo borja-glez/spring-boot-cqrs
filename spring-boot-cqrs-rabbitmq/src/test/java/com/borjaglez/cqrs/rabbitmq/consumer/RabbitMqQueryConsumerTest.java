@@ -15,6 +15,7 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
@@ -111,5 +112,36 @@ class RabbitMqQueryConsumerTest {
     assertThatThrownBy(() -> consumerWithMiddleware.consume(message, query))
         .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
+  void consumeShouldExposeContextFromHeaders() {
+    java.util.concurrent.atomic.AtomicReference<String> observed =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          observed.set(MessageContext.current().correlationId());
+          return chain.proceed(msg);
+        };
+
+    RabbitMqQueryConsumer consumerWithContext =
+        new RabbitMqQueryConsumer(
+            registry,
+            List.of(middleware),
+            mock(RabbitTemplate.class),
+            mock(RabbitMqNamingStrategy.class),
+            "cqrs.context.");
+
+    TestQuery query = new TestQuery("test-data");
+    when(registry.handle(query)).thenReturn("r");
+
+    MessageProperties props = new MessageProperties();
+    props.setHeader("cqrs.context.correlationId", "cid-q");
+    Message message = MessageBuilder.withBody("{}".getBytes()).andProperties(props).build();
+
+    Object result = consumerWithContext.consume(message, query);
+
+    assertThat(result).isEqualTo("r");
+    assertThat(observed.get()).isEqualTo("cid-q");
   }
 }

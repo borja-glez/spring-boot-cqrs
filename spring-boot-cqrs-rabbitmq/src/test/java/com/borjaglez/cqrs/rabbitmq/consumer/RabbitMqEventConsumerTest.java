@@ -16,6 +16,7 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
@@ -85,5 +86,36 @@ class RabbitMqEventConsumerTest {
 
     verify(registry).handle(event);
     assertThat(middlewareCalled).isTrue();
+  }
+
+  @Test
+  void consumeShouldExposeContextFromHeaders() {
+    java.util.concurrent.atomic.AtomicReference<String> observed =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          observed.set(MessageContext.current().correlationId());
+          return chain.proceed(msg);
+        };
+
+    RabbitMqEventConsumer consumerWithContext =
+        new RabbitMqEventConsumer(
+            registry,
+            List.of(middleware),
+            rabbitTemplate,
+            namingStrategy,
+            "events",
+            "app",
+            "cqrs.context.");
+
+    TestEvent event = new TestEvent("test-data");
+    MessageProperties props = new MessageProperties();
+    props.setHeader("cqrs.context.correlationId", "cid-ev");
+    Message message = MessageBuilder.withBody("{}".getBytes()).andProperties(props).build();
+
+    consumerWithContext.consume(message, event);
+
+    assertThat(observed.get()).isEqualTo("cid-ev");
+    assertThat(MessageContext.current().isEmpty()).isTrue();
   }
 }

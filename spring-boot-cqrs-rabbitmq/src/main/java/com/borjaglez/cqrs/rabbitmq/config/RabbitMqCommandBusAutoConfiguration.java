@@ -76,7 +76,8 @@ public class RabbitMqCommandBusAutoConfiguration {
       @Qualifier("cqrsMessageConverter") MessageConverter messageConverter,
       RabbitMqNamingStrategy rabbitNaming,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider,
-      @Value("${spring.application.name:cqrs-app}") String appName) {
+      @Value("${spring.application.name:cqrs-app}") String appName,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     RabbitMqCommandConsumer consumer =
         new RabbitMqCommandConsumer(
             registry,
@@ -84,7 +85,8 @@ public class RabbitMqCommandBusAutoConfiguration {
             rabbitTemplate,
             rabbitNaming,
             properties.getCommands().getExchange(),
-            appName);
+            appName,
+            contextHeaderPrefix);
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");

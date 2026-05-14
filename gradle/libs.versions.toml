@@ -11,6 +11,7 @@ spring-framework = "6.2.17"
 jackson = "2.20.0"
 micrometer = "1.15.10"
 jakarta-validation = "3.1.1"
+slf4j = "2.0.16"
 junit = "5.14.3"
 assertj = "3.27.7"
 mockito = "5.23.0"
@@ -48,6 +49,7 @@ spring-context = { module = "org.springframework:spring-context", version.ref = 
 spring-tx = { module = "org.springframework:spring-tx", version.ref = "spring-framework" }
 h2 = { module = "com.h2database:h2" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakarta-validation" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
 micrometer-observation = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer" }
 micrometer-core-versioned = { module = "io.micrometer:micrometer-core", version.ref = "micrometer-boot4" }

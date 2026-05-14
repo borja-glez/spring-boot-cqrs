@@ -5,6 +5,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 ## Table of Contents
 
 - [Core Properties](#core-properties)
+- [Context Propagation Properties](#context-propagation-properties)
 - [RabbitMQ Properties](#rabbitmq-properties)
 - [Full YAML Example](#full-yaml-example)
 - [Minimal YAML Example](#minimal-yaml-example)
@@ -18,6 +19,10 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | `cqrs.naming.prefix` | `String` | `""` (empty) | Prefix prepended to all generated message names. Used in `@CqrsMessage` name resolution. |
 | `cqrs.validation.enabled` | `boolean` | `true` | Enables the `CommandValidationInterceptor` middleware. Requires `jakarta.validation` on the classpath. |
 | `cqrs.observability.enabled` | `boolean` | `true` | Enables the `MicrometerBusObservability` middleware. Requires Micrometer on the classpath. |
+| `cqrs.context.enabled` | `boolean` | `true` | Enables the `ContextPropagationMiddleware` (correlation ID + MDC + transport headers). Requires SLF4J on the classpath. |
+| `cqrs.context.auto-correlation-id` | `boolean` | `true` | If no `correlationId` is present on entry, generates a UUID and adds it to the current `MessageContext`. |
+| `cqrs.context.mdc-keys` | `List<String>` | `[correlationId]` | Context keys mirrored into SLF4J MDC during handler execution. Previous MDC values are restored on exit. |
+| `cqrs.context.header-prefix` | `String` | `"cqrs.context."` | Prefix applied to transport headers (RabbitMQ + Kafka) when serializing/deserializing the context across services. |
 
 ### Naming Prefix
 
@@ -67,6 +72,28 @@ cqrs:
 ```
 
 When enabled, and a Micrometer `MeterRegistry` bean is present, the `MicrometerBusObservability` is registered as middleware. It records `cqrs.bus.dispatch` timers for every dispatched message.
+
+## Context Propagation Properties
+
+```yaml
+cqrs:
+  context:
+    enabled: true                 # default
+    auto-correlation-id: true     # default
+    mdc-keys:                     # default: [correlationId]
+      - correlationId
+      - tenantId
+    header-prefix: "cqrs.context."  # default
+```
+
+When enabled (the default), the `ContextPropagationMiddleware` is installed with `Ordered.HIGHEST_PRECEDENCE`. It:
+
+- Reads the current `MessageContext` from a `ThreadLocal` on dispatch entry.
+- Generates a `correlationId` (UUID) when missing and `auto-correlation-id=true`.
+- Mirrors every key listed in `mdc-keys` into SLF4J MDC (restoring previous values on exit).
+- Serializes context entries into RabbitMQ/Kafka message headers on publish (prefixed by `header-prefix`) and rehydrates them on the consumer side before the middleware chain runs.
+
+Set `cqrs.context.enabled=false` to disable auto-registration of the `ContextPropagationMiddleware`. This turns off the ThreadLocal/MDC middleware behavior described above, but it does **not** by itself disable RabbitMQ/Kafka transport header propagation; those adapters still serialize the current `MessageContext` into outbound headers and rehydrate it on inbound messages, independently of the middleware. See [middleware.md](middleware.md#message-context--correlation-id) for usage details and code examples.
 
 ## RabbitMQ Properties
 
@@ -122,6 +149,13 @@ cqrs:
     enabled: true
   observability:
     enabled: true
+  context:
+    enabled: true
+    auto-correlation-id: true
+    mdc-keys:
+      - correlationId
+      - tenantId
+    header-prefix: "cqrs.context."
   rabbitmq:
     enabled: true
     prefix: order-service

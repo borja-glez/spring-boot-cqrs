@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.rabbitmq.config;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -44,8 +45,10 @@ public class RabbitMqCqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean
-  public RabbitMqPublisher cqrsRabbitMqPublisher(RabbitTemplate rabbitTemplate) {
-    return new RabbitMqPublisher(rabbitTemplate);
+  public RabbitMqPublisher cqrsRabbitMqPublisher(
+      RabbitTemplate rabbitTemplate,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
+    return new RabbitMqPublisher(rabbitTemplate, contextHeaderPrefix);
   }
 
   @Bean

@@ -9,6 +9,7 @@ The middleware pipeline intercepts every message dispatched through any of the t
 - [Creating Custom Middleware](#creating-custom-middleware)
 - [Ordering with @Order](#ordering-with-order)
 - [Built-in Middleware](#built-in-middleware)
+- [Message Context & Correlation ID](#message-context--correlation-id)
 - [Examples](#examples)
 
 ## BusMiddleware Interface
@@ -168,6 +169,80 @@ Example Prometheus output:
 cqrs_bus_dispatch_seconds_count{cqrs_type="command",cqrs_message="CreateOrderCommand",cqrs_outcome="success"} 42.0
 cqrs_bus_dispatch_seconds_sum{cqrs_type="command",cqrs_message="CreateOrderCommand",cqrs_outcome="success"} 1.234
 ```
+
+### ContextPropagationMiddleware
+
+**Package:** `com.borjaglez.cqrs.context`
+**Auto-configured:** Yes, when SLF4J (`org.slf4j.MDC`) is on the classpath
+**Property:** `cqrs.context.enabled` (default: `true`)
+**Order:** `Ordered.HIGHEST_PRECEDENCE` — runs before validation, observability, and any user middleware.
+
+Propagates an immutable `MessageContext` through every bus dispatch. The context carries business-level metadata (correlation ID, tenant ID, user ID, any key/value pair) that handlers and other middleware can read via `MessageContext.current()`. Nothing needs to be threaded through method parameters.
+
+On entry the middleware:
+
+1. Reads the current `MessageContext` from a `ThreadLocal`.
+2. If no `correlationId` is present and `cqrs.context.auto-correlation-id=true` (default), generates a UUID and adds it.
+3. Mirrors every configured key (see `cqrs.context.mdc-keys`) into SLF4J MDC so downstream logs carry them automatically.
+4. Proceeds through the chain.
+5. Restores the previous MDC state and context on exit (even if the handler throws).
+
+## Message Context & Correlation ID
+
+`MessageContext` is an immutable value object living in `com.borjaglez.cqrs.context`. It is the single place from which handlers read propagated metadata.
+
+### Reading the context inside a handler or middleware
+
+```java
+@CommandHandler
+public class CreateOrderHandler {
+
+  @HandleCommand
+  public OrderId handle(CreateOrderCommand command) {
+    MessageContext ctx = MessageContext.current();
+    String correlationId = ctx.correlationId();        // auto-generated if missing
+    String tenantId = ctx.get("tenantId").orElse("-");
+    // ... business logic
+  }
+}
+```
+
+### Seeding the context at a system boundary
+
+Web filters, schedulers, or inbound adapters should open a `Scope` so the data flows through every subsequent dispatch:
+
+```java
+MessageContext ctx =
+    MessageContext.empty()
+        .with(MessageContext.CORRELATION_ID_KEY, request.getHeader("X-Correlation-Id"))
+        .with("tenantId", tenantResolver.resolve(request))
+        .with("userId", principal.getName());
+
+try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+  commandBus.dispatch(command);
+}
+```
+
+Nested dispatches (e.g. a command handler publishes an event whose handler dispatches another command) inherit the context automatically because `ContextPropagationMiddleware` runs on every bus and walks the same `ThreadLocal`.
+
+### Cross-transport propagation
+
+Both the RabbitMQ and Kafka adapters serialize every context entry into message headers, prefixed by `cqrs.context.header-prefix` (default: `cqrs.context.`). The consuming side rehydrates the context before the middleware chain runs, so the same `correlationId` flows across services without any application code.
+
+| Transport | Header key on the wire |
+|---|---|
+| RabbitMQ | `cqrs.context.correlationId`, `cqrs.context.tenantId`, … |
+| Kafka    | `cqrs.context.correlationId`, `cqrs.context.tenantId`, … |
+
+### Logging with MDC
+
+With the default configuration, SLF4J MDC always contains `correlationId` inside the handler execution. A Logback pattern such as:
+
+```xml
+<pattern>%d{ISO8601} [%X{correlationId:-}] %-5level %logger{36} - %msg%n</pattern>
+```
+
+automatically annotates every log line. Mirror additional keys by setting `cqrs.context.mdc-keys=correlationId,tenantId,userId`.
 
 ## Examples
 
