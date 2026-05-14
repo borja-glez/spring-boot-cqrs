@@ -188,6 +188,23 @@ class KafkaMessagePublisherTest {
   void publishUsesCustomContextHeaderPrefix() {
     KafkaMessagePublisher custom =
         new KafkaMessagePublisher(
+            kafkaTemplate, serializer, partitionKeyStrategy, messageNamingStrategy, "ctx.");
+    TestCommand command = new TestCommand("value");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("k");
+    when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("n");
+    when(serializer.serialize(command)).thenReturn(new byte[0]);
+
+    try (MessageContext.Scope ignored =
+        MessageContext.scope(MessageContext.empty().with("correlationId", "cid"))) {
+      custom.publish("topic", command);
+    }
+    assertThat(header(sentRecord(), "ctx.correlationId")).isEqualTo("cid");
+  }
+
+  @Test
+  void nullContextHeaderPrefixFallsBackToDefault() {
+    KafkaMessagePublisher custom =
+        new KafkaMessagePublisher(
             kafkaTemplate, serializer, partitionKeyStrategy, messageNamingStrategy, null);
     TestCommand command = new TestCommand("value");
     when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("k");

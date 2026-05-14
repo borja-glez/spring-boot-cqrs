@@ -4,12 +4,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
@@ -20,7 +22,9 @@ abstract class AbstractKafkaConsumer {
 
   protected AbstractKafkaConsumer(MessageSerializer serializer, String contextHeaderPrefix) {
     this.serializer = serializer;
-    this.contextHeaderPrefix = contextHeaderPrefix;
+    this.contextHeaderPrefix =
+        Objects.requireNonNullElse(
+            contextHeaderPrefix, KafkaMessagePublisher.DEFAULT_CONTEXT_HEADER_PREFIX);
   }
 
   protected <T> T deserialize(ConsumerRecord<String, byte[]> record) {

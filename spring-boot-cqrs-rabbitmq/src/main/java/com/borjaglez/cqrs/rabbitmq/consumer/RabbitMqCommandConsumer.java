@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.consumer;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -53,7 +54,9 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
     this.middlewares = middlewares;
     this.exchangeName = exchangeName;
     this.appName = appName;
-    this.contextHeaderPrefix = contextHeaderPrefix;
+    this.contextHeaderPrefix =
+        Objects.requireNonNullElse(
+            contextHeaderPrefix, RabbitMqPublisher.DEFAULT_CONTEXT_HEADER_PREFIX);
   }
 
   public Object consume(Message message, Command command) {
