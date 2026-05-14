@@ -15,6 +15,7 @@ public class QueryBusAssert extends AbstractAssert<QueryBusAssert, SpyQueryBus> 
 
   public QueryBusAssert(SpyQueryBus actual) {
     super(actual, QueryBusAssert.class);
+    isNotNull();
     this.filtered = actual.recorded();
   }
 

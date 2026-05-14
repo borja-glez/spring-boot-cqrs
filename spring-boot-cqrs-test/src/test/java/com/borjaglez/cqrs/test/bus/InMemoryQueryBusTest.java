@@ -46,4 +46,14 @@ class InMemoryQueryBusTest {
 
     assertThat(returned).isSameAs(bus);
   }
+
+  @Test
+  void registerRejectsDuplicateType() {
+    InMemoryQueryBus bus = new InMemoryQueryBus();
+    bus.register(TestQuery.class, q -> "first");
+
+    assertThatThrownBy(() -> bus.register(TestQuery.class, q -> "second"))
+        .isInstanceOf(HandlerAlreadyRegisteredException.class)
+        .hasMessageContaining(TestQuery.class.getName());
+  }
 }

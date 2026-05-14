@@ -14,7 +14,9 @@ public final class InMemoryCommandBus implements CommandBus {
 
   public <C extends Command, R> InMemoryCommandBus register(
       Class<C> type, TestCommandHandler<C, R> handler) {
-    handlers.put(type, handler);
+    if (handlers.putIfAbsent(type, handler) != null) {
+      throw new HandlerAlreadyRegisteredException(type);
+    }
     return this;
   }
 

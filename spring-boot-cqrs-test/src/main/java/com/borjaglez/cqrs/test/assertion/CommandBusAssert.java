@@ -15,6 +15,7 @@ public class CommandBusAssert extends AbstractAssert<CommandBusAssert, SpyComman
 
   public CommandBusAssert(SpyCommandBus actual) {
     super(actual, CommandBusAssert.class);
+    isNotNull();
     this.filtered = actual.recorded();
   }
 

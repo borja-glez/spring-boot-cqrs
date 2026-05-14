@@ -15,6 +15,7 @@ public class EventBusAssert extends AbstractAssert<EventBusAssert, SpyEventBus> 
 
   public EventBusAssert(SpyEventBus actual) {
     super(actual, EventBusAssert.class);
+    isNotNull();
     this.filtered = actual.recorded();
   }
 

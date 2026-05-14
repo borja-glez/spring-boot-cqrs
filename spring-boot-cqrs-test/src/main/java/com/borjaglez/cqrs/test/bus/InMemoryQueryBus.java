@@ -14,7 +14,9 @@ public final class InMemoryQueryBus implements QueryBus {
 
   public <Q extends Query, R> InMemoryQueryBus register(
       Class<Q> type, TestQueryHandler<Q, R> handler) {
-    handlers.put(type, handler);
+    if (handlers.putIfAbsent(type, handler) != null) {
+      throw new HandlerAlreadyRegisteredException(type);
+    }
     return this;
   }
 

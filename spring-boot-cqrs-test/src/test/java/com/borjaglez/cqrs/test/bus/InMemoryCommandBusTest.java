@@ -79,4 +79,14 @@ class InMemoryCommandBusTest {
 
     assertThat(returned).isSameAs(bus);
   }
+
+  @Test
+  void registerRejectsDuplicateType() {
+    InMemoryCommandBus bus = new InMemoryCommandBus();
+    bus.register(TestCommand.class, cmd -> "first");
+
+    assertThatThrownBy(() -> bus.register(TestCommand.class, cmd -> "second"))
+        .isInstanceOf(HandlerAlreadyRegisteredException.class)
+        .hasMessageContaining(TestCommand.class.getName());
+  }
 }
