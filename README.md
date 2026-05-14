@@ -1,6 +1,6 @@
 # spring-boot-cqrs
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.borjaglez.cqrs/spring-boot-cqrs-boot3-starter)](https://central.sonatype.com/artifact/com.borjaglez.cqrs/spring-boot-cqrs-boot3-starter)
+[![Maven Central](https://img.shields.io/maven-central/v/com.borjaglez.cqrs/spring-boot-cqrs-core)](https://central.sonatype.com/artifact/com.borjaglez.cqrs/spring-boot-cqrs-boot3-starter)
 [![CI](https://github.com/borja-glez/spring-boot-cqrs/actions/workflows/ci.yml/badge.svg)](https://github.com/borja-glez/spring-boot-cqrs/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/borja-glez/spring-boot-cqrs)](LICENSE)
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)
