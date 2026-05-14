@@ -8,6 +8,7 @@ dependencies {
     api(libs.spring.boot4.autoconfigure)
 
     compileOnly(libs.spring.boot4.starter.validation)
+    compileOnly(libs.spring.boot4.starter.actuator)
     compileOnly(libs.micrometer.core.versioned)
     compileOnly(libs.micrometer.observation.versioned)
     compileOnly(libs.jackson.databind.versioned)
@@ -17,6 +18,7 @@ dependencies {
 
     testImplementation(libs.spring.boot4.starter.test)
     testImplementation(libs.spring.boot4.starter.validation)
+    testImplementation(libs.spring.boot4.starter.actuator)
     testImplementation(libs.micrometer.core.versioned)
     testImplementation(libs.micrometer.observation.versioned)
     testImplementation(libs.micrometer.observation.test.versioned)

@@ -18,6 +18,7 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 - **Micrometer observability** middleware with per-message-type metrics
 - **JSR-380 Bean Validation** middleware for command validation
 - **Message context propagation** with auto-generated correlation IDs, SLF4J MDC mirroring, and transport header propagation across RabbitMQ/Kafka
+- **Actuator endpoints** (`/actuator/cqrs` + `info` contributor) exposing handlers, middlewares and message types when `spring-boot-starter-actuator` is present
 - **Test support module** with spy buses, in-memory buses, AssertJ assertions, and a `@CqrsTest` slice annotation
 - **Jackson-based serialization** SPI for message transport, including generic `ParameterizedTypeReference` support for distributed request/reply (core is Jackson-free; each starter brings the right version)
 - **AggregateRoot** base class with domain event recording
@@ -485,6 +486,7 @@ The repository includes five example applications:
 - [Kafka Adapter](docs/kafka-adapter.md) -- Topics, request/reply, partition keys, consumers
 - [RabbitMQ Adapter](docs/rabbitmq-adapter.md) -- Exchanges, queues, retry, dead-letter, consumers
 - [Configuration Reference](docs/configuration.md) -- All properties with YAML examples
+- [Actuator Endpoints](docs/actuator.md) -- `/actuator/cqrs`, `info` contributor, transport health
 - [Testing](docs/testing.md) -- Test utilities: spy buses, in-memory buses, AssertJ assertions, `@CqrsTest` slice
 - [GraalVM Native](docs/graalvm-native.md) -- AOT support, native image builds
 - [Migration Guide](docs/migration-guide.md) -- Migrating from the original amj-bus implementation
