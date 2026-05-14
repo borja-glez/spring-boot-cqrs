@@ -37,8 +37,7 @@ class CqrsEndpointTest {
     HandlerDescriptor event =
         new HandlerDescriptor(
             OrderCreatedEvent.class, HandlerType.EVENT, "order_created", Handler.class, false);
-    MiddlewareDescriptor middleware =
-        new MiddlewareDescriptor(SampleMiddleware.class, 10, true);
+    MiddlewareDescriptor middleware = new MiddlewareDescriptor(SampleMiddleware.class, 10, true);
 
     when(introspection.getHandlerCount(HandlerType.COMMAND)).thenReturn(1);
     when(introspection.getHandlerCount(HandlerType.EVENT)).thenReturn(1);
@@ -75,7 +74,9 @@ class CqrsEndpointTest {
 
     List<HandlerView> views = endpoint.handlersByKind("handlers", "command");
 
-    assertThat(views).singleElement().satisfies(view -> assertThat(view.kind()).isEqualTo("command"));
+    assertThat(views)
+        .singleElement()
+        .satisfies(view -> assertThat(view.kind()).isEqualTo("command"));
   }
 
   @Test
