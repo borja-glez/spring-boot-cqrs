@@ -287,6 +287,7 @@ public class LoggingMiddleware implements BusMiddleware {
 | `CommandValidationInterceptor` | Yes (when JSR-380 is on classpath) | `cqrs.validation.enabled` |
 | `MicrometerBusObservability` | Yes (when Micrometer is on classpath) | `cqrs.observability.enabled` |
 | `ContextPropagationMiddleware` | Yes (when SLF4J is on classpath) | `cqrs.context.enabled` |
+| `TracingMiddleware` | Yes (when an `ObservationRegistry` bean is present) | `cqrs.tracing.enabled` |
 
 ### Message Context & Correlation ID
 

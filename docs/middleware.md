@@ -250,6 +250,51 @@ automatically annotates every log line. Mirror additional keys by setting `cqrs.
 > a full bus or Spring context. See [testing.md](testing.md#middleware-test-harness)
 > for details.
 
+## Distributed Tracing
+
+`TracingMiddleware` (in `spring-boot-cqrs-core`) wraps every bus dispatch in a Micrometer `Observation`. When the consumer wires Micrometer Tracing (e.g., `spring-boot-starter-actuator` + `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`), each dispatch becomes a span named `cqrs.bus.dispatch` (configurable via `cqrs.tracing.observation-name`) with:
+
+- `cqrs.message.kind` — one of `command`, `event`, `query`, `unknown`
+- `cqrs.message.type` — the message class's simple name
+
+The span is a child of the active span when the dispatch starts, so an HTTP request → command → event handler chain stitches into a single trace.
+
+### Auto-registration
+
+The middleware is registered automatically when an `ObservationRegistry` bean is present in the context (Spring Boot Actuator provides one). It runs with `@Order(Ordered.HIGHEST_PRECEDENCE + 10)` — right after `ContextPropagationMiddleware`, so the span sees the correlation ID and any context-derived attributes.
+
+### Disabling
+
+```yaml
+cqrs:
+  tracing:
+    enabled: false
+```
+
+### Cross-transport propagation
+
+The W3C `traceparent` header is propagated automatically by Spring AMQP / Spring Kafka's own observation instrumentation when you enable it on the templates:
+
+```yaml
+spring:
+  rabbitmq:
+    template:
+      observation-enabled: true
+  kafka:
+    template:
+      observation-enabled: true
+```
+
+`TracingMiddleware` deliberately does **not** mirror trace headers into `MessageContext` — doing so would re-prefix `traceparent` under `cqrs.context.` and break W3C interop with downstream services that don't use this library. Use the transport-native observation hook instead.
+
+### Customizing the observation name
+
+```yaml
+cqrs:
+  tracing:
+    observation-name: my-service.cqrs.dispatch
+```
+
 ## Examples
 
 ### LoggingMiddleware

@@ -6,6 +6,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 
 - [Core Properties](#core-properties)
 - [Context Propagation Properties](#context-propagation-properties)
+- [Tracing Properties](#tracing-properties)
 - [RabbitMQ Properties](#rabbitmq-properties)
 - [Full YAML Example](#full-yaml-example)
 - [Minimal YAML Example](#minimal-yaml-example)
@@ -23,6 +24,8 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | `cqrs.context.auto-correlation-id` | `boolean` | `true` | If no `correlationId` is present on entry, generates a UUID and adds it to the current `MessageContext`. |
 | `cqrs.context.mdc-keys` | `List<String>` | `[correlationId]` | Context keys mirrored into SLF4J MDC during handler execution. Previous MDC values are restored on exit. |
 | `cqrs.context.header-prefix` | `String` | `"cqrs.context."` | Prefix applied to transport headers (RabbitMQ + Kafka) when serializing/deserializing the context across services. |
+| `cqrs.tracing.enabled` | `boolean` | `true` | Enables the `TracingMiddleware` (wraps each dispatch in a Micrometer `Observation`). Requires an `ObservationRegistry` bean (provided by Spring Boot Actuator). |
+| `cqrs.tracing.observation-name` | `String` | `"cqrs.bus.dispatch"` | Name of the observation/span created around each bus dispatch. |
 
 ### Naming Prefix
 
@@ -95,6 +98,19 @@ When enabled (the default), the `ContextPropagationMiddleware` is installed with
 
 Set `cqrs.context.enabled=false` to disable auto-registration of the `ContextPropagationMiddleware`. This turns off the ThreadLocal/MDC middleware behavior described above, but it does **not** by itself disable RabbitMQ/Kafka transport header propagation; those adapters still serialize the current `MessageContext` into outbound headers and rehydrate it on inbound messages, independently of the middleware. See [middleware.md](middleware.md#message-context--correlation-id) for usage details and code examples.
 
+## Tracing Properties
+
+```yaml
+cqrs:
+  tracing:
+    enabled: true                      # default
+    observation-name: "cqrs.bus.dispatch"  # default
+```
+
+When enabled (the default), and an `ObservationRegistry` bean is present in the context (provided by Spring Boot Actuator), the `TracingMiddleware` is installed with `Ordered.HIGHEST_PRECEDENCE + 10`. It wraps every bus dispatch in a Micrometer `Observation` named after `observation-name`, with low-cardinality key-values `cqrs.message.kind` (one of `command` / `event` / `query` / `unknown`) and `cqrs.message.type` (the message class's simple name).
+
+When Micrometer Tracing is also on the classpath (e.g., via `micrometer-tracing-bridge-otel` + an exporter), the observation becomes a span and stitches into the active trace. See [middleware.md](middleware.md#distributed-tracing) for the complete wiring guide and cross-transport propagation notes.
+
 ## RabbitMQ Properties
 
 Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
@@ -156,6 +172,9 @@ cqrs:
       - correlationId
       - tenantId
     header-prefix: "cqrs.context."
+  tracing:
+    enabled: true
+    observation-name: "cqrs.bus.dispatch"
   rabbitmq:
     enabled: true
     prefix: order-service
