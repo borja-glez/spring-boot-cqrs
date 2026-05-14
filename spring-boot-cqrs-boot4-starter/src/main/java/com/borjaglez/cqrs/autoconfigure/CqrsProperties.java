@@ -20,6 +20,7 @@ public class CqrsProperties {
   private ObservabilityProperties observability = new ObservabilityProperties();
   private IntrospectionProperties introspection = new IntrospectionProperties();
   private ContextProperties context = new ContextProperties();
+  private TracingProperties tracing = new TracingProperties();
 
   @Getter
   @Setter
@@ -58,5 +59,12 @@ public class CqrsProperties {
     private boolean autoCorrelationId = true;
     private List<String> mdcKeys = new ArrayList<>(List.of(MessageContext.CORRELATION_ID_KEY));
     private String headerPrefix = "cqrs.context.";
+  }
+
+  @Getter
+  @Setter
+  public static class TracingProperties {
+    private boolean enabled = true;
+    private String observationName = "cqrs.bus.dispatch";
   }
 }

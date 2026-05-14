@@ -16,5 +16,6 @@ dependencies {
     testImplementation(libs.spring.boot3.starter.validation)
     testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.observation)
+    testImplementation(libs.micrometer.observation.test)
     testImplementation(libs.slf4j.api)
 }

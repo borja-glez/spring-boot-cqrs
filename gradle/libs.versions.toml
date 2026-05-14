@@ -52,6 +52,7 @@ jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api",
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
 micrometer-observation = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer" }
+micrometer-observation-test = { module = "io.micrometer:micrometer-observation-test", version.ref = "micrometer" }
 micrometer-core-versioned = { module = "io.micrometer:micrometer-core", version.ref = "micrometer-boot4" }
 micrometer-observation-versioned = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer-boot4" }
 
