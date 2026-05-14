@@ -7,6 +7,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 - [Core Properties](#core-properties)
 - [Context Propagation Properties](#context-propagation-properties)
 - [Tracing Properties](#tracing-properties)
+- [Actuator Endpoints](#actuator-endpoints)
 - [RabbitMQ Properties](#rabbitmq-properties)
 - [Full YAML Example](#full-yaml-example)
 - [Minimal YAML Example](#minimal-yaml-example)
@@ -110,6 +111,16 @@ cqrs:
 When enabled (the default), and an `ObservationRegistry` bean is present in the context (provided by Spring Boot Actuator), the `TracingMiddleware` is installed with `Ordered.HIGHEST_PRECEDENCE + 10`. It wraps every bus dispatch in a Micrometer `Observation` named after `observation-name`, with low-cardinality key-values `cqrs.message.kind` (one of `command` / `event` / `query` / `unknown`) and `cqrs.message.type` (the message class's simple name).
 
 When Micrometer Tracing is also on the classpath (e.g., via `micrometer-tracing-bridge-otel` + an exporter), the observation becomes a span and stitches into the active trace. See [middleware.md](middleware.md#distributed-tracing) for the complete wiring guide and cross-transport propagation notes.
+
+## Actuator Endpoints
+
+This library does not introduce its own `cqrs.actuator.*` properties. When `spring-boot-starter-actuator` is on the classpath, the boot3 and boot4 starters expose `/actuator/cqrs` and contribute a `cqrs` section to `/actuator/info`. Standard Spring Boot management properties control them:
+
+- `management.endpoint.cqrs.enabled` — toggle the `/actuator/cqrs` endpoint (default `true`).
+- `management.info.cqrs.enabled` — toggle the info contributor (default `true`).
+- `management.endpoints.web.exposure.include` — expose `cqrs` and `info` for HTTP access.
+
+See [actuator.md](actuator.md) for the full guide, response payloads and transport health notes.
 
 ## RabbitMQ Properties
 

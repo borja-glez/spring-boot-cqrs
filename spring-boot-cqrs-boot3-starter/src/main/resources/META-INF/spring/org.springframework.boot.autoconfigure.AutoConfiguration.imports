@@ -4,3 +4,4 @@ com.borjaglez.cqrs.autoconfigure.CqrsValidationAutoConfiguration
 com.borjaglez.cqrs.autoconfigure.CqrsObservabilityAutoConfiguration
 com.borjaglez.cqrs.autoconfigure.CqrsContextAutoConfiguration
 com.borjaglez.cqrs.autoconfigure.CqrsTracingAutoConfiguration
+com.borjaglez.cqrs.autoconfigure.CqrsActuatorAutoConfiguration

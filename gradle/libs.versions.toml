@@ -33,9 +33,11 @@ spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-te
 spring-boot-devtools = { module = "org.springframework.boot:spring-boot-devtools" }
 spring-boot-docker-compose = { module = "org.springframework.boot:spring-boot-docker-compose" }
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot3-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation", version.ref = "spring-boot" }
 
 spring-boot4-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot4" }
+spring-boot4-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator", version.ref = "spring-boot4" }
 spring-boot4-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot4" }
 spring-boot4-starter-web = { module = "org.springframework.boot:spring-boot-starter-web", version.ref = "spring-boot4" }
 spring-boot4-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation", version.ref = "spring-boot4" }
