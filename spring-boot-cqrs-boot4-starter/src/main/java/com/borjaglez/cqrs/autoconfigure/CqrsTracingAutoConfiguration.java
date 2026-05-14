@@ -15,7 +15,7 @@ import io.micrometer.observation.ObservationRegistry;
 
 @AutoConfiguration
 @AutoConfigureAfter(CqrsAutoConfiguration.class)
-@ConditionalOnClass(ObservationRegistry.class)
+@ConditionalOnClass(name = "io.micrometer.observation.ObservationRegistry")
 @ConditionalOnProperty(
     prefix = "cqrs.tracing",
     name = "enabled",

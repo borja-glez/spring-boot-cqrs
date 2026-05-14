@@ -55,6 +55,7 @@ micrometer-observation = { module = "io.micrometer:micrometer-observation", vers
 micrometer-observation-test = { module = "io.micrometer:micrometer-observation-test", version.ref = "micrometer" }
 micrometer-core-versioned = { module = "io.micrometer:micrometer-core", version.ref = "micrometer-boot4" }
 micrometer-observation-versioned = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer-boot4" }
+micrometer-observation-test-versioned = { module = "io.micrometer:micrometer-observation-test", version.ref = "micrometer-boot4" }
 
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
