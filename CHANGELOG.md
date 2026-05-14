@@ -4,20 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.2.0] - 2026-05-14
 
-## [Unreleased]
+### Added
+- Expose Spring Boot Actuator endpoints for CQRS (#8) (#27) (6b2ded3)
+- Add distributed tracing middleware (#7) (#26) (0817320)
+- Add spring-boot-cqrs-test module (#14) (#25) (3b4d806)
+- Add MessageContext propagation and MDC integration (#15) (#24) (5de2929)
+- Add handler introspection API (#22) (09b5967)
+- Publish after commit and add outbox example (#13) (28654d7)
+- Add Kafka transport module and generic serializer support (#9) (d1a4ba5)
 
-### Changed
-- **BREAKING**: Maven group ID migrated from `com.borjaglez` to `com.borjaglez.cqrs` (#11).
-  Java package names are unchanged (`com.borjaglez.cqrs.*`).
-
-  Migration:
-  ```diff
-  - implementation("com.borjaglez:spring-boot-cqrs-boot3-starter:0.1.x")
-  + implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.2.0")
-  ```
-- Version bumped to `0.2.0-SNAPSHOT` to signal the breaking coordinate change.
-
+### Miscellaneous
+- Migrate Maven group ID to com.borjaglez.cqrs (#11) (#23) (05479da)
+- Bump version to 0.1.1-SNAPSHOT (a110ed1)
 ## [0.1.0] - 2026-04-07
 
 ### Miscellaneous
