@@ -18,6 +18,7 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 - **Micrometer observability** middleware with per-message-type metrics
 - **JSR-380 Bean Validation** middleware for command validation
 - **Message context propagation** with auto-generated correlation IDs, SLF4J MDC mirroring, and transport header propagation across RabbitMQ/Kafka
+- **Test support module** with spy buses, in-memory buses, AssertJ assertions, and a `@CqrsTest` slice annotation
 - **Jackson-based serialization** SPI for message transport, including generic `ParameterizedTypeReference` support for distributed request/reply (core is Jackson-free; each starter brings the right version)
 - **AggregateRoot** base class with domain event recording
 - **Spring Boot 3 and 4 support** via dedicated starter modules
@@ -126,6 +127,7 @@ That is all you need. The starter auto-configures the bus, discovers your handle
 | `spring-boot-cqrs-boot4-starter` | Spring Boot 4 auto-configuration |
 | `spring-boot-cqrs-kafka` | Distributed messaging adapter for Kafka with request/reply support and configurable partition keys |
 | `spring-boot-cqrs-rabbitmq` | Distributed messaging adapter with retry and dead-letter queue support |
+| `spring-boot-cqrs-test` | Test utilities: spy/in-memory buses, AssertJ assertions, `@CqrsTest` slice annotation |
 | `examples` | Runnable sample applications |
 
 Most applications only need the **boot3-starter** or **boot4-starter** (pick the one matching your Spring Boot version). The core module does not depend on Jackson at runtime -- each starter brings the correct Jackson version for its Spring Boot generation. Add the **rabbitmq** or **kafka** module when you need inter-service messaging.
@@ -482,6 +484,7 @@ The repository includes five example applications:
 - [Kafka Adapter](docs/kafka-adapter.md) -- Topics, request/reply, partition keys, consumers
 - [RabbitMQ Adapter](docs/rabbitmq-adapter.md) -- Exchanges, queues, retry, dead-letter, consumers
 - [Configuration Reference](docs/configuration.md) -- All properties with YAML examples
+- [Testing](docs/testing.md) -- Test utilities: spy buses, in-memory buses, AssertJ assertions, `@CqrsTest` slice
 - [GraalVM Native](docs/graalvm-native.md) -- AOT support, native image builds
 - [Migration Guide](docs/migration-guide.md) -- Migrating from the original amj-bus implementation
 

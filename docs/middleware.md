@@ -244,6 +244,12 @@ With the default configuration, SLF4J MDC always contains `correlationId` inside
 
 automatically annotates every log line. Mirror additional keys by setting `cqrs.context.mdc-keys=correlationId,tenantId,userId`.
 
+> **Testing middleware in isolation**: the `spring-boot-cqrs-test` module ships
+> `Handlers.invoke(message, handler, middlewares...)`, a tiny harness that runs
+> a single handler through a configurable middleware chain without bringing up
+> a full bus or Spring context. See [testing.md](testing.md#middleware-test-harness)
+> for details.
+
 ## Examples
 
 ### LoggingMiddleware
