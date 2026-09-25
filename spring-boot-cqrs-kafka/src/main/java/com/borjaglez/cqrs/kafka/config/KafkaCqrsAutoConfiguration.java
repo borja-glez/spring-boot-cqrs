@@ -20,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.core.env.Environment;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -124,6 +125,7 @@ public class KafkaCqrsAutoConfiguration {
         contextHeaderPrefix);
   }
 
+  @Conditional(RequestReplyBusEnabled.class)
   @Bean
   @ConditionalOnMissingBean
   public KafkaRequestReplyClient kafkaRequestReplyClient(
@@ -143,6 +145,7 @@ public class KafkaCqrsAutoConfiguration {
         properties.getReplies().getTimeout());
   }
 
+  @Conditional(RequestReplyBusEnabled.class)
   @Bean(name = "cqrsRepliesTopic")
   @ConditionalOnProperty(
       prefix = "cqrs.kafka",
@@ -159,6 +162,7 @@ public class KafkaCqrsAutoConfiguration {
         properties.getReplies().getReplicas());
   }
 
+  @Conditional(RequestReplyBusEnabled.class)
   @Bean(name = "cqrsKafkaReplyContainer")
   public ConcurrentMessageListenerContainer<String, byte[]> cqrsKafkaReplyContainer(
       ConsumerFactory<String, byte[]> cqrsKafkaConsumerFactory,

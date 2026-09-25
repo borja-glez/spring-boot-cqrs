@@ -141,6 +141,47 @@ class KafkaCqrsAutoConfigurationTest {
   }
 
   @Test
+  void commandsCanBeLeftOffKafka() {
+    contextRunner
+        .withPropertyValues("cqrs.kafka.commands.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(KafkaCommandBus.class);
+              assertThat(context).doesNotHaveBean("cqrsCommandsTopic");
+              assertThat(context).hasSingleBean(KafkaQueryBus.class);
+              assertThat(context).hasSingleBean(KafkaEventBus.class);
+              assertThat(context).hasSingleBean(KafkaRequestReplyClient.class);
+            });
+  }
+
+  @Test
+  void eventsOnlyApplicationsDoNotStartRequestReplyInfrastructure() {
+    contextRunner
+        .withPropertyValues("cqrs.kafka.commands.enabled=false", "cqrs.kafka.queries.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(KafkaEventBus.class);
+              assertThat(context).doesNotHaveBean(KafkaCommandBus.class);
+              assertThat(context).doesNotHaveBean(KafkaQueryBus.class);
+              assertThat(context).doesNotHaveBean(KafkaRequestReplyClient.class);
+              assertThat(context).doesNotHaveBean("cqrsKafkaReplyContainer");
+              assertThat(context).doesNotHaveBean("cqrsRepliesTopic");
+            });
+  }
+
+  @Test
+  void eventsCanBeLeftOffKafka() {
+    contextRunner
+        .withPropertyValues("cqrs.kafka.events.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(KafkaEventBus.class);
+              assertThat(context).doesNotHaveBean("cqrsEventsTopic");
+              assertThat(context).hasSingleBean(KafkaCommandBus.class);
+            });
+  }
+
+  @Test
   void shouldNotCreateKafkaBeansWhenDisabled() {
     contextRunner
         .withPropertyValues("cqrs.kafka.enabled=false")
