@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
@@ -19,7 +20,9 @@ import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqCommandBus;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
+import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 import com.borjaglez.cqrs.rabbitmq.config.RabbitMqCqrsProperties;
+import com.borjaglez.cqrs.rabbitmq.fixtures.FailingCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
@@ -121,5 +124,28 @@ class RabbitMqIntegrationTest {
     String result = rabbitMqQueryBus.ask(query);
 
     assertThat(result).isEqualTo("result:integration-query-data");
+  }
+
+  @Test
+  void shouldReceiveTheCommandResultViaRabbitMq() {
+    String result = rabbitMqCommandBus.dispatchAndReceive(new TestCommand("reply-data"));
+
+    assertThat(result).isEqualTo("handled:reply-data");
+  }
+
+  @Test
+  void shouldReportRemoteHandlerFailures() {
+    // The error reply used to lose its correlation id, so the caller saw a null result after the
+    // reply timeout instead of the failure (finding C1).
+    assertThatThrownBy(() -> rabbitMqCommandBus.dispatchAndReceive(new FailingCommand("sin stock")))
+        .isInstanceOfSatisfying(
+            RemoteHandlerException.class,
+            e -> {
+              assertThat(e.getRemoteExceptionType())
+                  .isEqualTo(IllegalStateException.class.getName());
+              assertThat(e.getMessage()).isEqualTo("Remote handler error: sin stock");
+            });
+    assertThatThrownBy(() -> rabbitMqCommandBus.dispatchAndWait(new FailingCommand("otra vez")))
+        .isInstanceOf(RemoteHandlerException.class);
   }
 }
