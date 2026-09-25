@@ -13,7 +13,10 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
 import tools.jackson.databind.json.JsonMapper;
 
 @AutoConfiguration
-@AutoConfigureAfter(CqrsAutoConfiguration.class)
+// Needs the mapper that Spring Boot's Jackson auto-configuration creates.
+@AutoConfigureAfter(
+    value = CqrsAutoConfiguration.class,
+    name = "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration")
 @ConditionalOnClass(name = "tools.jackson.databind.json.JsonMapper")
 @ConditionalOnBean(JsonMapper.class)
 public class CqrsSerializationAutoConfiguration {

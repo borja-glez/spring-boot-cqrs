@@ -12,7 +12,10 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @AutoConfiguration
-@AutoConfigureAfter(CqrsAutoConfiguration.class)
+// Needs the mapper that Spring Boot's Jackson auto-configuration creates.
+@AutoConfigureAfter(
+    value = CqrsAutoConfiguration.class,
+    name = "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration")
 @ConditionalOnClass(name = "com.fasterxml.jackson.databind.ObjectMapper")
 @ConditionalOnBean(ObjectMapper.class)
 public class CqrsSerializationAutoConfiguration {
