@@ -1,8 +1,10 @@
 package com.borjaglez.cqrs.kafka.config;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -10,15 +12,15 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
@@ -37,8 +39,20 @@ import com.borjaglez.cqrs.kafka.infrastructure.KafkaTopicNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
-@AutoConfiguration
-@AutoConfigureAfter(name = "com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration")
+/**
+ * Kafka infrastructure of the CQRS buses.
+ *
+ * <p>Producer and consumer settings are taken from the factories Spring Boot creates from {@code
+ * spring.kafka.*} (only the serializers are replaced), so the module works with Spring Boot 3 and 4
+ * even though Boot 4 moved its Kafka auto-configuration to another package. Without those factories
+ * only {@code spring.kafka.bootstrap-servers} is used.
+ */
+@AutoConfiguration(
+    afterName = {
+      "com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration",
+      "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration",
+      "org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration"
+    })
 @ConditionalOnClass(KafkaTemplate.class)
 @ConditionalOnProperty(
     prefix = "cqrs.kafka",
@@ -47,6 +61,9 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
     matchIfMissing = true)
 @EnableConfigurationProperties(KafkaCqrsProperties.class)
 public class KafkaCqrsAutoConfiguration {
+
+  static final String BOOT_PRODUCER_FACTORY = "kafkaProducerFactory";
+  static final String BOOT_CONSUMER_FACTORY = "kafkaConsumerFactory";
 
   @Bean
   @ConditionalOnMissingBean
@@ -63,8 +80,10 @@ public class KafkaCqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(name = "cqrsKafkaProducerFactory")
-  public ProducerFactory<String, byte[]> cqrsKafkaProducerFactory(KafkaProperties kafkaProperties) {
-    Map<String, Object> properties = kafkaProperties.buildProducerProperties();
+  public ProducerFactory<String, byte[]> cqrsKafkaProducerFactory(
+      ListableBeanFactory beanFactory, Environment environment) {
+    Map<String, Object> properties =
+        baseProperties(beanFactory, BOOT_PRODUCER_FACTORY, ProducerFactory.class, environment);
     properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
     properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
     return new DefaultKafkaProducerFactory<>(properties);
@@ -72,8 +91,10 @@ public class KafkaCqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(name = "cqrsKafkaConsumerFactory")
-  public ConsumerFactory<String, byte[]> cqrsKafkaConsumerFactory(KafkaProperties kafkaProperties) {
-    Map<String, Object> properties = kafkaProperties.buildConsumerProperties();
+  public ConsumerFactory<String, byte[]> cqrsKafkaConsumerFactory(
+      ListableBeanFactory beanFactory, Environment environment) {
+    Map<String, Object> properties =
+        baseProperties(beanFactory, BOOT_CONSUMER_FACTORY, ConsumerFactory.class, environment);
     properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
     properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
     properties.putIfAbsent(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -158,5 +179,25 @@ public class KafkaCqrsAutoConfiguration {
     container.setConcurrency(1);
     container.getContainerProperties().setMissingTopicsFatal(false);
     return container;
+  }
+
+  private static Map<String, Object> baseProperties(
+      ListableBeanFactory beanFactory,
+      String bootFactoryName,
+      Class<?> factoryType,
+      Environment environment) {
+    Map<String, Object> properties = new HashMap<>();
+    if (beanFactory.containsBean(bootFactoryName)) {
+      Object bootFactory = beanFactory.getBean(bootFactoryName, factoryType);
+      properties.putAll(
+          bootFactory instanceof ProducerFactory<?, ?> producer
+              ? producer.getConfigurationProperties()
+              : ((ConsumerFactory<?, ?>) bootFactory).getConfigurationProperties());
+    } else {
+      properties.put(
+          CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
+          environment.getProperty("spring.kafka.bootstrap-servers", "localhost:9092"));
+    }
+    return properties;
   }
 }
