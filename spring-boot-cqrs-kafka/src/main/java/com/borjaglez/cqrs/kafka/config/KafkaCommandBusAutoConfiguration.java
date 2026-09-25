@@ -82,7 +82,7 @@ public class KafkaCommandBusAutoConfiguration {
         contextHeaderPrefix);
   }
 
-  @Bean(name = "cqrsCommandListenerContainer")
+  @Bean(name = "cqrsKafkaCommandListenerContainer")
   public ConcurrentMessageListenerContainer<String, byte[]> cqrsCommandListenerContainer(
       ConsumerFactory<String, byte[]> cqrsKafkaConsumerFactory,
       KafkaCommandConsumer kafkaCommandConsumer,

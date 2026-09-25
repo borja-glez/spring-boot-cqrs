@@ -81,7 +81,7 @@ public class KafkaEventBusAutoConfiguration {
         contextHeaderPrefix);
   }
 
-  @Bean(name = "cqrsEventListenerContainer")
+  @Bean(name = "cqrsKafkaEventListenerContainer")
   public ConcurrentMessageListenerContainer<String, byte[]> cqrsEventListenerContainer(
       ConsumerFactory<String, byte[]> cqrsKafkaConsumerFactory,
       KafkaEventConsumer kafkaEventConsumer,
