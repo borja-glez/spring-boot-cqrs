@@ -80,7 +80,9 @@ public class RabbitMqEventBusAutoConfiguration {
       RabbitMqNamingStrategy rabbitNaming,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider,
       @Value("${spring.application.name:cqrs-app}") String appName,
-      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix,
+      @Value("${spring.rabbitmq.listener.simple.observation-enabled:false}")
+          boolean observationEnabled) {
     RabbitMqEventConsumer consumer =
         new RabbitMqEventConsumer(
             registry,
@@ -100,6 +102,8 @@ public class RabbitMqEventBusAutoConfiguration {
     container.setQueueNames(rabbitNaming.queue(appName, properties.getEvents().getExchange()));
     container.setConcurrentConsumers(properties.getEvents().getConcurrentConsumers());
     container.setMaxConcurrentConsumers(properties.getEvents().getMaxConcurrentConsumers());
+    // Same switch as Boot's listener containers: with it the trace of the sender continues here.
+    container.setObservationEnabled(observationEnabled);
     return container;
   }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -67,5 +68,23 @@ class RabbitMqEventBusAutoConfigurationTest {
             context -> {
               assertThat(context).doesNotHaveBean(RabbitMqEventBus.class);
             });
+  }
+
+  @Test
+  void shouldObserveTheListenerContainerLikeBootDoes() {
+    contextRunner.run(
+        context ->
+            assertThat(
+                    context.getBean(
+                        "cqrsEventListenerContainer", SimpleMessageListenerContainer.class))
+                .hasFieldOrPropertyWithValue("observationEnabled", false));
+    contextRunner
+        .withPropertyValues("spring.rabbitmq.listener.simple.observation-enabled=true")
+        .run(
+            context ->
+                assertThat(
+                        context.getBean(
+                            "cqrsEventListenerContainer", SimpleMessageListenerContainer.class))
+                    .hasFieldOrPropertyWithValue("observationEnabled", true));
   }
 }
