@@ -1,11 +1,13 @@
 package com.borjaglez.cqrs.rabbitmq.infrastructure;
 
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.core.Address;
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
 import org.springframework.amqp.rabbit.support.DefaultMessagePropertiesConverter;
@@ -21,6 +23,10 @@ public class ExtendedMessageListenerAdapter extends MessageListenerAdapter {
 
   static final String HEADER_ERROR = "cqrs.error";
   static final String HEADER_ERROR_TYPE = "cqrs.error.type";
+  static final String HEADER_NULL_RESULT = "cqrs.result.null";
+
+  /** Stands for a {@code null} result, which Spring AMQP would otherwise not answer at all. */
+  static final Object NULL_RESULT = new Object();
 
   private final MessagePropertiesConverter propertiesConverter =
       new DefaultMessagePropertiesConverter();
@@ -35,6 +41,31 @@ public class ExtendedMessageListenerAdapter extends MessageListenerAdapter {
   protected Object[] buildListenerArguments(
       Object extractedMessage, Channel channel, Message message) {
     return new Object[] {message, extractedMessage};
+  }
+
+  /**
+   * A handler that returns {@code null} to a request that expects a reply still gets one, so the
+   * requester can tell a {@code null} result from a missing reply.
+   */
+  @Override
+  protected Object invokeListenerMethod(
+      String methodName, Object[] arguments, Message originalMessage) {
+    Object result = super.invokeListenerMethod(methodName, arguments, originalMessage);
+    String replyTo = originalMessage.getMessageProperties().getReplyTo();
+    if (result == null && replyTo != null && !replyTo.isEmpty()) {
+      return NULL_RESULT;
+    }
+    return result;
+  }
+
+  @Override
+  protected Message buildMessage(Channel channel, Object result, Type genericType) {
+    if (result == NULL_RESULT) {
+      MessageProperties properties = new MessageProperties();
+      properties.setHeader(HEADER_NULL_RESULT, true);
+      return MessageBuilder.withBody(new byte[0]).andProperties(properties).build();
+    }
+    return super.buildMessage(channel, result, genericType);
   }
 
   @Override

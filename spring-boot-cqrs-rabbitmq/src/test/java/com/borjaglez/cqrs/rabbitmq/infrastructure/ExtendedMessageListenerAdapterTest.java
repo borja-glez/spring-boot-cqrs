@@ -197,4 +197,57 @@ class ExtendedMessageListenerAdapterTest {
       throw new IllegalStateException("Handler failed");
     }
   }
+
+  @Test
+  void aNullResultIsAnsweredWhenTheRequesterWaitsForAReply() {
+    ExtendedMessageListenerAdapter adapter =
+        new ExtendedMessageListenerAdapter(
+            new NullDelegate(), JsonMessageConverterFactory.create(), "handle");
+    MessageProperties props = new MessageProperties();
+    props.setReplyTo("reply-exchange/reply-key");
+    Message request = MessageBuilder.withBody("x".getBytes()).andProperties(props).build();
+
+    Object result = adapter.invokeListenerMethod("handle", new Object[] {request, "x"}, request);
+
+    assertThat(result).isSameAs(ExtendedMessageListenerAdapter.NULL_RESULT);
+    Message reply = adapter.buildMessage(mock(Channel.class), result, null);
+    assertThat(reply.getBody()).isEmpty();
+    assertThat((Object) reply.getMessageProperties().getHeader("cqrs.result.null")).isEqualTo(true);
+  }
+
+  @Test
+  void aNullResultIsNotAnsweredWithoutReplyAddress() {
+    ExtendedMessageListenerAdapter adapter =
+        new ExtendedMessageListenerAdapter(
+            new NullDelegate(), JsonMessageConverterFactory.create(), "handle");
+    Message noReplyTo = MessageBuilder.withBody("x".getBytes()).build();
+    MessageProperties emptyProps = new MessageProperties();
+    emptyProps.setReplyTo("");
+    Message emptyReplyTo =
+        MessageBuilder.withBody("x".getBytes()).andProperties(emptyProps).build();
+
+    assertThat(adapter.invokeListenerMethod("handle", new Object[] {noReplyTo, "x"}, noReplyTo))
+        .isNull();
+    assertThat(
+            adapter.invokeListenerMethod("handle", new Object[] {emptyReplyTo, "x"}, emptyReplyTo))
+        .isNull();
+  }
+
+  @Test
+  void otherResultsAreConvertedAsUsual() {
+    ExtendedMessageListenerAdapter adapter =
+        new ExtendedMessageListenerAdapter(
+            new NullDelegate(), JsonMessageConverterFactory.create(), "handle");
+
+    Message reply = adapter.buildMessage(mock(Channel.class), "done", String.class);
+
+    assertThat(new String(reply.getBody(), StandardCharsets.UTF_8)).isEqualTo("\"done\"");
+  }
+
+  /** Test delegate that returns nothing. */
+  public static class NullDelegate {
+    public Object handle(Message message, Object payload) {
+      return null;
+    }
+  }
 }

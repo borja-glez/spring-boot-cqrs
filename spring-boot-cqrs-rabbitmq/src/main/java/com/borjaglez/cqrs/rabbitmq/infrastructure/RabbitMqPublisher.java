@@ -13,6 +13,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
+import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 
 public class RabbitMqPublisher {
 
@@ -21,6 +22,7 @@ public class RabbitMqPublisher {
   private static final String HEADER_MESSAGE_TYPE = "cqrs.message.type";
   private static final String HEADER_ERROR = "cqrs.error";
   private static final String HEADER_ERROR_TYPE = "cqrs.error.type";
+  private static final String HEADER_NULL_RESULT = "cqrs.result.null";
 
   private final RabbitTemplate rabbitTemplate;
   private final String contextHeaderPrefix;
@@ -54,14 +56,10 @@ public class RabbitMqPublisher {
     applyCqrsHeaders(properties, messageType, snapshotContextHeaders());
 
     Message requestMessage = converter.toMessage(payload, properties);
-    Message reply = rabbitTemplate.sendAndReceive(exchange, routingKey, requestMessage);
-
-    if (reply == null) {
+    Message reply = receive(exchange, routingKey, requestMessage);
+    if (isNullResult(reply)) {
       return null;
     }
-
-    checkError(reply);
-
     return converter.fromMessage(reply);
   }
 
@@ -76,18 +74,31 @@ public class RabbitMqPublisher {
     applyCqrsHeaders(properties, messageType, snapshotContextHeaders());
 
     Message requestMessage = converter.toMessage(payload, properties);
-    Message reply = rabbitTemplate.sendAndReceive(exchange, routingKey, requestMessage);
-
-    if (reply == null) {
+    Message reply = receive(exchange, routingKey, requestMessage);
+    if (isNullResult(reply)) {
       return null;
     }
-
-    checkError(reply);
-
     if (responseType != null && converter instanceof SmartMessageConverter smartConverter) {
       return smartConverter.fromMessage(reply, responseType);
     }
     return converter.fromMessage(reply);
+  }
+
+  /**
+   * Sends the request and waits for the reply. A missing reply is a timeout, never a {@code null}
+   * result: handlers answer {@code null} explicitly.
+   */
+  private Message receive(String exchange, String routingKey, Message requestMessage) {
+    Message reply = rabbitTemplate.sendAndReceive(exchange, routingKey, requestMessage);
+    if (reply == null) {
+      throw new RemoteReplyTimeoutException(exchange, routingKey);
+    }
+    checkError(reply);
+    return reply;
+  }
+
+  private static boolean isNullResult(Message reply) {
+    return Boolean.TRUE.equals(reply.getMessageProperties().getHeader(HEADER_NULL_RESULT));
   }
 
   public void checkError(Message reply) {

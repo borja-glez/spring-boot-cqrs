@@ -21,8 +21,10 @@ import com.borjaglez.cqrs.rabbitmq.RabbitMqCommandBus;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
 import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
+import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 import com.borjaglez.cqrs.rabbitmq.config.RabbitMqCqrsProperties;
 import com.borjaglez.cqrs.rabbitmq.fixtures.FailingCommand;
+import com.borjaglez.cqrs.rabbitmq.fixtures.SlowCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
@@ -32,7 +34,8 @@ import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
     properties = {
       "spring.application.name=integration-test",
       "cqrs.rabbitmq.enabled=true",
-      "cqrs.rabbitmq.prefix=test-cqrs"
+      "cqrs.rabbitmq.prefix=test-cqrs",
+      "spring.rabbitmq.template.reply-timeout=2000"
     })
 @Import(TestContainerConfiguration.class)
 @EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
@@ -147,5 +150,16 @@ class RabbitMqIntegrationTest {
             });
     assertThatThrownBy(() -> rabbitMqCommandBus.dispatchAndWait(new FailingCommand("otra vez")))
         .isInstanceOf(RemoteHandlerException.class);
+  }
+
+  @Test
+  void shouldTellANullResultFromAMissingReply() {
+    // A missing reply used to come back as a null result, so a command whose handler never
+    // answered in time looked successful (finding C23).
+    Object nullResult = rabbitMqCommandBus.dispatchAndReceive(new SlowCommand(0));
+    assertThat(nullResult).isNull();
+
+    assertThatThrownBy(() -> rabbitMqCommandBus.dispatchAndWait(new SlowCommand(4000)))
+        .isInstanceOf(RemoteReplyTimeoutException.class);
   }
 }
