@@ -9,8 +9,11 @@ import lombok.Getter;
 @Getter
 public abstract class Event {
 
-  private final String eventId;
-  private final Instant occurredOn;
+  // Not final so deserializers that only populate non-final fields (Jackson 3 by default) keep the
+  // identity the message was sent with. There are no setters: the value never changes after
+  // construction or deserialization.
+  private String eventId;
+  private Instant occurredOn;
 
   protected Event() {
     this.eventId = UUID.randomUUID().toString();

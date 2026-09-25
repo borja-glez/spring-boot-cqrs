@@ -8,7 +8,10 @@ import lombok.Getter;
 @Getter
 public abstract class Command {
 
-  private final String commandId;
+  // Not final so deserializers that only populate non-final fields (Jackson 3 by default) keep the
+  // identity the message was sent with. There are no setters: the value never changes after
+  // construction or deserialization.
+  private String commandId;
 
   protected Command() {
     this.commandId = UUID.randomUUID().toString();
