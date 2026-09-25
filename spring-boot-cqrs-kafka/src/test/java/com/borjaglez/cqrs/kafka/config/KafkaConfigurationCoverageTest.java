@@ -39,7 +39,8 @@ class KafkaConfigurationCoverageTest {
                 mock(KafkaCommandConsumer.class),
                 properties,
                 namingStrategy,
-                "orders-service");
+                "orders-service",
+                false);
 
     assertThat(container.getContainerProperties().getGroupId())
         .isEqualTo("orders-service.cqrs.commands");
@@ -59,7 +60,8 @@ class KafkaConfigurationCoverageTest {
                 mock(KafkaCommandConsumer.class),
                 properties,
                 namingStrategy,
-                "orders-service");
+                "orders-service",
+                false);
 
     assertThat(container.getContainerProperties().getGroupId()).isEqualTo("custom-commands");
   }
@@ -78,7 +80,8 @@ class KafkaConfigurationCoverageTest {
                 mock(KafkaQueryConsumer.class),
                 properties,
                 namingStrategy,
-                "orders-service");
+                "orders-service",
+                false);
 
     assertThat(container.getContainerProperties().getGroupId())
         .isEqualTo("orders-service.cqrs.queries");
@@ -98,7 +101,8 @@ class KafkaConfigurationCoverageTest {
                 mock(KafkaQueryConsumer.class),
                 properties,
                 namingStrategy,
-                "orders-service");
+                "orders-service",
+                false);
 
     assertThat(container.getContainerProperties().getGroupId()).isEqualTo("custom-queries");
   }
@@ -117,7 +121,8 @@ class KafkaConfigurationCoverageTest {
                 mock(KafkaEventConsumer.class),
                 properties,
                 namingStrategy,
-                "orders-service");
+                "orders-service",
+                false);
 
     assertThat(container.getContainerProperties().getGroupId())
         .isEqualTo("orders-service.cqrs.events");
@@ -137,7 +142,8 @@ class KafkaConfigurationCoverageTest {
                 mock(KafkaEventConsumer.class),
                 properties,
                 namingStrategy,
-                "orders-service");
+                "orders-service",
+                false);
 
     assertThat(container.getContainerProperties().getGroupId()).isEqualTo("custom-events");
   }

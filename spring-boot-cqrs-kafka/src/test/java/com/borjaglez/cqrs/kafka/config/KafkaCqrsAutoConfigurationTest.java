@@ -16,7 +16,9 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 
 import com.borjaglez.cqrs.autoconfigure.CqrsAutoConfiguration;
 import com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration;
@@ -223,6 +225,48 @@ class KafkaCqrsAutoConfigurationTest {
               assertThat(context).doesNotHaveBean(KafkaCommandBus.class);
               assertThat(context).doesNotHaveBean(KafkaEventBus.class);
               assertThat(context).doesNotHaveBean(KafkaQueryBus.class);
+            });
+  }
+
+  @Test
+  void shouldObserveTheTemplateAndContainersLikeBootDoes() {
+    String[] containers = {
+      "cqrsKafkaCommandListenerContainer",
+      "cqrsKafkaEventListenerContainer",
+      "cqrsKafkaQueryListenerContainer",
+      "cqrsKafkaReplyContainer"
+    };
+    contextRunner.run(
+        context -> {
+          assertThat(context.getBean("cqrsKafkaTemplate", KafkaTemplate.class))
+              .hasFieldOrPropertyWithValue("observationEnabled", false);
+          for (String name : containers) {
+            assertThat(
+                    context
+                        .getBean(name, ConcurrentMessageListenerContainer.class)
+                        .getContainerProperties()
+                        .isObservationEnabled())
+                .as(name)
+                .isFalse();
+          }
+        });
+    contextRunner
+        .withPropertyValues(
+            "spring.kafka.template.observation-enabled=true",
+            "spring.kafka.listener.observation-enabled=true")
+        .run(
+            context -> {
+              assertThat(context.getBean("cqrsKafkaTemplate", KafkaTemplate.class))
+                  .hasFieldOrPropertyWithValue("observationEnabled", true);
+              for (String name : containers) {
+                assertThat(
+                        context
+                            .getBean(name, ConcurrentMessageListenerContainer.class)
+                            .getContainerProperties()
+                            .isObservationEnabled())
+                    .as(name)
+                    .isTrue();
+              }
             });
   }
 }

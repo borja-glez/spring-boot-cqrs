@@ -105,8 +105,12 @@ public class KafkaCqrsAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean
   public KafkaTemplate<String, byte[]> cqrsKafkaTemplate(
-      ProducerFactory<String, byte[]> cqrsKafkaProducerFactory) {
-    return new KafkaTemplate<>(cqrsKafkaProducerFactory);
+      ProducerFactory<String, byte[]> cqrsKafkaProducerFactory,
+      @Value("${spring.kafka.template.observation-enabled:false}") boolean observationEnabled) {
+    KafkaTemplate<String, byte[]> template = new KafkaTemplate<>(cqrsKafkaProducerFactory);
+    // Same switch as Boot's template: with it the current trace travels in the record headers.
+    template.setObservationEnabled(observationEnabled);
+    return template;
   }
 
   @Bean
@@ -169,7 +173,8 @@ public class KafkaCqrsAutoConfiguration {
       KafkaRequestReplyClient kafkaRequestReplyClient,
       KafkaCqrsProperties properties,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
-      @Value("${spring.application.name:cqrs-app}") String applicationName) {
+      @Value("${spring.application.name:cqrs-app}") String applicationName,
+      @Value("${spring.kafka.listener.observation-enabled:false}") boolean observationEnabled) {
     ContainerProperties containerProperties =
         new ContainerProperties(
             kafkaTopicNamingStrategy.replyTopic(
@@ -178,6 +183,8 @@ public class KafkaCqrsAutoConfiguration {
         applicationName + ".cqrs.replies." + UUID.randomUUID().toString().replace('-', '.'));
     containerProperties.setMessageListener(
         (MessageListener<String, byte[]>) kafkaRequestReplyClient::handleReply);
+    // Same switch as Boot's listener containers: with it the sender's trace continues here.
+    containerProperties.setObservationEnabled(observationEnabled);
     ConcurrentMessageListenerContainer<String, byte[]> container =
         new ConcurrentMessageListenerContainer<>(cqrsKafkaConsumerFactory, containerProperties);
     container.setConcurrency(1);
