@@ -1,14 +1,19 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.DefaultRabbitMqNamingStrategy;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.JsonMessageConverterFactory;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -36,6 +41,24 @@ class RabbitMqCqrsAutoConfigurationTest {
           assertThat(namingStrategy).isInstanceOf(DefaultRabbitMqNamingStrategy.class);
           assertThat(converter).isNotNull();
         });
+  }
+
+  @Test
+  void shouldTrustTheConfiguredPackagesOnly() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.trusted-packages=com.example.contracts")
+        .run(
+            context -> {
+              assertThat(context.getBean(RabbitMqCqrsProperties.class).getTrustedPackages())
+                  .containsExactly("com.example.contracts");
+              MessageConverter converter =
+                  context.getBean("cqrsMessageConverter", MessageConverter.class);
+              Message message =
+                  JsonMessageConverterFactory.create()
+                      .toMessage(new TestCommand("data"), new MessageProperties());
+              assertThatThrownBy(() -> converter.fromMessage(message))
+                  .hasMessageContaining("not in the trusted packages");
+            });
   }
 
   @Test

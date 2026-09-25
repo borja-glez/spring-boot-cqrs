@@ -21,18 +21,38 @@ public final class JsonMessageConverterFactory {
               "org.springframework.amqp.support.converter.Jackson2JsonMessageConverter",
               JACKSON_2_OBJECT_MAPPER));
 
+  private static final String[] TRUST_ALL = {"*"};
+
   private JsonMessageConverterFactory() {}
 
+  /** A converter that trusts every package, as Spring AMQP 3 did by default. */
   public static MessageConverter create() {
-    return create(JsonMessageConverterFactory.class.getClassLoader(), DEFAULT_CONVERTERS);
+    return create(TRUST_ALL);
+  }
+
+  /**
+   * A converter that only deserializes types from the given packages ({@code "*"} for all). Spring
+   * AMQP 4 trusts only {@code java.util} and {@code java.lang} by default, which rejects every
+   * command, event and query.
+   */
+  public static MessageConverter create(String... trustedPackages) {
+    return create(
+        JsonMessageConverterFactory.class.getClassLoader(), DEFAULT_CONVERTERS, trustedPackages);
   }
 
   static MessageConverter create(
       ClassLoader classLoader, List<ConverterCandidate> converterCandidates) {
+    return create(classLoader, converterCandidates, TRUST_ALL);
+  }
+
+  static MessageConverter create(
+      ClassLoader classLoader,
+      List<ConverterCandidate> converterCandidates,
+      String... trustedPackages) {
     for (ConverterCandidate converterCandidate : converterCandidates) {
       if (isPresent(converterCandidate.converterClassName(), classLoader)
           && isPresent(converterCandidate.objectMapperClassName(), classLoader)) {
-        return instantiate(converterCandidate.converterClassName(), classLoader);
+        return instantiate(converterCandidate.converterClassName(), classLoader, trustedPackages);
       }
     }
 
@@ -42,11 +62,13 @@ public final class JsonMessageConverterFactory {
             + "or Jackson2JsonMessageConverter (Spring AMQP 3 / Jackson 2).");
   }
 
-  private static MessageConverter instantiate(String converterClassName, ClassLoader classLoader) {
+  private static MessageConverter instantiate(
+      String converterClassName, ClassLoader classLoader, String... trustedPackages) {
     try {
       Class<?> converterClass = ClassUtils.forName(converterClassName, classLoader);
-      Constructor<?> constructor = converterClass.getDeclaredConstructor();
-      Object instance = constructor.newInstance();
+      // Both Spring AMQP converters take the trusted packages in their constructor.
+      Constructor<?> constructor = converterClass.getDeclaredConstructor(String[].class);
+      Object instance = constructor.newInstance((Object) trustedPackages.clone());
       return (MessageConverter) instance;
     } catch (Exception ex) {
       throw new IllegalStateException(

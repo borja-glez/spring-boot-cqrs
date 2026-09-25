@@ -33,8 +33,9 @@ public class RabbitMqCqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(name = "cqrsMessageConverter")
-  public MessageConverter cqrsMessageConverter() {
-    return JsonMessageConverterFactory.create();
+  public MessageConverter cqrsMessageConverter(RabbitMqCqrsProperties properties) {
+    return JsonMessageConverterFactory.create(
+        properties.getTrustedPackages().toArray(String[]::new));
   }
 
   @Bean
