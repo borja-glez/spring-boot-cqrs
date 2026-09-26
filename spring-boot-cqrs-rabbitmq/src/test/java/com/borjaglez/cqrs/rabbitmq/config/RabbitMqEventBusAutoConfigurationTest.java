@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
@@ -183,5 +184,52 @@ class RabbitMqEventBusAutoConfigurationTest {
               assertThat(context).doesNotHaveBean("cqrsEventDeclarables");
               assertThat(context).doesNotHaveBean("cqrsEventListenerContainer");
             });
+  }
+
+  @Test
+  void rabbitMqEventBusShouldNotDependOnTheLocalEventBus() {
+    contextRunner.run(
+        context -> {
+          assertThat(context).hasBean("springEventBus");
+          assertThat(context.getBeanFactory().getDependenciesForBean("rabbitMqEventBus"))
+              .isNotEmpty()
+              .doesNotContain("springEventBus");
+        });
+  }
+
+  @Test
+  void shouldNotWaitForConfirmsByDefault() {
+    contextRunner.run(
+        context ->
+            assertThat(context.getBean(RabbitMqEventBus.class))
+                .extracting("confirmTimeout")
+                .isNull());
+  }
+
+  @Test
+  void shouldWaitForConfirmsWhenEnabled() {
+    contextRunner
+        .withPropertyValues(
+            "spring.rabbitmq.publisher-confirm-type=correlated",
+            "cqrs.rabbitmq.events.confirms.enabled=true",
+            "cqrs.rabbitmq.events.confirms.timeout=2s")
+        .run(
+            context ->
+                assertThat(context.getBean(RabbitMqEventBus.class))
+                    .extracting("confirmTimeout")
+                    .isEqualTo(Duration.ofSeconds(2)));
+  }
+
+  @Test
+  void shouldFailToStartWhenConfirmsAreEnabledWithoutCorrelatedPublisherConfirms() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.events.confirms.enabled=true")
+        .run(
+            context ->
+                assertThat(context)
+                    .getFailure()
+                    .rootCause()
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("spring.rabbitmq.publisher-confirm-type=correlated"));
   }
 }

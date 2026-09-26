@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.amqp.support.converter.SmartMessageConverter;
@@ -25,6 +29,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.context.MessageContextTaskDecorator;
+import com.borjaglez.cqrs.rabbitmq.PublishNotConfirmedException;
 import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 
@@ -420,5 +425,102 @@ class RabbitMqPublisherTest {
     verify(converter, org.mockito.Mockito.atLeastOnce()).toMessage(any(), propsCaptor.capture());
     assertThat((Object) propsCaptor.getValue().getHeader("cqrs.context.correlationId"))
         .isEqualTo("cid-2");
+  }
+
+  @Test
+  void publishConfirmedShouldReturnWhenTheBrokerAcks() {
+    answerConfirm(correlation -> correlation.getFuture().complete(confirm(true, null)));
+
+    MessageContext ctx = MessageContext.empty().with("correlationId", "abc");
+    try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+      publisher.publishConfirmed("ex", "key", "payload", "event", Duration.ofSeconds(1));
+    }
+
+    ArgumentCaptor<MessagePostProcessor> captor =
+        ArgumentCaptor.forClass(MessagePostProcessor.class);
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq("ex"), eq("key"), eq("payload"), captor.capture(), any(CorrelationData.class));
+    Message processed =
+        captor
+            .getValue()
+            .postProcessMessage(
+                MessageBuilder.withBody("x".getBytes())
+                    .andProperties(new MessageProperties())
+                    .build());
+    assertThat((Object) processed.getMessageProperties().getHeader("cqrs.message.type"))
+        .isEqualTo("event");
+    assertThat((Object) processed.getMessageProperties().getHeader("cqrs.context.correlationId"))
+        .isEqualTo("abc");
+  }
+
+  @Test
+  void publishConfirmedShouldThrowWhenTheBrokerNacks() {
+    answerConfirm(correlation -> correlation.getFuture().complete(confirm(false, "queue full")));
+
+    assertThatThrownBy(
+            () ->
+                publisher.publishConfirmed("ex", "key", "payload", "event", Duration.ofSeconds(1)))
+        .isInstanceOf(PublishNotConfirmedException.class)
+        .hasMessage("Message key sent to ex was rejected by the broker: queue full");
+  }
+
+  @Test
+  void publishConfirmedShouldThrowWhenTheConfirmTimesOut() {
+    assertThatThrownBy(
+            () ->
+                publisher.publishConfirmed("ex", "key", "payload", "event", Duration.ofMillis(10)))
+        .isInstanceOf(PublishNotConfirmedException.class)
+        .hasMessage("Message key sent to ex was not confirmed by the broker within PT0.01S")
+        .hasCauseInstanceOf(TimeoutException.class);
+  }
+
+  @Test
+  void publishConfirmedShouldThrowWhenTheConfirmFails() {
+    IllegalStateException failure = new IllegalStateException("boom");
+    answerConfirm(correlation -> correlation.getFuture().completeExceptionally(failure));
+
+    assertThatThrownBy(
+            () ->
+                publisher.publishConfirmed("ex", "key", "payload", "event", Duration.ofSeconds(1)))
+        .isInstanceOf(PublishNotConfirmedException.class)
+        .hasMessage("Message key sent to ex was not confirmed by the broker")
+        .hasCause(failure);
+  }
+
+  @Test
+  void publishConfirmedShouldKeepTheInterruptFlagWhenInterrupted() {
+    Thread.currentThread().interrupt();
+    try {
+      assertThatThrownBy(
+              () ->
+                  publisher.publishConfirmed(
+                      "ex", "key", "payload", "event", Duration.ofSeconds(1)))
+          .isInstanceOf(PublishNotConfirmedException.class)
+          .hasMessageContaining("interrupted")
+          .hasCauseInstanceOf(InterruptedException.class);
+      assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  private void answerConfirm(java.util.function.Consumer<CorrelationData> action) {
+    doAnswer(
+            invocation -> {
+              action.accept(invocation.getArgument(4));
+              return null;
+            })
+        .when(rabbitTemplate)
+        .convertAndSend(
+            any(String.class),
+            any(String.class),
+            any(Object.class),
+            any(MessagePostProcessor.class),
+            any(CorrelationData.class));
+  }
+
+  private static CorrelationData.Confirm confirm(boolean ack, String reason) {
+    return new CorrelationData.Confirm(ack, reason);
   }
 }

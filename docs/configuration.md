@@ -226,6 +226,8 @@ Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
 | `cqrs.rabbitmq.events.exchange` | `String` | `"events"` | Logical name of the event exchange. |
 | `cqrs.rabbitmq.events.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the event listener container. |
 | `cqrs.rabbitmq.events.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the event listener container. |
+| `cqrs.rabbitmq.events.confirms.enabled` | `boolean` | `false` | Whether publishing an event waits for the broker to confirm it. When `true`, `RabbitMqEventBus.publish` throws `PublishNotConfirmedException` if the broker rejects the event or does not confirm it within the timeout. Needs `spring.rabbitmq.publisher-confirm-type=correlated` (the application fails to start otherwise). |
+| `cqrs.rabbitmq.events.confirms.timeout` | `Duration` | `5s` | How long publishing an event waits for the broker confirmation when confirms are enabled. |
 | `cqrs.rabbitmq.queries.exchange` | `String` | `"queries"` | Logical name of the query exchange. |
 | `cqrs.rabbitmq.queries.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the query listener container. |
 | `cqrs.rabbitmq.queries.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the query listener container. |

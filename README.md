@@ -374,7 +374,7 @@ cqrs:
 
 RabbitMQ starts automatically via [Spring Boot Docker Compose](https://docs.spring.io/spring-boot/reference/features/docker-compose.html) when running `./gradlew :examples:example-rabbitmq:bootRun` — no manual `docker compose up` is needed. Connection properties are auto-configured from the running container.
 
-The RabbitMQ event bus automatically falls back to the local Spring event bus if the AMQP connection is unavailable.
+The RabbitMQ event bus throws when the event cannot be sent; it does not fall back to the local event bus. `publish(List<Event>)` stops at the first failure. By default the bus does not wait for the broker to accept the event; set `cqrs.rabbitmq.events.confirms.enabled=true` (with `spring.rabbitmq.publisher-confirm-type=correlated`) to fail when the broker rejects it or does not confirm it within `cqrs.rabbitmq.events.confirms.timeout` (5s). For reliable publication, use an outbox (see [Transactional event publishing](#transactional-event-publishing)).
 
 ### Kafka
 

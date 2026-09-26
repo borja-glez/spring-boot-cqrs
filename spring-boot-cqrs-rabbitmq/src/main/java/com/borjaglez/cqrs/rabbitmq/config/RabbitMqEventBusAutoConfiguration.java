@@ -1,5 +1,6 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -20,7 +21,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
-import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -63,13 +63,23 @@ public class RabbitMqEventBusAutoConfiguration {
       RabbitMqNamingStrategy rabbitNaming,
       MessageNamingStrategy messageNaming,
       RabbitMqCqrsProperties properties,
-      @Qualifier("springEventBus") EventBus fallbackEventBus) {
+      RabbitTemplate rabbitTemplate) {
+    RabbitMqCqrsProperties.ConfirmsProperties confirms = properties.getEvents().getConfirms();
+    Duration confirmTimeout = null;
+    if (confirms.isEnabled()) {
+      if (!rabbitTemplate.getConnectionFactory().isPublisherConfirms()) {
+        throw new IllegalStateException(
+            "cqrs.rabbitmq.events.confirms.enabled=true needs correlated publisher confirms:"
+                + " set spring.rabbitmq.publisher-confirm-type=correlated");
+      }
+      confirmTimeout = confirms.getTimeout();
+    }
     return new RabbitMqEventBus(
         publisher,
         rabbitNaming,
         messageNaming,
         properties.getEvents().getExchange(),
-        fallbackEventBus);
+        confirmTimeout);
   }
 
   @Bean

@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -110,10 +111,35 @@ class RabbitMqCqrsPropertiesTest {
   @Test
   void shouldSetEvents() {
     RabbitMqCqrsProperties properties = new RabbitMqCqrsProperties();
-    RabbitMqCqrsProperties.BusProperties events =
-        new RabbitMqCqrsProperties.BusProperties("my-events", 2, 4);
+    RabbitMqCqrsProperties.EventBusProperties events =
+        new RabbitMqCqrsProperties.EventBusProperties("my-events", 2, 4);
     properties.setEvents(events);
     assertThat(properties.getEvents().getExchange()).isEqualTo("my-events");
+  }
+
+  @Test
+  void eventConfirmsShouldBeDisabledByDefaultWithAFiveSecondTimeout() {
+    RabbitMqCqrsProperties.EventBusProperties events = new RabbitMqCqrsProperties().getEvents();
+
+    assertThat(events.getConfirms().isEnabled()).isFalse();
+    assertThat(events.getConfirms().getTimeout()).isEqualTo(Duration.ofSeconds(5));
+    assertThat(new RabbitMqCqrsProperties.EventBusProperties().getConfirms().isEnabled()).isFalse();
+  }
+
+  @Test
+  void shouldBindEventConfirms() {
+    RabbitMqCqrsProperties properties =
+        new Binder(
+                new MapConfigurationPropertySource(
+                    Map.of(
+                        "cqrs.rabbitmq.events.confirms.enabled", "true",
+                        "cqrs.rabbitmq.events.confirms.timeout", "250ms")))
+            .bind("cqrs.rabbitmq", RabbitMqCqrsProperties.class)
+            .get();
+
+    assertThat(properties.getEvents().getConfirms().isEnabled()).isTrue();
+    assertThat(properties.getEvents().getConfirms().getTimeout()).isEqualTo(Duration.ofMillis(250));
+    assertThat(properties.getEvents().getExchange()).isEqualTo("events");
   }
 
   @Test

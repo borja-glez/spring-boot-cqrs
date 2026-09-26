@@ -15,7 +15,7 @@ All library code lives under the `com.borjaglez.cqrs` package hierarchy.
 - Middleware pipeline intercepts all bus dispatches for cross-cutting concerns.
 - Handler discovery is annotation-driven via `BeanPostProcessor`.
 - GraalVM native image support with automatic AOT hint registration.
-- RabbitMQ adapters fall back to local buses when unavailable.
+- Broker adapters report publish failures to the caller instead of falling back to local buses.
 
 ## Quality
 

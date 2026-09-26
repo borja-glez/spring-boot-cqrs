@@ -1,5 +1,6 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +26,7 @@ public class RabbitMqCqrsProperties {
 
   private RetryProperties retry = new RetryProperties();
   private BusProperties commands = new BusProperties("commands", 10, 20);
-  private BusProperties events = new BusProperties("events", 10, 20);
+  private EventBusProperties events = new EventBusProperties("events", 10, 20);
   private BusProperties queries = new BusProperties("queries", 10, 20);
 
   @Getter
@@ -67,5 +68,36 @@ public class RabbitMqCqrsProperties {
       this.concurrentConsumers = concurrentConsumers;
       this.maxConcurrentConsumers = maxConcurrentConsumers;
     }
+  }
+
+  @Getter
+  @Setter
+  public static class EventBusProperties extends BusProperties {
+
+    private ConfirmsProperties confirms = new ConfirmsProperties();
+
+    public EventBusProperties() {
+      super();
+    }
+
+    public EventBusProperties(
+        String exchange, int concurrentConsumers, int maxConcurrentConsumers) {
+      super(exchange, concurrentConsumers, maxConcurrentConsumers);
+    }
+  }
+
+  @Getter
+  @Setter
+  public static class ConfirmsProperties {
+
+    /**
+     * Whether publishing an event waits for the broker to confirm it and fails when the broker
+     * rejects it or does not confirm it within the timeout. Needs {@code
+     * spring.rabbitmq.publisher-confirm-type=correlated}.
+     */
+    private boolean enabled = false;
+
+    /** How long publishing an event waits for the broker confirmation. */
+    private Duration timeout = Duration.ofSeconds(5);
   }
 }
