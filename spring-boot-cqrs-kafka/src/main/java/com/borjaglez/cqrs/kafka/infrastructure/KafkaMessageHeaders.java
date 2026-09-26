@@ -9,6 +9,7 @@ public final class KafkaMessageHeaders {
   public static final String REPLY_TOPIC = "cqrs.reply.topic";
   public static final String REQUEST_MODE = "cqrs.request.mode";
   public static final String ERROR = "cqrs.error";
+  public static final String ERROR_TYPE = "cqrs.error.type";
 
   private KafkaMessageHeaders() {}
 }

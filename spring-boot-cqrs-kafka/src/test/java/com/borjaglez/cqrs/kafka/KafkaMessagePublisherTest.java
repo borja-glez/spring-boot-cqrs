@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -96,16 +97,16 @@ class KafkaMessagePublisherTest {
   }
 
   @Test
-  void publishReplyUsesEmptyStringWhenPayloadIsNull() {
-    when(serializer.serialize("")).thenReturn(new byte[0]);
-
+  void publishReplySendsANullResultAsAnEmptyBody() {
     publisher.publishReply("cqrs.replies", "corr-1", null);
 
     ProducerRecord<String, byte[]> record = sentRecord();
     assertThat(record.topic()).isEqualTo("cqrs.replies");
     assertThat(record.key()).isEqualTo("corr-1");
+    assertThat(record.value()).isEmpty();
     assertThat(header(record, KafkaMessageHeaders.CORRELATION_ID)).isEqualTo("corr-1");
-    assertThat(header(record, KafkaMessageHeaders.PAYLOAD_TYPE)).isEqualTo(String.class.getName());
+    assertThat(record.headers().lastHeader(KafkaMessageHeaders.PAYLOAD_TYPE)).isNull();
+    verifyNoInteractions(serializer);
   }
 
   @Test
@@ -127,6 +128,16 @@ class KafkaMessagePublisherTest {
     assertThat(header(record, KafkaMessageHeaders.CORRELATION_ID)).isEqualTo("corr-1");
     assertThat(header(record, KafkaMessageHeaders.ERROR)).isEqualTo("true");
     assertThat(header(record, KafkaMessageHeaders.PAYLOAD_TYPE)).isEqualTo(String.class.getName());
+  }
+
+  @Test
+  void publishErrorReplyDescribesAnExceptionWithoutMessageByItsClass() {
+    publisher.publishErrorReply("cqrs.replies", "corr-1", new NullPointerException());
+
+    ProducerRecord<String, byte[]> record = sentRecord();
+    assertThat(new String(record.value(), UTF_8)).isEqualTo(NullPointerException.class.getName());
+    assertThat(header(record, KafkaMessageHeaders.ERROR_TYPE))
+        .isEqualTo(NullPointerException.class.getName());
   }
 
   @Test

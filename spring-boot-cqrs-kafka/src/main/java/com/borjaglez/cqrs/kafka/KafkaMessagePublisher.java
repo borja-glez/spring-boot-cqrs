@@ -87,29 +87,47 @@ public class KafkaMessagePublisher {
     }
   }
 
+  /**
+   * Answers a request. A {@code null} result travels as an empty body without payload type, which
+   * the caller reads back as {@code null}: serialized as {@code ""} it came back as an empty
+   * string.
+   */
   public void publishReply(String topic, String correlationId, Object payload) {
-    Object safePayload = payload == null ? "" : payload;
     ProducerRecord<String, byte[]> record =
-        new ProducerRecord<>(topic, correlationId, serializer.serialize(safePayload));
+        new ProducerRecord<>(
+            topic, correlationId, payload == null ? new byte[0] : serializer.serialize(payload));
     record
         .headers()
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
-    record
-        .headers()
-        .add(
-            new RecordHeader(
-                KafkaMessageHeaders.PAYLOAD_TYPE,
-                safePayload.getClass().getName().getBytes(UTF_8)));
+    if (payload != null) {
+      record
+          .headers()
+          .add(
+              new RecordHeader(
+                  KafkaMessageHeaders.PAYLOAD_TYPE, payload.getClass().getName().getBytes(UTF_8)));
+    }
     kafkaTemplate.send(record).join();
   }
 
+  /**
+   * Answers a request with the failure of its handler. An exception without message (a bare
+   * NullPointerException, say) is described by its class instead of making this method fail, which
+   * left the caller waiting for the timeout.
+   */
   public void publishErrorReply(String topic, String correlationId, RuntimeException error) {
+    String description =
+        error.getMessage() != null ? error.getMessage() : error.getClass().getName();
     ProducerRecord<String, byte[]> record =
-        new ProducerRecord<>(topic, correlationId, error.getMessage().getBytes(UTF_8));
+        new ProducerRecord<>(topic, correlationId, description.getBytes(UTF_8));
     record
         .headers()
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));
     record.headers().add(new RecordHeader(KafkaMessageHeaders.ERROR, "true".getBytes(UTF_8)));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.ERROR_TYPE, error.getClass().getName().getBytes(UTF_8)));
     record
         .headers()
         .add(
