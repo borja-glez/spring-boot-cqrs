@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.3.1] - 2026-09-26
+
+### Added
+- Record the failure cause on dead-lettered messages (#89) (43eea54)
+
+### Documentation
+- Document and test that generic remote results need a ParameterizedTypeReference (#92) (5ed5bec)
+- Add the Kafka adapter guide and document where middleware runs (#85) (053d772)
+- Describe how to work on an issue (#78) (f1bbb3b)
+- Update README for v0.3.0 (6924255)
+
+### Fixed
+- Send MessageContext headers with request-reply commands and queries (#91) (f8eb225)
+- Reject abstract handler parameters and report unhandled message subclasses (#90) (ac7c3dd)
+- Start the reply consumer at the instance start time (#88) (619454f)
+- Fail at startup when a handler method cannot be invoked through the bean's proxy (#87) (dcf1427)
+- Let a middleware call MiddlewareChain.proceed more than once (#86) (a0755bb)
+
+### Miscellaneous
+- Bump version to 0.3.1-SNAPSHOT (e74eb6a)
+
+### Ci
+- Update workflow actions to their Node 24 releases (#77) (5e1a0d3)
 ## [0.3.0] - 2026-09-26
 
 ### Added
