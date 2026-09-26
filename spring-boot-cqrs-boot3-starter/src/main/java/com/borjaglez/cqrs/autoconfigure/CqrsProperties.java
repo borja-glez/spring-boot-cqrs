@@ -1,11 +1,14 @@
 package com.borjaglez.cqrs.autoconfigure;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.retry.BackoffStrategy;
+import com.borjaglez.cqrs.retry.RetryPolicy;
 import com.borjaglez.cqrs.tracing.TracingMiddleware;
 
 import lombok.Getter;
@@ -22,6 +25,7 @@ public class CqrsProperties {
   private IntrospectionProperties introspection = new IntrospectionProperties();
   private ContextProperties context = new ContextProperties();
   private TracingProperties tracing = new TracingProperties();
+  private RetryProperties retry = new RetryProperties();
 
   @Getter
   @Setter
@@ -67,5 +71,51 @@ public class CqrsProperties {
   public static class TracingProperties {
     private boolean enabled = true;
     private String observationName = TracingMiddleware.DEFAULT_OBSERVATION_NAME;
+  }
+
+  @Getter
+  @Setter
+  public static class RetryProperties {
+    /** Whether to register the in-process retry middleware for commands and queries. */
+    private boolean enabled = false;
+
+    /** Total attempts, the first one included; 1 disables retries. */
+    private int maxAttempts = RetryPolicy.DEFAULT_MAX_ATTEMPTS;
+
+    private BackoffProperties backoff = new BackoffProperties();
+
+    /**
+     * Fully-qualified exception class names that make a failure retriable. Empty means the default
+     * set (java.lang.RuntimeException).
+     */
+    private List<String> retriableExceptions = new ArrayList<>();
+
+    /** Fully-qualified exception class names added to the default non-retriable set. */
+    private List<String> nonRetriableExceptions = new ArrayList<>();
+  }
+
+  @Getter
+  @Setter
+  public static class BackoffProperties {
+    /** Backoff strategy between attempts. */
+    private Strategy strategy = Strategy.EXPONENTIAL_JITTER;
+
+    /** Delay after the first failed attempt; the constant delay of the fixed strategy. */
+    private Duration initialDelay = BackoffStrategy.DEFAULT_INITIAL_DELAY;
+
+    /** Factor applied to the delay after every failed attempt; at least 1. */
+    private double multiplier = BackoffStrategy.DEFAULT_MULTIPLIER;
+
+    /** Upper bound of the delay. */
+    private Duration maxDelay = BackoffStrategy.DEFAULT_MAX_DELAY;
+
+    /** Random spread of the delay, between 0 and 1 (0.1 means +/-10 %). */
+    private double jitterFactor = BackoffStrategy.DEFAULT_JITTER_FACTOR;
+
+    public enum Strategy {
+      FIXED,
+      EXPONENTIAL,
+      EXPONENTIAL_JITTER
+    }
   }
 }
