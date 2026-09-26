@@ -1,12 +1,15 @@
 package com.borjaglez.cqrs.rabbitmq;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -14,7 +17,9 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,8 +27,15 @@ import org.springframework.amqp.AmqpConnectException;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
+import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.event.EventHandlerExecutionException;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
+import com.borjaglez.cqrs.middleware.MiddlewareChain;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.fixtures.PlainTextMessageConverter;
+import com.borjaglez.cqrs.rabbitmq.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -131,6 +143,98 @@ class RabbitMqEventBusTest {
           .isInstanceOf(AmqpConnectException.class);
     } finally {
       connectionFactory.destroy();
+    }
+  }
+
+  @Test
+  void publishRunsOutboundMiddlewaresBeforePublishingAndSkipsTheOthers() {
+    List<String> calls = new ArrayList<>();
+    List<String> correlationIds = new ArrayList<>();
+    TestEvent event = new TestEvent("test-data");
+    doAnswer(
+            invocation -> {
+              calls.add("publish");
+              correlationIds.add(
+                  MessageContext.current().get(MessageContext.CORRELATION_ID_KEY).orElseThrow());
+              return null;
+            })
+        .when(publisher)
+        .publish("cqrs.events", "test.order.created", event, "event");
+    RabbitMqEventBus bus =
+        new RabbitMqEventBus(
+            publisher,
+            rabbitNaming,
+            messageNaming,
+            "events",
+            null,
+            List.of(
+                new ContextPropagationMiddleware(true, List.of(), () -> "sender-id"),
+                new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+                new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL)));
+
+    bus.publish(event);
+
+    assertThat(calls).containsExactly("outbound", "publish");
+    assertThat(correlationIds).containsExactly("sender-id");
+  }
+
+  @Test
+  void confirmedPublishRunsOutboundMiddlewaresBeforePublishing() {
+    List<String> calls = new ArrayList<>();
+    TestEvent event = new TestEvent("test-data");
+    Duration timeout = Duration.ofSeconds(1);
+    doAnswer(invocation -> calls.add("publish"))
+        .when(publisher)
+        .publishConfirmed("cqrs.events", "test.order.created", event, "event", timeout);
+    RabbitMqEventBus bus =
+        new RabbitMqEventBus(
+            publisher,
+            rabbitNaming,
+            messageNaming,
+            "events",
+            timeout,
+            List.of(new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND)));
+
+    bus.publish(event);
+
+    assertThat(calls).containsExactly("outbound", "publish");
+  }
+
+  @Test
+  void outboundMiddlewareCanShortCircuitThePublish() {
+    Exception failure = new Exception("denied");
+    RabbitMqEventBus bus =
+        new RabbitMqEventBus(
+            publisher,
+            rabbitNaming,
+            messageNaming,
+            "events",
+            null,
+            List.of(new ShortCircuit(failure)));
+
+    assertThatThrownBy(() -> bus.publish(new TestEvent("test-data")))
+        .isInstanceOf(EventHandlerExecutionException.class)
+        .hasCause(failure);
+    verifyNoInteractions(publisher);
+  }
+
+  /** Outbound middleware that fails with a checked exception instead of calling the chain. */
+  private static final class ShortCircuit implements BusMiddleware {
+
+    private final Exception failure;
+
+    ShortCircuit(Exception failure) {
+      this.failure = failure;
+    }
+
+    @Override
+    public Object process(Object message, MiddlewareChain chain) throws Exception {
+      throw failure;
+    }
+
+    @Override
+    public Set<DispatchPhase> phases() {
+      return Set.of(DispatchPhase.OUTBOUND);
     }
   }
 }

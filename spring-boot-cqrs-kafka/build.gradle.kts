@@ -17,6 +17,7 @@ dependencies {
     testImplementation(libs.spring.kafka.test)
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.datatype.jsr310)
+    testImplementation(libs.spring.boot.starter.validation)
     // An application may use Kafka and RabbitMQ side by side (finding C26).
     testImplementation(project(":spring-boot-cqrs-rabbitmq"))
 }

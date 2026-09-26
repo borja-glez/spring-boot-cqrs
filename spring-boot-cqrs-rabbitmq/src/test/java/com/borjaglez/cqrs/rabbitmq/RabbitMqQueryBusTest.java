@@ -2,15 +2,28 @@ package com.borjaglez.cqrs.rabbitmq;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
+import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
+import com.borjaglez.cqrs.middleware.MiddlewareChain;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.QueryHandlerExecutionException;
+import com.borjaglez.cqrs.rabbitmq.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -130,5 +143,81 @@ class RabbitMqQueryBusTest {
     assertThatThrownBy(() -> queryBus.ask(query, typeRef))
         .isInstanceOf(QueryHandlerExecutionException.class)
         .hasCause(checkedException);
+  }
+
+  @Test
+  void askRunsOutboundMiddlewaresBeforePublishingAndSkipsTheOthers() {
+    List<String> calls = new ArrayList<>();
+    List<String> correlationIds = new ArrayList<>();
+    TestQuery query = new TestQuery("test-data");
+    when(rabbitNaming.exchange("queries")).thenReturn("cqrs.queries");
+    when(messageNaming.queryName(TestQuery.class)).thenReturn("test.order.get");
+    when(publisher.publishAndReceive(
+            eq("cqrs.queries"), eq("test.order.get"), eq(query), eq("query")))
+        .thenAnswer(
+            invocation -> {
+              calls.add("publish");
+              correlationIds.add(
+                  MessageContext.current().get(MessageContext.CORRELATION_ID_KEY).orElseThrow());
+              return "result";
+            });
+    when(publisher.publishAndReceive(
+            eq("cqrs.queries"), eq("test.order.get"), eq(query), eq("query"), any()))
+        .thenAnswer(
+            invocation -> {
+              calls.add("publish");
+              return "typed-result";
+            });
+    RabbitMqQueryBus bus =
+        new RabbitMqQueryBus(
+            publisher,
+            rabbitNaming,
+            messageNaming,
+            "queries",
+            List.of(
+                new ContextPropagationMiddleware(true, List.of(), () -> "sender-id"),
+                new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+                new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND)));
+
+    String result = bus.ask(query);
+    String typed = bus.ask(query, new ParameterizedTypeReference<String>() {});
+
+    assertThat(result).isEqualTo("result");
+    assertThat(typed).isEqualTo("typed-result");
+    assertThat(calls).containsExactly("outbound", "publish", "outbound", "publish");
+    assertThat(correlationIds).containsExactly("sender-id");
+  }
+
+  @Test
+  void outboundMiddlewareCanShortCircuitTheSend() {
+    Exception failure = new Exception("denied");
+    RabbitMqQueryBus bus =
+        new RabbitMqQueryBus(
+            publisher, rabbitNaming, messageNaming, "queries", List.of(new ShortCircuit(failure)));
+
+    assertThatThrownBy(() -> bus.ask(new TestQuery("test-data")))
+        .isInstanceOf(QueryHandlerExecutionException.class)
+        .hasCause(failure);
+    verifyNoInteractions(publisher);
+  }
+
+  /** Outbound middleware that fails with a checked exception instead of calling the chain. */
+  private static final class ShortCircuit implements BusMiddleware {
+
+    private final Exception failure;
+
+    ShortCircuit(Exception failure) {
+      this.failure = failure;
+    }
+
+    @Override
+    public Object process(Object message, MiddlewareChain chain) throws Exception {
+      throw failure;
+    }
+
+    @Override
+    public Set<DispatchPhase> phases() {
+      return Set.of(DispatchPhase.OUTBOUND);
+    }
   }
 }

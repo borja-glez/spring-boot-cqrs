@@ -1,6 +1,6 @@
 # Middleware Documentation
 
-The middleware pipeline intercepts every message dispatched through any of the three buses (Command, Event, Query). Middleware can inspect, modify, or short-circuit messages before they reach handlers. It runs where the handler runs: with the RabbitMQ and Kafka buses, on the receiving side only (see [Middleware on Remote Buses](#middleware-on-remote-buses)).
+The middleware pipeline intercepts every message dispatched through any of the three buses (Command, Event, Query). Middleware can inspect, modify, or short-circuit messages before they reach handlers. Each middleware declares in which [dispatch phases](#middleware-on-remote-buses) it runs: in local dispatches, on the sending side of the RabbitMQ and Kafka buses, and on their receiving side. By default it runs in local dispatches and on the receiving side.
 
 ## Table of Contents
 
@@ -19,10 +19,16 @@ The middleware pipeline intercepts every message dispatched through any of the t
 @FunctionalInterface
 public interface BusMiddleware {
     Object process(Object message, MiddlewareChain chain) throws Exception;
+
+    default Set<DispatchPhase> phases() {
+        return Set.of(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+    }
 }
 ```
 
 The `message` parameter is the `Command`, `Event`, or `Query` being dispatched. Call `chain.proceed(message)` to pass the message to the next middleware in the chain (or to the terminal handler if this is the last middleware). Return the result from `chain.proceed()` to propagate the handler's return value.
+
+`phases()` says where the middleware runs; see [Middleware on Remote Buses](#middleware-on-remote-buses).
 
 ## MiddlewareChain
 
@@ -114,16 +120,58 @@ The built-in middleware participates in the same pipeline: `ContextPropagationMi
 
 ## Middleware on Remote Buses
 
-The middleware chain runs **where the handler runs**. With the in-process buses (`SpringCommandBus`, `SpringQueryBus`, `SpringEventBus`) that is the dispatching application. With the remote buses of the RabbitMQ and Kafka modules (`RabbitMqCommandBus`, `RabbitMqQueryBus`, `RabbitMqEventBus`, `KafkaCommandBus`, `KafkaQueryBus`, `KafkaEventBus`) it is the **receiving side only**: the bus hands the message straight to the transport publisher, and the consumer of the receiving service rehydrates the `MessageContext` from the headers and runs the whole chain (built-in and user middleware) before the handler.
+A message can pass a middleware chain in three places, the three values of `DispatchPhase`:
 
-No `BusMiddleware` runs on the sending side. Consequences:
+| Phase | Where | Buses |
+|---|---|---|
+| `LOCAL` | In-process dispatch, before the handler | `SpringCommandBus`, `SpringQueryBus`, the local `springEventBus` |
+| `OUTBOUND` | Sending side of a remote bus, before the message is published | `RabbitMqCommandBus`, `RabbitMqQueryBus`, `RabbitMqEventBus`, `KafkaCommandBus`, `KafkaQueryBus`, `KafkaEventBus` |
+| `INBOUND` | Receiving side of a remote bus, in the consumer, before the handler | The RabbitMQ and Kafka consumers |
 
-- **Validation:** `CommandValidationInterceptor` runs in the receiving service. An invalid command is published, travels to the receiver and fails there; with request/reply the caller gets a remote error (`RemoteHandlerException` with RabbitMQ, a `RuntimeException("Remote handler error: ...")` with Kafka) instead of a local `ConstraintViolationException`. With a fire-and-forget `dispatch` the sender is not told at all. Validate before sending if you need to fail fast.
-- **Context:** `ContextPropagationMiddleware` does not run on the sender, so a remote dispatch made without an open `MessageContext` sends no `correlationId` header, and the receiver generates one that the sender's logs do not have. Open a `MessageContext.Scope` with a correlation id at the boundary (see [Seeding the context](#seeding-the-context-at-a-system-boundary)) to share it.
-- **Metrics and spans:** `MicrometerBusObservability` and `TracingMiddleware` record the dispatch on the receiver. On the sender the only observation is the transport's own (`spring.rabbitmq.template.observation-enabled`, `spring.kafka.template.observation-enabled`); see [Distributed Tracing](#distributed-tracing).
-- **User middleware** (logging, authorization, transactions, idempotency) sees remote messages only in the receiving service.
+Every bus is given all the `BusMiddleware` beans, in `@Order` order, and runs only those whose `phases()` contains its phase. A remote message therefore passes the `OUTBOUND` chain in the sending process and the `INBOUND` chain in the receiving process; the consumer rehydrates the `MessageContext` from the headers before its chain runs. A middleware that declares both phases runs twice per remote message, once in each process.
 
-Whether middleware should also run on the sending side is tracked in [#59](https://github.com/borja-glez/spring-boot-cqrs/issues/59).
+`BusMiddleware.phases()` defaults to `LOCAL` and `INBOUND`: a middleware runs where the handler runs and not on the sender. The built-in middleware:
+
+| Middleware | `LOCAL` | `OUTBOUND` | `INBOUND` | Why |
+|---|:-:|:-:|:-:|---|
+| `ContextPropagationMiddleware` | Yes | Yes | Yes | On the sender it generates the correlation id before the headers are written and mirrors the context into MDC during the send. |
+| `CommandValidationInterceptor` | Yes | Yes | Yes | An invalid command fails on the sender, before anything is published. The receiver validates again: it cannot trust every producer. |
+| `TracingMiddleware` | Yes | No | Yes | The sender's span is the transport's own producer observation; a second one would duplicate it. |
+| `MicrometerBusObservability` | Yes | No | Yes | No sender-side meter: sharing the `cqrs.bus.dispatch` name would count each remote message twice. |
+| `RetryMiddleware` | Yes | No | Yes | It retries the handler. A failed remote send is not retried by it. |
+
+Consequences on the sending side:
+
+- **Validation:** `dispatch`, `dispatchAndWait` and `dispatchAndReceive` of an invalid command throw `jakarta.validation.ConstraintViolationException` in the caller, and nothing is published. Before 0.4.0 the command travelled to the receiver and the caller got a remote error (`RemoteHandlerException` with RabbitMQ, `RuntimeException("Remote handler error: ...")` with Kafka) or, with a fire-and-forget `dispatch`, nothing at all.
+- **Context:** a remote dispatch made without an open `MessageContext` gets a correlation id on the sender (with `cqrs.context.auto-correlation-id=true`), sent as `cqrs.context.correlationId`, so the sender and the receiver log the same id. The scope is closed when the send returns: code after the dispatch still sees the caller's context. Open a `MessageContext.Scope` at the boundary (see [Seeding the context](#seeding-the-context-at-a-system-boundary)) when the caller's own logs must carry the id too.
+- **Metrics and spans:** `MicrometerBusObservability` and `TracingMiddleware` record the dispatch on the receiver only. On the sender the only observation is the transport's own (`spring.rabbitmq.template.observation-enabled`, `spring.kafka.template.observation-enabled`); see [Distributed Tracing](#distributed-tracing).
+- **User middleware** (logging, authorization, transactions, idempotency) keeps running only where the handler runs, unless it declares `OUTBOUND`.
+
+A middleware can throw to stop a remote send, like any other middleware: the publisher is never called, and a checked exception is wrapped in `CommandHandlerExecutionException`, `QueryHandlerExecutionException` or `EventHandlerExecutionException`, as in local dispatches. The message a middleware passes to `chain.proceed` is the one sent, and its class chooses the routing key or message name.
+
+To run your own middleware on the sender, override `phases()`:
+
+```java
+@Component
+@Order(5)
+public class OutboundAuditMiddleware implements BusMiddleware {
+
+    @Override
+    public Object process(Object message, MiddlewareChain chain) throws Exception {
+        audit.recordSend(message);
+        return chain.proceed(message);
+    }
+
+    @Override
+    public Set<DispatchPhase> phases() {
+        return Set.of(DispatchPhase.OUTBOUND);   // only before remote sends
+    }
+}
+```
+
+`DispatchPhase.OUTBOUND.select(middlewares)` returns the middlewares of a list that declare a phase, in order; the buses and consumers use it, and `phases()` must not return `null`. The auto-configuration passes every `BusMiddleware` bean to the remote buses; when you build a remote bus yourself, pass them to the constructor that takes a `List<BusMiddleware>` (the constructors without it run no middleware before sending). The `/actuator/cqrs` endpoint lists the phases of each middleware (see [Actuator](actuator.md)).
+
+> **Upgrading from 0.3.x.** Before 0.4.0 no middleware ran on the sending side of the RabbitMQ and Kafka buses. `ContextPropagationMiddleware` and `CommandValidationInterceptor` now also run there: an invalid command fails in the caller with `ConstraintViolationException` instead of a remote error, and remote messages sent without a context carry a correlation id generated by the sender. Catch `ConstraintViolationException` where you caught the remote error. To keep the previous behavior for one of them, turn it off (`cqrs.validation.enabled=false` or `cqrs.context.enabled=false`) and declare your own bean: a subclass whose `phases()` returns `Set.of(DispatchPhase.LOCAL, DispatchPhase.INBOUND)`. `cqrs.context.enabled=false` also stops the registration of `MessageContextThreadLocalAccessor`. User middleware is not affected: `phases()` defaults to the previous behavior.
 
 ## Built-in Middleware
 
@@ -151,6 +199,8 @@ public class CommandValidationInterceptor implements BusMiddleware {
 
 Only `Command` instances are validated. Events and queries pass through untouched.
 
+It runs in every phase: in local dispatches, and on both sides of the RabbitMQ and Kafka buses, so an invalid command sent to another service fails in the caller before it is published, and the receiver validates what it gets from other producers (see [Middleware on Remote Buses](#middleware-on-remote-buses)).
+
 Usage:
 
 ```java
@@ -169,7 +219,7 @@ public class CreateUserCommand extends Command {
 **Auto-configured:** Yes, when Micrometer is on the classpath  
 **Property:** `cqrs.observability.enabled` (default: `true`)
 
-Records a `cqrs.bus.dispatch` timer for every message dispatched through any bus. Tags:
+Records a `cqrs.bus.dispatch` timer for every message handled: local dispatches and, with RabbitMQ and Kafka, messages consumed on the receiving side. Remote sends are not timed on the sender, so each message is counted once. Tags:
 
 | Tag | Description |
 |---|---|
@@ -200,6 +250,8 @@ On entry the middleware:
 3. Mirrors every configured key (see `cqrs.context.mdc-keys`) into SLF4J MDC so downstream logs carry them automatically.
 4. Proceeds through the chain.
 5. Restores the previous MDC state and context on exit (even if the handler throws).
+
+It runs in every phase. On the sending side of the RabbitMQ and Kafka buses it runs before the message is published, so the correlation id it generates is written to the `cqrs.context.correlationId` header and the receiver continues it.
 
 ### RetryMiddleware
 
@@ -237,7 +289,7 @@ RetryMiddleware retryMiddleware() {
 
 `RetryPolicy` and `BackoffStrategy` do not depend on the bus: `policy.shouldRetry(exception, failedAttempts)` and `backoff.delayAfter(failedAttempts)` can drive any retry loop.
 
-**Remote buses.** With RabbitMQ and Kafka the middleware runs in the consumer (see [Middleware on Remote Buses](#middleware-on-remote-buses)), before the transport's own retry. The attempts multiply: with `cqrs.retry.max-attempts=3` and `cqrs.rabbitmq.retry.max-attempts=3` a failing handler runs up to 9 times before the message is dead-lettered. Lower one of them when you enable both.
+**Remote buses.** The middleware keeps the default phases, `LOCAL` and `INBOUND`: with RabbitMQ and Kafka it runs in the consumer (see [Middleware on Remote Buses](#middleware-on-remote-buses)), before the transport's own retry, and not on the sender, so a failed remote send (or a failed remote request/reply) is not retried by it. The attempts multiply: with `cqrs.retry.max-attempts=3` and `cqrs.rabbitmq.retry.max-attempts=3` a failing handler runs up to 9 times before the message is dead-lettered. Lower one of them when you enable both.
 
 **Transactions.** Retrying an optimistic-lock failure only helps when the transaction starts inside the retry: in the handler itself, or in a middleware ordered after `RetryMiddleware`. If the caller's transaction wraps the dispatch, it is already marked rollback-only after the first failure and every retry fails too.
 
@@ -290,7 +342,7 @@ Both the RabbitMQ and Kafka adapters serialize every context entry into the head
 
 ### Crossing threads (`@Async`, executors)
 
-`MessageContext` lives in a `ThreadLocal`, so it does not follow work handed to another thread on its own. Without help, a task submitted to a `TaskExecutor`, an `@Async` method or `CompletableFuture.supplyAsync(..., executor)` runs with an empty context: messages it sends carry no `cqrs.context.*` headers, and a local dispatch gets a fresh `correlationId`. Two ways to carry it across:
+`MessageContext` lives in a `ThreadLocal`, so it does not follow work handed to another thread on its own. Without help, a task submitted to a `TaskExecutor`, an `@Async` method or `CompletableFuture.supplyAsync(..., executor)` runs with an empty context: messages it sends carry none of the caller's `cqrs.context.*` entries, and both a local dispatch and a remote send get a fresh `correlationId`. Two ways to carry it across:
 
 **1. Explicit, no extra dependency.** `MessageContext.wrap(Runnable)` and `MessageContext.wrap(Callable)` capture the context that is current when you call them and run the task inside it. The worker thread's own context is replaced for the duration of the task and restored afterwards, so pooled threads never leak context between tasks.
 
@@ -333,7 +385,7 @@ try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
 }
 ```
 
-Middleware runs only on the receiving side of the RabbitMQ and Kafka buses (see [Middleware on Remote Buses](#middleware-on-remote-buses)), so a remote dispatch from a context-less thread sends no `correlationId` at all; the consumer's `ContextPropagationMiddleware` then generates a new one.
+`ContextPropagationMiddleware` also runs on the sending side of the RabbitMQ and Kafka buses (see [Middleware on Remote Buses](#middleware-on-remote-buses)), so a remote dispatch from a context-less thread still sends a `correlationId`, but a new one: it is not linked to the work that started it. Carry the context across threads, or persist it as shown above, to keep one id.
 
 ### Logging with MDC
 
@@ -353,7 +405,7 @@ automatically annotates every log line. Mirror additional keys by setting `cqrs.
 
 ## Distributed Tracing
 
-`TracingMiddleware` (in `spring-boot-cqrs-core`) wraps every bus dispatch in a Micrometer `Observation`. When the consumer wires Micrometer Tracing (e.g., `spring-boot-starter-actuator` + `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`), each dispatch becomes a span named `cqrs.bus.handle` (configurable via `cqrs.tracing.observation-name`) with:
+`TracingMiddleware` (in `spring-boot-cqrs-core`) wraps every local dispatch, and every message consumed from RabbitMQ or Kafka, in a Micrometer `Observation`. It does not run on the sending side of the remote buses, where the transport's producer observation covers the send. When the consumer wires Micrometer Tracing (e.g., `spring-boot-starter-actuator` + `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`), each dispatch becomes a span named `cqrs.bus.handle` (configurable via `cqrs.tracing.observation-name`) with:
 
 - `cqrs.message.kind` — one of `command`, `event`, `query`, `unknown`
 - `cqrs.message.type` — the message class's simple name

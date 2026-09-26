@@ -67,9 +67,15 @@ public class RabbitMqCommandBusAutoConfiguration {
       RabbitMqPublisher publisher,
       RabbitMqNamingStrategy rabbitNaming,
       MessageNamingStrategy messageNaming,
-      RabbitMqCqrsProperties properties) {
+      RabbitMqCqrsProperties properties,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
+    // The bus keeps the middlewares that declare DispatchPhase.OUTBOUND.
     return new RabbitMqCommandBus(
-        publisher, rabbitNaming, messageNaming, properties.getCommands().getExchange());
+        publisher,
+        rabbitNaming,
+        messageNaming,
+        properties.getCommands().getExchange(),
+        middlewaresProvider.getIfAvailable(Collections::emptyList));
   }
 
   @Bean

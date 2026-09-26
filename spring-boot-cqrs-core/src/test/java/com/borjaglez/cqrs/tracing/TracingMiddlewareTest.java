@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestQuery;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -118,5 +119,11 @@ class TracingMiddlewareTest {
 
     TestObservationRegistryAssert.assertThat(registry)
         .hasObservationWithNameEqualTo("my.app.dispatch");
+  }
+
+  @Test
+  void doesNotRunOnTheSenderOfRemoteMessages() {
+    assertThat(middleware.phases())
+        .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
   }
 }

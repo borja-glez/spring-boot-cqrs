@@ -22,6 +22,7 @@ import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestQuery;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 import com.borjaglez.cqrs.tracing.TracingMiddleware;
 
@@ -332,5 +333,11 @@ class RetryMiddlewareTest {
   @FunctionalInterface
   private interface ExceptionSupplier {
     Exception get();
+  }
+
+  @Test
+  void runsLocallyAndOnTheReceiverButNotOnTheSender() {
+    assertThat(RetryMiddleware.builder().build().phases())
+        .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
   }
 }

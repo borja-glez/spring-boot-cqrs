@@ -131,7 +131,10 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
         .map(
             m ->
                 new MiddlewareDescriptor(
-                    m.getClass(), resolveOrder(m), m instanceof BusObservabilityInterceptor))
+                    m.getClass(),
+                    resolveOrder(m),
+                    m instanceof BusObservabilityInterceptor,
+                    m.phases()))
         .sorted(Comparator.comparingInt(MiddlewareDescriptor::order))
         .collect(Collectors.toList());
   }

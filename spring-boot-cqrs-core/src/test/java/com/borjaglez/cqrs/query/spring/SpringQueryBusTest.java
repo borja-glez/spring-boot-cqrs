@@ -12,8 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.fixtures.TestQuery;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.query.QueryHandlerExecutionException;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 
@@ -87,5 +89,19 @@ class SpringQueryBusTest {
     String result = bus.ask(query, new ParameterizedTypeReference<String>() {});
 
     assertThat(result).isEqualTo("answer");
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheLocalPhase() {
+    QueryHandlerRegistry registry = mock(QueryHandlerRegistry.class);
+    RecordingMiddleware local = new RecordingMiddleware(DispatchPhase.LOCAL);
+    RecordingMiddleware outboundOnly = new RecordingMiddleware(DispatchPhase.OUTBOUND);
+    SpringQueryBus bus = new SpringQueryBus(registry, List.of(local, outboundOnly));
+    TestQuery query = new TestQuery("data");
+
+    bus.ask(query);
+
+    assertThat(local.seen()).containsExactly(query);
+    assertThat(outboundOnly.seen()).isEmpty();
   }
 }

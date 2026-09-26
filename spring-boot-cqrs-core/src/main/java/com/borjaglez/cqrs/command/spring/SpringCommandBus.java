@@ -8,15 +8,20 @@ import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 public class SpringCommandBus implements CommandBus {
 
   private final CommandHandlerRegistry registry;
   private final List<BusMiddleware> middlewares;
 
+  /**
+   * Creates the bus. Only the middlewares of {@code middlewares} that declare {@link
+   * DispatchPhase#LOCAL} run, in the order of the list.
+   */
   public SpringCommandBus(CommandHandlerRegistry registry, List<BusMiddleware> middlewares) {
     this.registry = registry;
-    this.middlewares = middlewares;
+    this.middlewares = DispatchPhase.LOCAL.select(middlewares);
   }
 
   @Override

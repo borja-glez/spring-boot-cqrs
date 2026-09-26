@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka.consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -21,9 +23,11 @@ import org.junit.jupiter.api.Test;
 
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
+import com.borjaglez.cqrs.kafka.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
@@ -164,5 +168,28 @@ class KafkaQueryConsumerTest {
         .add(new RecordHeader(KafkaMessageHeaders.REPLY_TOPIC, "reply-topic".getBytes(UTF_8)))
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, "corr-1".getBytes(UTF_8)));
     return record;
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheInboundPhase() {
+    List<String> calls = new ArrayList<>();
+    KafkaQueryConsumer inbound =
+        new KafkaQueryConsumer(registry, phased(calls), serializer, publisher);
+    TestQuery query = new TestQuery("value");
+    ConsumerRecord<String, byte[]> record = recordFor();
+    when(serializer.deserialize(record.value(), TestQuery.class)).thenReturn(query);
+    when(registry.handle(query)).thenReturn("done");
+
+    inbound.consume(record);
+
+    assertThat(calls).containsExactly("inbound");
+    verify(publisher).publishReply("reply-topic", "corr-1", "done");
+  }
+
+  private static List<BusMiddleware> phased(List<String> calls) {
+    return List.of(
+        new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
+        new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+        new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
 }

@@ -1,8 +1,10 @@
 package com.borjaglez.cqrs.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -23,10 +25,14 @@ import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
 import com.borjaglez.cqrs.introspection.CqrsIntrospection;
 import com.borjaglez.cqrs.introspection.CqrsIntrospectionLogger;
 import com.borjaglez.cqrs.introspection.DefaultCqrsIntrospection;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
+import com.borjaglez.cqrs.middleware.MiddlewareChain;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.QueryBus;
+import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.query.spring.SpringQueryBus;
 
@@ -345,6 +351,37 @@ class CqrsAutoConfigurationTest {
           return 0;
         }
       };
+    }
+  }
+
+  @Test
+  void localBusesSkipMiddlewareThatDoesNotDeclareTheLocalPhase() {
+    contextRunner
+        .withBean("outboundOnly", BusMiddleware.class, OutboundOnlyMiddleware::new)
+        .run(
+            context -> {
+              QueryBus queryBus = context.getBean(QueryBus.class);
+              assertThatThrownBy(() -> queryBus.ask(new UnhandledQuery()))
+                  .isInstanceOf(QueryNotRegisteredException.class);
+              assertThat(context.getBean(CqrsIntrospection.class).getMiddleware())
+                  .singleElement()
+                  .satisfies(
+                      descriptor ->
+                          assertThat(descriptor.phases()).containsOnly(DispatchPhase.OUTBOUND));
+            });
+  }
+
+  static class UnhandledQuery extends Query {}
+
+  static class OutboundOnlyMiddleware implements BusMiddleware {
+    @Override
+    public Object process(Object message, MiddlewareChain chain) {
+      throw new IllegalStateException("must not run in a local dispatch");
+    }
+
+    @Override
+    public Set<DispatchPhase> phases() {
+      return Set.of(DispatchPhase.OUTBOUND);
     }
   }
 }

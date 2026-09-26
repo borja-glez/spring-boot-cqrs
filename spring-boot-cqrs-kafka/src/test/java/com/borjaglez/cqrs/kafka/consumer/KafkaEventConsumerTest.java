@@ -1,12 +1,14 @@
 package com.borjaglez.cqrs.kafka.consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -17,9 +19,11 @@ import org.junit.jupiter.api.Test;
 
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
+import com.borjaglez.cqrs.kafka.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 class KafkaEventConsumerTest {
@@ -143,5 +147,26 @@ class KafkaEventConsumerTest {
             new RecordHeader(
                 KafkaMessageHeaders.PAYLOAD_TYPE, TestEvent.class.getName().getBytes(UTF_8)));
     return record;
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheInboundPhase() {
+    List<String> calls = new ArrayList<>();
+    KafkaEventConsumer inbound = new KafkaEventConsumer(registry, phased(calls), serializer);
+    TestEvent event = new TestEvent("value");
+    ConsumerRecord<String, byte[]> record = recordFor();
+    when(serializer.deserialize(record.value(), TestEvent.class)).thenReturn(event);
+
+    inbound.consume(record);
+
+    assertThat(calls).containsExactly("inbound");
+    verify(registry).handle(event);
+  }
+
+  private static List<BusMiddleware> phased(List<String> calls) {
+    return List.of(
+        new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
+        new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+        new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
 }

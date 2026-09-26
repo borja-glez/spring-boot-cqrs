@@ -18,6 +18,7 @@ import com.borjaglez.cqrs.introspection.CqrsIntrospection;
 import com.borjaglez.cqrs.introspection.HandlerDescriptor;
 import com.borjaglez.cqrs.introspection.HandlerType;
 import com.borjaglez.cqrs.introspection.MiddlewareDescriptor;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 class CqrsEndpointTest {
 
@@ -38,7 +39,12 @@ class CqrsEndpointTest {
     HandlerDescriptor event =
         new HandlerDescriptor(
             OrderCreatedEvent.class, HandlerType.EVENT, "order_created", Handler.class, false);
-    MiddlewareDescriptor middleware = new MiddlewareDescriptor(SampleMiddleware.class, 10, true);
+    MiddlewareDescriptor middleware =
+        new MiddlewareDescriptor(
+            SampleMiddleware.class,
+            10,
+            true,
+            Set.of(DispatchPhase.INBOUND, DispatchPhase.OUTBOUND, DispatchPhase.LOCAL));
 
     when(introspection.getHandlerCount(HandlerType.COMMAND)).thenReturn(1);
     when(introspection.getHandlerCount(HandlerType.EVENT)).thenReturn(1);
@@ -61,6 +67,7 @@ class CqrsEndpointTest {
               assertThat(view.type()).isEqualTo(SampleMiddleware.class.getName());
               assertThat(view.order()).isEqualTo(10);
               assertThat(view.observability()).isTrue();
+              assertThat(view.phases()).containsExactly("LOCAL", "OUTBOUND", "INBOUND");
             });
     assertThat(descriptor.messageTypes())
         .containsExactly(CreateOrderCommand.class.getName(), OrderCreatedEvent.class.getName());

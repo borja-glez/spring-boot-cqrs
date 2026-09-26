@@ -11,6 +11,7 @@ import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -106,7 +107,7 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
     super(rabbitTemplate, namingStrategy, maxAttempts);
     this.exposure = exposure;
     this.registry = registry;
-    this.middlewares = middlewares;
+    this.middlewares = DispatchPhase.INBOUND.select(middlewares);
     this.exchangeName = exchangeName;
     this.appName = appName;
     this.contextHeaderPrefix =

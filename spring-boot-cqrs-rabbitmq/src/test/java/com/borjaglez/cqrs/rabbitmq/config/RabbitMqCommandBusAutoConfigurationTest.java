@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 
@@ -13,12 +14,14 @@ import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqCommandBus;
 import com.borjaglez.cqrs.rabbitmq.fixtures.InternalCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommandHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.OutboundBlocker;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommandHandler;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
@@ -271,5 +274,20 @@ class RabbitMqCommandBusAutoConfigurationTest {
                   .extracting("exposure")
                   .isEqualTo(RabbitMqExposure.ALL);
             });
+  }
+
+  @Test
+  void commandBusRunsTheOutboundMiddlewareBeansBeforeSending() {
+    contextRunner
+        .withBean("outboundBlocker", BusMiddleware.class, OutboundBlocker::new)
+        .run(
+            context ->
+                assertThatThrownBy(
+                        () ->
+                            context
+                                .getBean(RabbitMqCommandBus.class)
+                                .dispatch(new TestCommand("data")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage(OutboundBlocker.MESSAGE));
   }
 }

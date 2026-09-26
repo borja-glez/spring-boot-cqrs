@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.validation.CommandValidationInterceptor;
 
 class CqrsValidationAutoConfigurationTest {
@@ -88,5 +89,16 @@ class CqrsValidationAutoConfigurationTest {
     Validator validator() {
       return Validation.buildDefaultValidatorFactory().getValidator();
     }
+  }
+
+  @Test
+  void commandValidationAlsoRunsOnTheSenderOfRemoteBuses() {
+    contextRunner
+        .withUserConfiguration(ValidatorConfiguration.class)
+        .run(
+            context ->
+                assertThat(context.getBean(CommandValidationInterceptor.class).phases())
+                    .containsExactlyInAnyOrder(
+                        DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND));
   }
 }

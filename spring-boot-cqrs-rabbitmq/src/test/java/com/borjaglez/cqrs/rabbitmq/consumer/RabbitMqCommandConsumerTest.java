@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -24,8 +25,10 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.rabbitmq.fixtures.InternalCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommand;
+import com.borjaglez.cqrs.rabbitmq.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
@@ -380,5 +383,26 @@ class RabbitMqCommandConsumerTest {
         consumerExposing(RabbitMqExposure.ALL).consume(createMessage("command_reply"), command);
 
     assertThat(result).isEqualTo("result");
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheInboundPhase() {
+    List<String> calls = new ArrayList<>();
+    RabbitMqCommandConsumer inbound =
+        new RabbitMqCommandConsumer(
+            registry, phased(calls), rabbitTemplate, namingStrategy, "commands", "app");
+    TestCommand command = new TestCommand("test-data");
+
+    inbound.consume(createMessage("command"), command);
+
+    assertThat(calls).containsExactly("inbound");
+    verify(registry).handle(command);
+  }
+
+  private static List<BusMiddleware> phased(List<String> calls) {
+    return List.of(
+        new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
+        new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+        new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
 }

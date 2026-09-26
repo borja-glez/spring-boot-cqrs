@@ -12,6 +12,7 @@ import com.borjaglez.cqrs.introspection.CqrsIntrospection;
 import com.borjaglez.cqrs.introspection.HandlerDescriptor;
 import com.borjaglez.cqrs.introspection.HandlerType;
 import com.borjaglez.cqrs.introspection.MiddlewareDescriptor;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 @Endpoint(id = "cqrs")
 public class CqrsEndpoint {
@@ -80,11 +81,18 @@ public class CqrsEndpoint {
     }
   }
 
-  public record MiddlewareView(String type, int order, boolean observability) {
+  /**
+   * A middleware as the endpoint shows it. {@code phases} lists where it runs ({@code LOCAL},
+   * {@code OUTBOUND}, {@code INBOUND}), in that order.
+   */
+  public record MiddlewareView(String type, int order, boolean observability, List<String> phases) {
 
     static MiddlewareView from(MiddlewareDescriptor descriptor) {
       return new MiddlewareView(
-          descriptor.middlewareType().getName(), descriptor.order(), descriptor.isObservability());
+          descriptor.middlewareType().getName(),
+          descriptor.order(),
+          descriptor.isObservability(),
+          descriptor.phases().stream().sorted().map(DispatchPhase::name).toList());
     }
   }
 }

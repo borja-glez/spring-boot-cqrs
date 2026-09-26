@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka.consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.argThat;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -22,10 +24,12 @@ import org.junit.jupiter.api.Test;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
+import com.borjaglez.cqrs.kafka.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestMode;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 class KafkaCommandConsumerTest {
@@ -353,5 +357,27 @@ class KafkaCommandConsumerTest {
   private String correlationId(ConsumerRecord<String, byte[]> record) {
     return new String(
         record.headers().lastHeader(KafkaMessageHeaders.CORRELATION_ID).value(), UTF_8);
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheInboundPhase() {
+    List<String> calls = new ArrayList<>();
+    KafkaCommandConsumer inbound =
+        new KafkaCommandConsumer(registry, phased(calls), serializer, publisher);
+    TestCommand command = new TestCommand("value");
+    ConsumerRecord<String, byte[]> record = recordFor(command, null, null);
+    when(serializer.deserialize(record.value(), TestCommand.class)).thenReturn(command);
+
+    inbound.consume(record);
+
+    assertThat(calls).containsExactly("inbound");
+    verify(registry).handle(command);
+  }
+
+  private static List<BusMiddleware> phased(List<String> calls) {
+    return List.of(
+        new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
+        new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+        new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
 }

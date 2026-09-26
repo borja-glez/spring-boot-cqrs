@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -22,9 +23,11 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
@@ -204,5 +207,32 @@ class RabbitMqQueryConsumerTest {
         MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
 
     assertThat(exposingAll.consume(message, query)).isEqualTo("local-result");
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheInboundPhase() {
+    List<String> calls = new ArrayList<>();
+    RabbitMqQueryConsumer inbound =
+        new RabbitMqQueryConsumer(
+            registry,
+            phased(calls),
+            mock(RabbitTemplate.class),
+            mock(RabbitMqNamingStrategy.class));
+    TestQuery query = new TestQuery("test-data");
+    when(registry.handle(query)).thenReturn("query-result");
+    Message message =
+        MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+
+    Object result = inbound.consume(message, query);
+
+    assertThat(result).isEqualTo("query-result");
+    assertThat(calls).containsExactly("inbound");
+  }
+
+  private static List<BusMiddleware> phased(List<String> calls) {
+    return List.of(
+        new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
+        new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+        new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
 }
