@@ -12,6 +12,7 @@ import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.event.Event;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaContextHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
+import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageKeys;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageKind;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaPartitionKeyStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -77,6 +78,12 @@ public class KafkaMessagePublisher {
         .add(
             new RecordHeader(
                 KafkaMessageHeaders.PAYLOAD_TYPE, message.getClass().getName().getBytes(UTF_8)));
+    String declaredKey = KafkaMessageKeys.declaredKey(messageKind, message);
+    if (declaredKey != null) {
+      record
+          .headers()
+          .add(new RecordHeader(KafkaMessageHeaders.MESSAGE_KEY, declaredKey.getBytes(UTF_8)));
+    }
     KafkaContextHeaders.write(record.headers(), contextHeaderPrefix);
     try {
       kafkaTemplate.send(record).join();

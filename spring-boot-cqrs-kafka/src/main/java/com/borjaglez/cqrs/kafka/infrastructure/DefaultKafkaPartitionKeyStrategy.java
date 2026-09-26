@@ -6,6 +6,11 @@ import com.borjaglez.cqrs.kafka.config.KafkaCqrsProperties;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.Query;
 
+/**
+ * Keys a command or event by the key it declares through {@link com.borjaglez.cqrs.KeyedMessage},
+ * so all the messages of one entity keep their order; any other message, or one declaring a {@code
+ * null} or blank key, is keyed as {@code cqrs.kafka.partition-key.strategy} says.
+ */
 public class DefaultKafkaPartitionKeyStrategy implements KafkaPartitionKeyStrategy {
 
   private final KafkaCqrsProperties.PartitionKeyStrategyType strategyType;
@@ -19,6 +24,10 @@ public class DefaultKafkaPartitionKeyStrategy implements KafkaPartitionKeyStrate
 
   @Override
   public String partitionKey(KafkaMessageKind messageKind, Object message) {
+    String declaredKey = KafkaMessageKeys.declaredKey(messageKind, message);
+    if (declaredKey != null) {
+      return declaredKey;
+    }
     return switch (strategyType) {
       case NONE -> null;
       case PAYLOAD_TYPE -> message.getClass().getName();

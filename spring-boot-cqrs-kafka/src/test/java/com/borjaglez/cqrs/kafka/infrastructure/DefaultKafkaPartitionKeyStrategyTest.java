@@ -11,6 +11,10 @@ import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.kafka.config.KafkaCqrsProperties;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedCommand;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedEvent;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedQuery;
+import com.borjaglez.cqrs.kafka.fixtures.TestOtherKeyedEvent;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 
@@ -80,5 +84,65 @@ class DefaultKafkaPartitionKeyStrategyTest {
         new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);
 
     assertThat(strategy.partitionKey(KafkaMessageKind.COMMAND, new TestCommand("value"))).isNull();
+  }
+
+  @Test
+  void eventsOfDifferentTypesDeclaringTheSameKeyGetTheSameRecordKey() {
+    when(messageNamingStrategy.eventName(TestKeyedEvent.class)).thenReturn("orders.order.placed");
+    when(messageNamingStrategy.eventName(TestOtherKeyedEvent.class))
+        .thenReturn("orders.order.cancelled");
+
+    DefaultKafkaPartitionKeyStrategy strategy =
+        new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);
+
+    assertThat(strategy.partitionKey(KafkaMessageKind.EVENT, new TestKeyedEvent("order-1")))
+        .isEqualTo("order-1");
+    assertThat(strategy.partitionKey(KafkaMessageKind.EVENT, new TestOtherKeyedEvent("order-1")))
+        .isEqualTo("order-1");
+  }
+
+  @Test
+  void commandsUseTheirDeclaredKeyWhateverTheConfiguredStrategy() {
+    properties.getPartitionKey().setStrategy(KafkaCqrsProperties.PartitionKeyStrategyType.NONE);
+
+    DefaultKafkaPartitionKeyStrategy strategy =
+        new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);
+
+    assertThat(strategy.partitionKey(KafkaMessageKind.COMMAND, new TestKeyedCommand("order-1")))
+        .isEqualTo("order-1");
+  }
+
+  @Test
+  void aNullDeclaredKeyFallsBackToTheConfiguredStrategy() {
+    when(messageNamingStrategy.eventName(TestKeyedEvent.class)).thenReturn("orders.order.placed");
+
+    DefaultKafkaPartitionKeyStrategy strategy =
+        new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);
+
+    assertThat(strategy.partitionKey(KafkaMessageKind.EVENT, new TestKeyedEvent(null)))
+        .isEqualTo("orders.order.placed");
+  }
+
+  @Test
+  void aBlankDeclaredKeyFallsBackToTheConfiguredStrategy() {
+    when(messageNamingStrategy.commandName(TestKeyedCommand.class))
+        .thenReturn("orders.order.place");
+
+    DefaultKafkaPartitionKeyStrategy strategy =
+        new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);
+
+    assertThat(strategy.partitionKey(KafkaMessageKind.COMMAND, new TestKeyedCommand("  ")))
+        .isEqualTo("orders.order.place");
+  }
+
+  @Test
+  void queriesIgnoreADeclaredKey() {
+    when(messageNamingStrategy.queryName(TestKeyedQuery.class)).thenReturn("orders.order.find");
+
+    DefaultKafkaPartitionKeyStrategy strategy =
+        new DefaultKafkaPartitionKeyStrategy(properties, messageNamingStrategy);
+
+    assertThat(strategy.partitionKey(KafkaMessageKind.QUERY, new TestKeyedQuery("order-1")))
+        .isEqualTo("orders.order.find");
   }
 }

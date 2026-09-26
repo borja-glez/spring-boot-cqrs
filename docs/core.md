@@ -85,6 +85,34 @@ repository.save(order);
 eventBus.publish(order.pullEvents());
 ```
 
+### KeyedMessage
+
+```java
+package com.borjaglez.cqrs;
+
+public interface KeyedMessage {
+    String messageKey();
+}
+```
+
+Opt-in interface for commands and events that belong to an entity (usually an aggregate) and must keep their order relative to the other messages of that entity. Transports that order by key use it: the Kafka adapter sends `messageKey()` as the record key, so all the messages with the same key, of any type, go to the same partition and are consumed in publication order, and also as the `cqrs.message.key` header (see [Partition Keys](kafka-adapter.md#partition-keys)).
+
+```java
+public class OrderCancelled extends Event implements KeyedMessage {
+    private UUID orderId;
+
+    @Override
+    public String messageKey() {
+        return orderId.toString();
+    }
+}
+```
+
+- A `null` or blank key means "no key": the transport keeps its configured behaviour.
+- Queries have no ordering need; a query implementing the interface is sent as if it did not.
+- `messageKey()` is not a bean getter, so Jackson does not add it to the payload. A record with a `messageKey` component implements it directly.
+- It is read through the interface, without reflection, so it needs no GraalVM hints.
+
 ## Annotations
 
 ### Type-level annotations (class)

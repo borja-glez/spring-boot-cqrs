@@ -109,6 +109,12 @@ public class KafkaRequestReplyClient {
         .add(
             new RecordHeader(
                 KafkaMessageHeaders.PAYLOAD_TYPE, payload.getClass().getName().getBytes(UTF_8)));
+    String declaredKey = KafkaMessageKeys.declaredKey(messageKind, payload);
+    if (declaredKey != null) {
+      record
+          .headers()
+          .add(new RecordHeader(KafkaMessageHeaders.MESSAGE_KEY, declaredKey.getBytes(UTF_8)));
+    }
     record
         .headers()
         .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, correlationId.getBytes(UTF_8)));

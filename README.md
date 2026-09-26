@@ -423,6 +423,21 @@ Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
 - `PAYLOAD_TYPE` -- route by Java payload type
 - `NONE` -- send records without a key
 
+Kafka orders records per partition, so with these strategies messages keep their order only within one message type. To keep all the messages of one aggregate in order (an `OrderPlaced` before its `OrderCancelled`), let commands and events implement `KeyedMessage`: its key becomes the record key (and the `cqrs.message.key` header), and a `null` or blank key falls back to the configured strategy.
+
+```java
+public class OrderCancelled extends Event implements KeyedMessage {
+  private UUID orderId;
+
+  @Override
+  public String messageKey() {
+    return orderId.toString();
+  }
+}
+```
+
+See [Partition Keys](docs/kafka-adapter.md#partition-keys) for details.
+
 ### Generic results over RabbitMQ and Kafka
 
 A remote reply carries only the runtime class of the handler's result, and the requester rebuilds the result from that erased class. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) come back as they were sent. A generic result (a collection, a map, a generic wrapper such as `Page<OrderDto>`) comes back with untyped content, `LinkedHashMap` instead of `OrderDto`, unless the caller passes a `ParameterizedTypeReference`:
@@ -466,7 +481,7 @@ The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `Comm
 | `cqrs.kafka.enabled` | `true` | Enable Kafka bus adapters |
 | `cqrs.kafka.prefix` | `"cqrs"` | Prefix for Kafka topic names |
 | `cqrs.kafka.auto-create-topics` | `true` | Auto-register CQRS topics through Spring Kafka |
-| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` | Strategy used to compute Kafka record keys |
+| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` | Strategy used to compute Kafka record keys of messages that declare no `KeyedMessage` key |
 | `cqrs.kafka.replies.topic` | `"replies"` | Base reply topic name used for request/reply |
 | `cqrs.kafka.replies.partitions` | `1` | Reply topic partition count |
 | `cqrs.kafka.replies.replicas` | `1` | Reply topic replication factor |
