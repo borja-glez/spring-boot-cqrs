@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -29,6 +30,11 @@ import com.borjaglez.cqrs.kafka.infrastructure.KafkaPartitionKeyStrategy;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestReplyClient;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaTopicNamingStrategy;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
+import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
+import com.borjaglez.cqrs.rabbitmq.config.RabbitMqCommandBusAutoConfiguration;
+import com.borjaglez.cqrs.rabbitmq.config.RabbitMqCqrsAutoConfiguration;
+import com.borjaglez.cqrs.rabbitmq.config.RabbitMqEventBusAutoConfiguration;
+import com.borjaglez.cqrs.rabbitmq.config.RabbitMqQueryBusAutoConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class KafkaCqrsAutoConfigurationTest {
@@ -68,6 +74,31 @@ class KafkaCqrsAutoConfigurationTest {
           assertThat(context).hasBean("cqrsQueriesTopic");
           assertThat(context).hasBean("cqrsRepliesTopic");
         });
+  }
+
+  @Test
+  void shouldRunSideBySideWithTheRabbitMqModule() {
+    // Both modules declared listener containers with the same bean names, so an application
+    // using Kafka for events and RabbitMQ for commands failed to start (finding C26).
+    contextRunner
+        .withPropertyValues("spring.rabbitmq.host=localhost", "spring.rabbitmq.port=1")
+        .withConfiguration(
+            AutoConfigurations.of(
+                RabbitAutoConfiguration.class,
+                RabbitMqCqrsAutoConfiguration.class,
+                RabbitMqCommandBusAutoConfiguration.class,
+                RabbitMqEventBusAutoConfiguration.class,
+                RabbitMqQueryBusAutoConfiguration.class))
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).hasSingleBean(KafkaEventBus.class);
+              assertThat(context).hasSingleBean(RabbitMqEventBus.class);
+              assertThat(context).hasBean("cqrsKafkaEventListenerContainer");
+              assertThat(context).hasBean("cqrsKafkaCommandListenerContainer");
+              assertThat(context).hasBean("cqrsKafkaQueryListenerContainer");
+              assertThat(context).hasBean("cqrsEventListenerContainer");
+            });
   }
 
   @Test

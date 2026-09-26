@@ -78,7 +78,7 @@ public class KafkaQueryBusAutoConfiguration {
         contextHeaderPrefix);
   }
 
-  @Bean(name = "cqrsQueryListenerContainer")
+  @Bean(name = "cqrsKafkaQueryListenerContainer")
   public ConcurrentMessageListenerContainer<String, byte[]> cqrsQueryListenerContainer(
       ConsumerFactory<String, byte[]> cqrsKafkaConsumerFactory,
       KafkaQueryConsumer kafkaQueryConsumer,
