@@ -10,7 +10,9 @@ A production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring
 - `spring-boot-cqrs-core` — Bus interfaces, base types, annotations, middleware, serialization SPI
 - `spring-boot-cqrs-boot3-starter` — Spring Boot 3.5.x auto-configuration
 - `spring-boot-cqrs-boot4-starter` — Spring Boot 4.0.x auto-configuration
-- `spring-boot-cqrs-rabbitmq` — Distributed messaging adapter
+- `spring-boot-cqrs-rabbitmq` — RabbitMQ distributed messaging adapter
+- `spring-boot-cqrs-kafka` — Kafka distributed messaging adapter
+- `spring-boot-cqrs-test` — Test support: spy and in-memory buses, AssertJ assertions, `@CqrsTest`
 
 ## Build / Test Commands
 
@@ -167,7 +169,7 @@ class ClassNameTest {
 - **Middleware pipeline** intercepts all bus dispatches via `BusMiddleware` interface
 - **Handler discovery** is annotation-driven via `BeanPostProcessorHandlerDiscoverer`
 - **GraalVM native support** via `CqrsRuntimeHintsRegistrar` and `CqrsBeanRegistrationAotProcessor`
-- RabbitMQ event bus **falls back to local Spring event bus** if AMQP is unavailable
+- The RabbitMQ and Kafka event buses **throw** when an event cannot be sent (`AmqpException`, or the `KafkaMessagePublisher` exception); there is no fallback to the local Spring event bus. Reliable publication goes through an outbox
 
 ## Dependency Management
 

@@ -64,6 +64,12 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.3.1")
 </dependency>
 ```
 
+### Upgrading
+
+Upgrading from an earlier version? [docs/upgrading.md](docs/upgrading.md) lists the breaking
+changes of each release with before/after code and migration steps, and
+[CHANGELOG.md](CHANGELOG.md) marks them with **BREAKING:**.
+
 ### Minimal Example
 
 **1. Define a command:**
@@ -572,6 +578,7 @@ The repository includes five example applications:
 - [Actuator Endpoints](docs/actuator.md) -- `/actuator/cqrs`, `info` contributor, transport health
 - [Testing](docs/testing.md) -- Test utilities: spy buses, in-memory buses, AssertJ assertions, `@CqrsTest` slice
 - [GraalVM Native](docs/graalvm-native.md) -- AOT support, native image builds
+- [Upgrading](docs/upgrading.md) -- Breaking changes of each release and how to migrate
 - [Migration Guide](docs/migration-guide.md) -- Migrating from the original amj-bus implementation
 
 ## GraalVM Native
