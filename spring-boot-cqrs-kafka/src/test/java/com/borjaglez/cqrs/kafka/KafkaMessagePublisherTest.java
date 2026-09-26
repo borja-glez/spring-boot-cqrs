@@ -17,9 +17,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.kafka.config.KafkaCqrsProperties;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedCommand;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedEvent;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedQuery;
+import com.borjaglez.cqrs.kafka.fixtures.TestOtherKeyedEvent;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
+import com.borjaglez.cqrs.kafka.infrastructure.DefaultKafkaPartitionKeyStrategy;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageKind;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaPartitionKeyStrategy;
@@ -234,6 +240,78 @@ class KafkaMessagePublisherTest {
     assertThatThrownBy(() -> publisher.publish("cqrs.misc", new Object()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Unsupported CQRS message type");
+  }
+
+  @Test
+  void eventsOfDifferentTypesDeclaringTheSameKeyArePublishedWithTheSameRecordKey() {
+    KafkaMessagePublisher keyed =
+        new KafkaMessagePublisher(
+            kafkaTemplate,
+            serializer,
+            new DefaultKafkaPartitionKeyStrategy(new KafkaCqrsProperties(), messageNamingStrategy),
+            messageNamingStrategy);
+    TestKeyedEvent placed = new TestKeyedEvent("order-1");
+    TestOtherKeyedEvent cancelled = new TestOtherKeyedEvent("order-1");
+    when(messageNamingStrategy.eventName(TestKeyedEvent.class)).thenReturn("orders.order.placed");
+    when(messageNamingStrategy.eventName(TestOtherKeyedEvent.class))
+        .thenReturn("orders.order.cancelled");
+    when(serializer.serialize(any())).thenReturn(new byte[0]);
+
+    keyed.publish("cqrs.events", placed);
+    ProducerRecord<String, byte[]> first = sentRecord();
+    keyed.publish("cqrs.events", cancelled);
+    ProducerRecord<String, byte[]> second = sentRecord();
+
+    assertThat(first.key()).isEqualTo("order-1");
+    assertThat(second.key()).isEqualTo("order-1");
+  }
+
+  @Test
+  void publishAddsTheDeclaredKeyAsHeader() {
+    TestKeyedEvent event = new TestKeyedEvent("order-1");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.EVENT, event)).thenReturn("order-1");
+    when(messageNamingStrategy.eventName(TestKeyedEvent.class)).thenReturn("orders.order.placed");
+    when(serializer.serialize(event)).thenReturn(new byte[0]);
+
+    publisher.publish("cqrs.events", event);
+
+    assertThat(header(sentRecord(), KafkaMessageHeaders.MESSAGE_KEY)).isEqualTo("order-1");
+  }
+
+  @Test
+  void publishOmitsTheKeyHeaderWhenTheMessageDeclaresNoKey() {
+    TestEvent event = new TestEvent("value");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.EVENT, event)).thenReturn("event-key");
+    when(messageNamingStrategy.eventName(TestEvent.class)).thenReturn("sales.event.created");
+    when(serializer.serialize(event)).thenReturn(new byte[0]);
+
+    publisher.publish("cqrs.events", event);
+
+    assertThat(sentRecord().headers().lastHeader(KafkaMessageHeaders.MESSAGE_KEY)).isNull();
+  }
+
+  @Test
+  void publishOmitsTheKeyHeaderWhenTheDeclaredKeyIsBlank() {
+    TestKeyedCommand command = new TestKeyedCommand(" ");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command)).thenReturn("k");
+    when(messageNamingStrategy.commandName(TestKeyedCommand.class)).thenReturn("n");
+    when(serializer.serialize(command)).thenReturn(new byte[0]);
+
+    publisher.publish("cqrs.commands", command);
+
+    assertThat(sentRecord().headers().lastHeader(KafkaMessageHeaders.MESSAGE_KEY)).isNull();
+  }
+
+  @Test
+  void publishOmitsTheKeyHeaderForQueries() {
+    TestKeyedQuery query = new TestKeyedQuery("order-1");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.QUERY, query)).thenReturn("k");
+    when(messageNamingStrategy.queryName(TestKeyedQuery.class)).thenReturn("n");
+    when(serializer.serialize(query)).thenReturn(new byte[0]);
+
+    publisher.publish("cqrs.queries", query);
+
+    assertThat(sentRecord().headers().lastHeader(KafkaMessageHeaders.MESSAGE_KEY)).isNull();
   }
 
   private ProducerRecord<String, byte[]> sentRecord() {

@@ -29,8 +29,11 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.kafka.config.KafkaCqrsProperties;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedCommand;
+import com.borjaglez.cqrs.kafka.fixtures.TestKeyedQuery;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
@@ -272,6 +275,78 @@ class KafkaRequestReplyClientTest {
         .hasCauseInstanceOf(RuntimeException.class)
         .rootCause()
         .hasMessage("Remote handler error: boom");
+  }
+
+  @Test
+  void requestsOfACommandDeclaringAKeyUseItAsRecordKeyAndHeader() throws Exception {
+    KafkaRequestReplyClient keyed = clientWithDefaultPartitionKeyStrategy();
+    TestKeyedCommand command = new TestKeyedCommand("order-1");
+    when(messageNamingStrategy.commandName(TestKeyedCommand.class))
+        .thenReturn("orders.order.cancel");
+    when(serializer.serialize(command)).thenReturn("request".getBytes(UTF_8));
+
+    CompletableFuture<Object> invocation =
+        startRequest(
+            () ->
+                keyed.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.REPLY));
+
+    ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
+    assertThat(requestRecord.key()).isEqualTo("order-1");
+    assertThat(header(requestRecord, KafkaMessageHeaders.MESSAGE_KEY)).isEqualTo("order-1");
+
+    keyed.handleReply(replyWithPayloadType(requestRecord, String.class.getName(), new byte[0]));
+    assertThat(invocation.join()).isNull();
+  }
+
+  @Test
+  void requestsOfACommandDeclaringABlankKeyUseTheConfiguredStrategyWithoutHeader()
+      throws Exception {
+    KafkaRequestReplyClient keyed = clientWithDefaultPartitionKeyStrategy();
+    TestKeyedCommand command = new TestKeyedCommand("");
+    when(messageNamingStrategy.commandName(TestKeyedCommand.class))
+        .thenReturn("orders.order.cancel");
+    when(serializer.serialize(command)).thenReturn("request".getBytes(UTF_8));
+
+    CompletableFuture<Object> invocation =
+        startRequest(
+            () ->
+                keyed.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.REPLY));
+
+    ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
+    assertThat(requestRecord.key()).isEqualTo("orders.order.cancel");
+    assertThat(requestRecord.headers().lastHeader(KafkaMessageHeaders.MESSAGE_KEY)).isNull();
+
+    keyed.handleReply(replyWithPayloadType(requestRecord, String.class.getName(), new byte[0]));
+    assertThat(invocation.join()).isNull();
+  }
+
+  @Test
+  void requestsOfAQueryIgnoreADeclaredKey() throws Exception {
+    KafkaRequestReplyClient keyed = clientWithDefaultPartitionKeyStrategy();
+    TestKeyedQuery query = new TestKeyedQuery("order-1");
+    when(messageNamingStrategy.queryName(TestKeyedQuery.class)).thenReturn("orders.order.find");
+    when(serializer.serialize(query)).thenReturn("request".getBytes(UTF_8));
+
+    CompletableFuture<Object> invocation =
+        startRequest(
+            () -> keyed.sendAndReceive(null, "cqrs.queries", query, null, KafkaRequestMode.REPLY));
+
+    ProducerRecord<String, byte[]> requestRecord = waitForSentRecord();
+    assertThat(requestRecord.key()).isEqualTo("orders.order.find");
+    assertThat(requestRecord.headers().lastHeader(KafkaMessageHeaders.MESSAGE_KEY)).isNull();
+
+    keyed.handleReply(replyWithPayloadType(requestRecord, String.class.getName(), new byte[0]));
+    assertThat(invocation.join()).isNull();
+  }
+
+  private KafkaRequestReplyClient clientWithDefaultPartitionKeyStrategy() {
+    return new KafkaRequestReplyClient(
+        kafkaTemplate,
+        serializer,
+        new DefaultKafkaPartitionKeyStrategy(new KafkaCqrsProperties(), messageNamingStrategy),
+        messageNamingStrategy,
+        "cqrs.orders.replies",
+        Duration.ofSeconds(5));
   }
 
   @Test

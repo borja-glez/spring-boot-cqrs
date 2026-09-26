@@ -4,6 +4,13 @@ public final class KafkaMessageHeaders {
 
   public static final String MESSAGE_KIND = "cqrs.message.kind";
   public static final String MESSAGE_NAME = "cqrs.message.name";
+
+  /**
+   * The key declared by a command or event implementing {@link com.borjaglez.cqrs.KeyedMessage};
+   * absent when the message declares no key or a blank one.
+   */
+  public static final String MESSAGE_KEY = "cqrs.message.key";
+
   public static final String PAYLOAD_TYPE = "cqrs.payload.type";
   public static final String CORRELATION_ID = "cqrs.correlation.id";
   public static final String REPLY_TOPIC = "cqrs.reply.topic";

@@ -179,7 +179,35 @@ public interface KafkaPartitionKeyStrategy {
 | `PAYLOAD_TYPE` | The fully qualified class name of the message |
 | `NONE` | No key (`null`) |
 
-With `MESSAGE_NAME` or `PAYLOAD_TYPE` all records of one message type share a key, so they land on the same partition and keep their order, and one consumer of the group handles them. To partition by business identity (an order id, say), provide your own `KafkaPartitionKeyStrategy` bean; it replaces the default:
+Kafka only keeps order within a partition. With `MESSAGE_NAME` or `PAYLOAD_TYPE` all records of one message type share a key, so they keep their order among themselves, but two messages of different types about the same order (an `OrderPlaced` and an `OrderCancelled`, say) usually land on different partitions and can be consumed in any order.
+
+### Keying by entity with `KeyedMessage`
+
+A command or event that implements `com.borjaglez.cqrs.KeyedMessage` declares its own key, and the default strategy uses it before looking at `cqrs.kafka.partition-key.strategy`:
+
+```java
+@CqrsMessage(service = "orders", module = "order", name = "order-placed")
+public class OrderPlaced extends Event implements KeyedMessage {
+  private UUID orderId;
+
+  @Override
+  public String messageKey() {
+    return orderId.toString();
+  }
+}
+```
+
+- Every record with the same key, whatever its message type, goes to the same partition of the topic and is consumed in publication order. The guarantee is per key and per topic: commands and events travel on different topics.
+- A message that does not implement `KeyedMessage`, or returns a `null` or blank key, is keyed by the configured strategy, so nothing changes for existing messages. The default stays `MESSAGE_NAME`.
+- Queries ignore a declared key: they have no ordering need.
+- Requests sent with `dispatchAndReceive` or `ask` follow the same rule as one-way records.
+- The declared key is also sent as the `cqrs.message.key` header (only when there is one), so consumers can read it without deserializing the payload.
+
+> **Switching keys:** records keep the partition they were written to. When an existing message starts declaring a key (or changes it), the records of one entity published before and after the deployment can sit on different partitions for as long as the older ones are not consumed, so for that window their relative order is not guaranteed. Let the topic drain, or tolerate reordering for that window.
+
+### Custom strategy
+
+To compute keys in another way, provide your own `KafkaPartitionKeyStrategy` bean; it replaces the default, including its `KeyedMessage` handling (`KafkaMessageKeys.declaredKey(kind, message)` returns the declared key if you want to keep it):
 
 ```java
 @Bean
@@ -188,6 +216,8 @@ KafkaPartitionKeyStrategy kafkaPartitionKeyStrategy() {
       message instanceof OrderMessage order ? order.getOrderId() : null;
 }
 ```
+
+The `cqrs.message.key` header is added from the declared key regardless of the strategy.
 
 Replies are always keyed by their correlation id.
 
@@ -223,6 +253,7 @@ A record without the `cqrs.payload.type` header is rejected with an `IllegalStat
 |---|---|---|
 | `cqrs.message.kind` | Requests and one-way records | `COMMAND`, `EVENT` or `QUERY` |
 | `cqrs.message.name` | Requests and one-way records | Message name from `MessageNamingStrategy` |
+| `cqrs.message.key` | Requests and one-way commands and events whose payload implements `KeyedMessage` with a non-blank key | The declared key |
 | `cqrs.payload.type` | Requests, one-way records, replies with a result, error replies | Fully qualified class name of the payload |
 | `cqrs.correlation.id` | Requests and replies | Correlation id of the request |
 | `cqrs.reply.topic` | Requests | Reply topic of the sending application |
@@ -263,7 +294,7 @@ Defined in `KafkaCqrsProperties` (`cqrs.kafka.*`):
 | `cqrs.kafka.enabled` | `boolean` | `true` | Master switch for all Kafka bus adapters. |
 | `cqrs.kafka.prefix` | `String` | `"cqrs"` | Prefix for topic names. Blank means no prefix. |
 | `cqrs.kafka.auto-create-topics` | `boolean` | `true` | Declares `NewTopic` beans for the enabled buses and the reply topic. |
-| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` \| `PAYLOAD_TYPE` \| `NONE` | `MESSAGE_NAME` | Record key used by `DefaultKafkaPartitionKeyStrategy`. |
+| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` \| `PAYLOAD_TYPE` \| `NONE` | `MESSAGE_NAME` | Record key used by `DefaultKafkaPartitionKeyStrategy` for messages that declare no `KeyedMessage` key. |
 | `cqrs.kafka.replies.topic` | `String` | `"replies"` | Logical name of the reply topic (`{prefix}.{app}.{topic}`). |
 | `cqrs.kafka.replies.partitions` | `int` | `1` | Partitions of the reply topic. |
 | `cqrs.kafka.replies.replicas` | `short` | `1` | Replication factor of the reply topic. |

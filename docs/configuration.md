@@ -132,7 +132,7 @@ Defined in `KafkaCqrsProperties` (`cqrs.kafka.*`). See [kafka-adapter.md](kafka-
 | `cqrs.kafka.enabled` | `boolean` | `true` | Master switch for all Kafka bus adapters. |
 | `cqrs.kafka.prefix` | `String` | `"cqrs"` | Prefix for topic names. Blank means no prefix. |
 | `cqrs.kafka.auto-create-topics` | `boolean` | `true` | Declares `NewTopic` beans for the enabled buses and the reply topic. |
-| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` \| `PAYLOAD_TYPE` \| `NONE` | `MESSAGE_NAME` | Record key used by the default `KafkaPartitionKeyStrategy`. |
+| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` \| `PAYLOAD_TYPE` \| `NONE` | `MESSAGE_NAME` | Record key used by the default `KafkaPartitionKeyStrategy` for messages that declare no `KeyedMessage` key. |
 | `cqrs.kafka.replies.topic` | `String` | `"replies"` | Logical name of the reply topic (`{prefix}.{spring.application.name}.{topic}`). |
 | `cqrs.kafka.replies.partitions` | `int` | `1` | Partitions of the reply topic. |
 | `cqrs.kafka.replies.replicas` | `short` | `1` | Replication factor of the reply topic. |
