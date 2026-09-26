@@ -1,2 +1,4 @@
 org.springframework.beans.factory.aot.BeanRegistrationAotProcessor=\
   com.borjaglez.cqrs.aot.CqrsBeanRegistrationAotProcessor
+org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor=\
+  com.borjaglez.cqrs.aot.CqrsMessageTypesAotProcessor

@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.aot;
 
 import java.lang.reflect.Method;
 
+import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.beans.factory.aot.BeanRegistrationAotContribution;
@@ -17,7 +18,14 @@ import com.borjaglez.cqrs.event.annotation.HandleEvent;
 import com.borjaglez.cqrs.query.annotation.HandleQuery;
 import com.borjaglez.cqrs.query.annotation.QueryHandler;
 
+/**
+ * Registers what a native image needs to run the handlers: the handler classes, and every message
+ * and result type of their methods for (de)serialization, including the types they contain (nested
+ * records, collections, generics).
+ */
 public class CqrsBeanRegistrationAotProcessor implements BeanRegistrationAotProcessor {
+
+  private final BindingReflectionHintsRegistrar bindings = new BindingReflectionHintsRegistrar();
 
   @Override
   public BeanRegistrationAotContribution processAheadOfTime(RegisteredBean registeredBean) {
@@ -54,6 +62,12 @@ public class CqrsBeanRegistrationAotProcessor implements BeanRegistrationAotProc
   private void registerMethodParameterHints(RuntimeHints hints, Method method) {
     for (Class<?> paramType : method.getParameterTypes()) {
       hints.reflection().registerType(paramType, MemberCategory.values());
+    }
+    // Messages cross the wire as JSON: their nested types need binding hints too (a record
+    // inside an event), and so do the results that go back to a remote caller.
+    bindings.registerReflectionHints(hints.reflection(), method.getGenericParameterTypes());
+    if (method.getReturnType() != void.class) {
+      bindings.registerReflectionHints(hints.reflection(), method.getGenericReturnType());
     }
   }
 }
