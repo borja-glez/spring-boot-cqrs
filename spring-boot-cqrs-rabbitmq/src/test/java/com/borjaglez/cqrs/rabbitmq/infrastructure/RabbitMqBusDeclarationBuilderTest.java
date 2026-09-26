@@ -71,7 +71,60 @@ class RabbitMqBusDeclarationBuilderTest {
             .orElseThrow();
 
     assertThat(retryQueue.getArguments()).containsEntry("x-message-ttl", 3000);
-    assertThat(retryQueue.getArguments()).containsEntry("x-dead-letter-exchange", "cqrs.commands");
+  }
+
+  @Test
+  void retryQueueShouldDeadLetterThroughTheDefaultExchangeToTheAppMainQueue() {
+    Declarables declarables =
+        builder.buildWithRetryAndDeadLetter(
+            "my-app", "commands", List.of("test.order.create"), 3000);
+
+    Queue retryQueue = queueNamed(declarables, "cqrs.my-app.commands.retry");
+
+    assertThat(retryQueue.getArguments())
+        .containsEntry("x-dead-letter-exchange", "")
+        .containsEntry("x-dead-letter-routing-key", "cqrs.my-app.commands");
+  }
+
+  @Test
+  void retryAndDeadLetterQueuesShouldBeBoundWithTheAppNameOnly() {
+    Declarables declarables =
+        builder.buildWithRetryAndDeadLetter(
+            "my-app", "commands", List.of("test.order.create"), 3000);
+
+    Binding retryBinding = bindingOf(declarables, "cqrs.my-app.commands.retry");
+    assertThat(retryBinding.getExchange()).isEqualTo("cqrs.commands.retry");
+    assertThat(retryBinding.getRoutingKey()).isEqualTo("my-app");
+
+    Binding deadLetterBinding = bindingOf(declarables, "cqrs.my-app.commands.dead_letter");
+    assertThat(deadLetterBinding.getExchange()).isEqualTo("cqrs.commands.dead_letter");
+    assertThat(deadLetterBinding.getRoutingKey()).isEqualTo("my-app");
+  }
+
+  @Test
+  void twoAppsShouldNotShareRetryOrDeadLetterRoutingKeys() {
+    List<String> routingKeys = List.of("test.order.create");
+    Declarables app1 = builder.buildWithRetryAndDeadLetter("app-1", "events", routingKeys, 1000);
+    Declarables app2 = builder.buildWithRetryAndDeadLetter("app-2", "events", routingKeys, 1000);
+
+    assertThat(bindingOf(app1, "cqrs.app-1.events.retry").getRoutingKey())
+        .isNotEqualTo(bindingOf(app2, "cqrs.app-2.events.retry").getRoutingKey());
+    assertThat(bindingOf(app1, "cqrs.app-1.events.dead_letter").getRoutingKey())
+        .isNotEqualTo(bindingOf(app2, "cqrs.app-2.events.dead_letter").getRoutingKey());
+  }
+
+  private static Queue queueNamed(Declarables declarables, String name) {
+    return declarables.getDeclarablesByType(Queue.class).stream()
+        .filter(q -> q.getName().equals(name))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static Binding bindingOf(Declarables declarables, String queueName) {
+    return declarables.getDeclarablesByType(Binding.class).stream()
+        .filter(b -> b.getDestination().equals(queueName))
+        .findFirst()
+        .orElseThrow();
   }
 
   @Test

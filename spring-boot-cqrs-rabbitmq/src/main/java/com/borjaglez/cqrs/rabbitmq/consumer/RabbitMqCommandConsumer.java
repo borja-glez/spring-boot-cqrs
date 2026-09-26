@@ -49,7 +49,31 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
       String exchangeName,
       String appName,
       String contextHeaderPrefix) {
-    super(rabbitTemplate, namingStrategy);
+    this(
+        registry,
+        middlewares,
+        rabbitTemplate,
+        namingStrategy,
+        exchangeName,
+        appName,
+        contextHeaderPrefix,
+        DEFAULT_MAX_ATTEMPTS);
+  }
+
+  /**
+   * Creates the consumer. {@code maxAttempts} is the total number of deliveries of a failed
+   * message, including the first one, and must be at least 1.
+   */
+  public RabbitMqCommandConsumer(
+      CommandHandlerRegistry registry,
+      List<BusMiddleware> middlewares,
+      RabbitTemplate rabbitTemplate,
+      RabbitMqNamingStrategy namingStrategy,
+      String exchangeName,
+      String appName,
+      String contextHeaderPrefix,
+      int maxAttempts) {
+    super(rabbitTemplate, namingStrategy, maxAttempts);
     this.registry = registry;
     this.middlewares = middlewares;
     this.exchangeName = exchangeName;

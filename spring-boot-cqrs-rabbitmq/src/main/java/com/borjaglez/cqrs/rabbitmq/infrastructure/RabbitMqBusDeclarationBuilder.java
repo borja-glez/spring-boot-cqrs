@@ -36,21 +36,25 @@ public class RabbitMqBusDeclarationBuilder {
       declarables.add(binding);
     }
 
-    // Retry exchange and queue (with TTL and DLX pointing back to main exchange)
+    // Retry exchange and queue. Failed messages are sent to the retry exchange with the
+    // application name as routing key, so only this application's retry queue receives them. When
+    // the TTL expires they are dead-lettered through the default exchange straight back to this
+    // application's main queue.
     TopicExchange retryExchange = new TopicExchange(namingStrategy.exchangeRetry(exchangeName));
     Queue retryQueue =
         QueueBuilder.durable(namingStrategy.queueRetry(appName, exchangeName))
             .ttl((int) retryTtl)
-            .deadLetterExchange(namingStrategy.exchange(exchangeName))
+            .deadLetterExchange("")
+            .deadLetterRoutingKey(mainQueue.getName())
             .build();
 
     declarables.add(retryExchange);
     declarables.add(retryQueue);
 
-    Binding retryBinding = BindingBuilder.bind(retryQueue).to(retryExchange).with("#");
+    Binding retryBinding = BindingBuilder.bind(retryQueue).to(retryExchange).with(appName);
     declarables.add(retryBinding);
 
-    // Dead-letter exchange and queue
+    // Dead-letter exchange and queue, also bound with the application name
     TopicExchange deadLetterExchange =
         new TopicExchange(namingStrategy.exchangeDeadLetter(exchangeName));
     Queue deadLetterQueue =
@@ -60,7 +64,7 @@ public class RabbitMqBusDeclarationBuilder {
     declarables.add(deadLetterQueue);
 
     Binding deadLetterBinding =
-        BindingBuilder.bind(deadLetterQueue).to(deadLetterExchange).with("#");
+        BindingBuilder.bind(deadLetterQueue).to(deadLetterExchange).with(appName);
     declarables.add(deadLetterBinding);
 
     return new Declarables(declarables);

@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -61,7 +62,7 @@ class RabbitMqEventConsumerTest {
 
     consumer.consume(message, event);
 
-    verify(rabbitTemplate).send("cqrs.events.retry", "#", message);
+    verify(rabbitTemplate).send("cqrs.events.retry", "app", message);
   }
 
   @Test
@@ -117,5 +118,45 @@ class RabbitMqEventConsumerTest {
 
     assertThat(observed.get()).isEqualTo("cid-ev");
     assertThat(MessageContext.current().isEmpty()).isTrue();
+  }
+
+  @Test
+  void consumeShouldSendStraightToDeadLetterWhenMaxAttemptsIsOne() {
+    TestEvent event = new TestEvent("test-data");
+    doThrow(new RuntimeException("handler error")).when(registry).handle(event);
+    when(namingStrategy.exchangeDeadLetter("events")).thenReturn("cqrs.events.dead_letter");
+    RabbitMqEventConsumer singleAttemptConsumer =
+        new RabbitMqEventConsumer(
+            registry,
+            Collections.emptyList(),
+            rabbitTemplate,
+            namingStrategy,
+            "events",
+            "app",
+            "cqrs.context.",
+            1);
+
+    Message message =
+        MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+    singleAttemptConsumer.consume(message, event);
+
+    verify(rabbitTemplate).send("cqrs.events.dead_letter", "app", message);
+  }
+
+  @Test
+  void constructorShouldRejectMaxAttemptsBelowOne() {
+    assertThatThrownBy(
+            () ->
+                new RabbitMqEventConsumer(
+                    registry,
+                    Collections.emptyList(),
+                    rabbitTemplate,
+                    namingStrategy,
+                    "events",
+                    "app",
+                    "cqrs.context.",
+                    0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("max-attempts");
   }
 }

@@ -108,13 +108,15 @@ Commands and events use a three-tier queue strategy:
 1. Message arrives at Main Queue
 2. Consumer attempts to process it
 3. On failure:
-   a. If redelivery count < maxRetries:
+   a. If the message has been delivered fewer than max-attempts times:
       - Increment cqrs.redelivery.count header
-      - Send to Retry Exchange (with # routing key)
-      - Retry Queue has TTL, after which message returns to Main Exchange (via DLX)
-   b. If redelivery count >= maxRetries:
-      - Send to Dead Letter Exchange
-      - Message stays in Dead Letter Queue for manual inspection
+      - Send to Retry Exchange with routing key = application name
+      - Only this application's Retry Queue is bound with that key; it has a TTL,
+        after which the message returns to this application's Main Queue
+        (dead-lettered through the default exchange)
+   b. Otherwise:
+      - Send to Dead Letter Exchange with routing key = application name
+      - Message stays in this application's Dead Letter Queue for manual inspection
 ```
 
 Configuration:
@@ -123,13 +125,13 @@ Configuration:
 cqrs:
   rabbitmq:
     retry:
-      max-attempts: 3    # default
+      max-attempts: 3    # total deliveries including the first one (default: 1 attempt + 2 retries)
       ttl: 1000           # milliseconds, default
 ```
 
 The retry queue is configured with:
 - A TTL (time-to-live) that causes messages to expire after the configured delay
-- A dead-letter exchange pointing back to the main exchange, so expired messages are re-delivered
+- `x-dead-letter-exchange=""` (the default exchange) and `x-dead-letter-routing-key` set to the application's main queue, so expired messages are re-delivered only to the application that failed to handle them
 
 This creates an exponential-backoff-like pattern where failed messages are retried after a delay.
 

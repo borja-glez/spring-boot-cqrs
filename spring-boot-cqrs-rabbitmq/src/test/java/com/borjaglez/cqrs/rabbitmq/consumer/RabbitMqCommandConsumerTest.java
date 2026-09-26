@@ -126,7 +126,7 @@ class RabbitMqCommandConsumerTest {
     Object result = consumer.consume(message, command);
 
     assertThat(result).isNull();
-    verify(rabbitTemplate).send("cqrs.commands.retry", "#", message);
+    verify(rabbitTemplate).send("cqrs.commands.retry", "app", message);
   }
 
   @Test
@@ -243,6 +243,45 @@ class RabbitMqCommandConsumerTest {
     Object result = consumerWithMiddleware.consume(message, command);
 
     assertThat(result).isNull();
-    verify(rabbitTemplate).send("cqrs.commands.retry", "#", message);
+    verify(rabbitTemplate).send("cqrs.commands.retry", "app", message);
+  }
+
+  @Test
+  void consumeShouldSendStraightToDeadLetterWhenMaxAttemptsIsOne() {
+    TestCommand command = new TestCommand("test-data");
+    when(registry.handle(command)).thenThrow(new RuntimeException("handler error"));
+    when(namingStrategy.exchangeDeadLetter("commands")).thenReturn("cqrs.commands.dead_letter");
+    RabbitMqCommandConsumer singleAttemptConsumer =
+        new RabbitMqCommandConsumer(
+            registry,
+            Collections.emptyList(),
+            rabbitTemplate,
+            namingStrategy,
+            "commands",
+            "app",
+            "cqrs.context.",
+            1);
+
+    Message message = createMessage("command");
+    singleAttemptConsumer.consume(message, command);
+
+    verify(rabbitTemplate).send("cqrs.commands.dead_letter", "app", message);
+  }
+
+  @Test
+  void constructorShouldRejectMaxAttemptsBelowOne() {
+    assertThatThrownBy(
+            () ->
+                new RabbitMqCommandConsumer(
+                    registry,
+                    Collections.emptyList(),
+                    rabbitTemplate,
+                    namingStrategy,
+                    "commands",
+                    "app",
+                    "cqrs.context.",
+                    0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("max-attempts");
   }
 }

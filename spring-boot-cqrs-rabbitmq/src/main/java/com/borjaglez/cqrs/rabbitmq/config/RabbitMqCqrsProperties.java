@@ -32,7 +32,14 @@ public class RabbitMqCqrsProperties {
   @Setter
   public static class RetryProperties {
 
+    /**
+     * Total number of deliveries of a failed asynchronous command or event, including the first
+     * one. The default {@code 3} means the first attempt plus two retries; {@code 1} sends a failed
+     * message straight to the dead-letter queue. Must be at least 1.
+     */
     private int maxAttempts = 3;
+
+    /** Delay in milliseconds a failed message waits in the retry queue before it is retried. */
     private long ttl = 1000;
   }
 

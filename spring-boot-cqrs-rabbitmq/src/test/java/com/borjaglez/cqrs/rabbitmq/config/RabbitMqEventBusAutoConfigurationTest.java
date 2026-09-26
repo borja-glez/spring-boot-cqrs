@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
@@ -86,5 +88,57 @@ class RabbitMqEventBusAutoConfigurationTest {
                         context.getBean(
                             "cqrsEventListenerContainer", SimpleMessageListenerContainer.class))
                     .hasFieldOrPropertyWithValue("observationEnabled", true));
+  }
+
+  @Test
+  void shouldPassMaxAttemptsFromPropertiesToTheConsumer() {
+    contextRunner.run(
+        context ->
+            assertThat(
+                    context
+                        .getBean("cqrsEventListenerContainer", SimpleMessageListenerContainer.class)
+                        .getMessageListener())
+                .extracting("delegate")
+                .extracting("maxAttempts")
+                .isEqualTo(3));
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.retry.max-attempts=1")
+        .run(
+            context ->
+                assertThat(
+                        context
+                            .getBean(
+                                "cqrsEventListenerContainer", SimpleMessageListenerContainer.class)
+                            .getMessageListener())
+                    .extracting("delegate")
+                    .extracting("maxAttempts")
+                    .isEqualTo(1));
+  }
+
+  @Test
+  void shouldFailToStartWhenMaxAttemptsIsBelowOne() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.retry.max-attempts=0")
+        .run(
+            context ->
+                assertThat(context)
+                    .getFailure()
+                    .rootCause()
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("max-attempts"));
+  }
+
+  @Test
+  void shouldBindRetryAndDeadLetterQueuesWithTheApplicationName() {
+    contextRunner
+        .withPropertyValues("spring.application.name=billing")
+        .run(
+            context -> {
+              Declarables declarables = context.getBean("cqrsEventDeclarables", Declarables.class);
+              assertThat(declarables.getDeclarablesByType(Binding.class))
+                  .filteredOn(b -> b.getDestination().startsWith("cqrs.billing.events."))
+                  .extracting(Binding::getRoutingKey)
+                  .containsExactlyInAnyOrder("billing", "billing");
+            });
   }
 }
