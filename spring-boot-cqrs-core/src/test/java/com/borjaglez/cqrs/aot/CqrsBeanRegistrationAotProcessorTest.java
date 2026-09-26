@@ -122,4 +122,31 @@ class CqrsBeanRegistrationAotProcessorTest {
     assertThat(RuntimeHintsPredicates.reflection().onType(TestQueryHandler.class).test(hints))
         .isTrue();
   }
+
+  @Test
+  void registersBindingHintsForNestedMessageTypesAndResults() throws Exception {
+    RegisteredBean registeredBean = mock(RegisteredBean.class);
+    when(registeredBean.getBeanClass()).thenReturn((Class) ReturningHandler.class);
+    org.springframework.aot.generate.GenerationContext generationContext =
+        mock(org.springframework.aot.generate.GenerationContext.class);
+    RuntimeHints hints = new RuntimeHints();
+    when(generationContext.getRuntimeHints()).thenReturn(hints);
+
+    processor
+        .processAheadOfTime(registeredBean)
+        .applyTo(
+            generationContext,
+            mock(org.springframework.beans.factory.aot.BeanRegistrationCode.class));
+
+    assertThat(
+            RuntimeHintsPredicates.reflection()
+                .onMethod(com.borjaglez.cqrs.aot.scanned.OrderLine.class, "quantity")
+                .invoke())
+        .accepts(hints);
+    assertThat(
+            RuntimeHintsPredicates.reflection()
+                .onMethod(ReturningHandler.Reservation.class, "missing")
+                .invoke())
+        .accepts(hints);
+  }
 }
