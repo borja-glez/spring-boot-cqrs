@@ -88,7 +88,8 @@ public class RabbitMqCommandBusAutoConfiguration {
             rabbitNaming,
             properties.getCommands().getExchange(),
             appName,
-            contextHeaderPrefix);
+            contextHeaderPrefix,
+            properties.getRetry().getMaxAttempts());
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");

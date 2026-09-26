@@ -130,7 +130,7 @@ Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
 |---|---|---|---|
 | `cqrs.rabbitmq.enabled` | `boolean` | `true` | Master switch for all RabbitMQ bus adapters. Set to `false` to use only in-process buses. |
 | `cqrs.rabbitmq.prefix` | `String` | `"cqrs"` | Prefix for RabbitMQ exchange and queue names. |
-| `cqrs.rabbitmq.retry.max-attempts` | `int` | `3` | Maximum number of retry attempts before a message is sent to the dead-letter queue. |
+| `cqrs.rabbitmq.retry.max-attempts` | `int` | `3` | Total number of deliveries of a failed asynchronous command or event, **including the first one**, before it is sent to the dead-letter queue. The default `3` means the first attempt plus two retries; `1` disables retries. Must be at least `1` (the application fails to start otherwise). |
 | `cqrs.rabbitmq.retry.ttl` | `long` | `1000` | Time-to-live (in milliseconds) for messages in the retry queue before they are re-delivered. |
 | `cqrs.rabbitmq.commands.exchange` | `String` | `"commands"` | Logical name of the command exchange. Combined with prefix to form the full exchange name. |
 | `cqrs.rabbitmq.commands.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the command listener container. |
@@ -156,6 +156,10 @@ DL Queue:       {rabbitmq.prefix}.{spring.application.name}.{bus.exchange}.dead_
 ```
 
 The application name is read from `spring.application.name` (defaults to `cqrs-app` if not set).
+
+Failed messages are sent to the retry and dead-letter exchanges with the application name as routing key, and each application binds its own retry and dead-letter queues with its name. The retry queue dead-letters expired messages through the default exchange directly to the application's main queue, so a retry only reaches the application whose handler failed.
+
+> **Upgrading from an earlier version:** the retry queues are now declared with different arguments (`x-dead-letter-exchange=""`, `x-dead-letter-routing-key={main queue}`) and the retry and dead-letter queues are bound with the application name instead of `#`. RabbitMQ refuses to redeclare an existing queue with different arguments, so delete the existing `*.retry` queues (and the old `#` bindings of the `*.dead_letter` queues) before deploying the new version.
 
 ## Full YAML Example
 
