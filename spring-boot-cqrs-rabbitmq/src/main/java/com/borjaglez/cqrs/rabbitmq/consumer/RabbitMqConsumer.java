@@ -1,8 +1,12 @@
 package com.borjaglez.cqrs.rabbitmq.consumer;
 
+import java.time.Instant;
+
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqErrorHeaders;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 
 /**
@@ -14,6 +18,10 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
  * expires the retry queue dead-letters it back to that application's main queue. Once the
  * configured number of attempts is exhausted, the message is sent to the dead-letter exchange, also
  * with the application name as routing key.
+ *
+ * <p>A dead-lettered message keeps its body and headers and also records why it failed, in the
+ * headers named in {@link RabbitMqErrorHeaders}: the exception type and message, the number of
+ * deliveries made and the instant it was dead-lettered.
  */
 public abstract class RabbitMqConsumer {
 
@@ -49,7 +57,29 @@ public abstract class RabbitMqConsumer {
     this.maxAttempts = maxAttempts;
   }
 
+  /**
+   * Retries a failed message or, once its attempts are exhausted, sends it to the dead-letter
+   * exchange without recording the failure cause.
+   *
+   * @param message the message that failed
+   * @param exchangeName logical name of the exchange the message was consumed from
+   * @param appName name of the application whose handler failed
+   */
   protected void handleConsumptionError(Message message, String exchangeName, String appName) {
+    handleConsumptionError(message, exchangeName, appName, null);
+  }
+
+  /**
+   * Retries a failed message or, once its attempts are exhausted, sends it to the dead-letter
+   * exchange with the failure recorded in the {@link RabbitMqErrorHeaders} headers.
+   *
+   * @param message the message that failed
+   * @param exchangeName logical name of the exchange the message was consumed from
+   * @param appName name of the application whose handler failed
+   * @param failure the exception thrown while consuming the message, or {@code null} if unknown
+   */
+  protected void handleConsumptionError(
+      Message message, String exchangeName, String appName, Throwable failure) {
     int redeliveryCount = getRedeliveryCount(message);
 
     if (redeliveryCount < getMaxRetries()) {
@@ -59,6 +89,7 @@ public abstract class RabbitMqConsumer {
       String retryExchange = namingStrategy.exchangeRetry(exchangeName);
       rabbitTemplate.send(retryExchange, appName, message);
     } else {
+      recordFailure(message.getMessageProperties(), redeliveryCount + 1, failure);
       String deadLetterExchange = namingStrategy.exchangeDeadLetter(exchangeName);
       rabbitTemplate.send(deadLetterExchange, appName, message);
     }
@@ -80,6 +111,25 @@ public abstract class RabbitMqConsumer {
    */
   protected int getMaxRetries() {
     return getMaxAttempts() - 1;
+  }
+
+  private static void recordFailure(MessageProperties properties, int attempts, Throwable failure) {
+    if (failure != null) {
+      Throwable cause = RabbitMqErrorHeaders.handlerFailure(failure);
+      properties.setHeader(RabbitMqErrorHeaders.ERROR_TYPE, cause.getClass().getName());
+      String errorMessage = cause.getMessage();
+      if (errorMessage != null) {
+        properties.setHeader(RabbitMqErrorHeaders.ERROR_MESSAGE, truncate(errorMessage));
+      }
+    }
+    properties.setHeader(RabbitMqErrorHeaders.ERROR_ATTEMPTS, attempts);
+    properties.setHeader(RabbitMqErrorHeaders.ERROR_TIMESTAMP, Instant.now().toString());
+  }
+
+  private static String truncate(String value) {
+    return value.length() > RabbitMqErrorHeaders.MAX_ERROR_MESSAGE_LENGTH
+        ? value.substring(0, RabbitMqErrorHeaders.MAX_ERROR_MESSAGE_LENGTH)
+        : value;
   }
 
   private int getRedeliveryCount(Message message) {

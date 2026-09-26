@@ -20,8 +20,6 @@ public class RabbitMqPublisher {
   public static final String DEFAULT_CONTEXT_HEADER_PREFIX = "cqrs.context.";
 
   private static final String HEADER_MESSAGE_TYPE = "cqrs.message.type";
-  private static final String HEADER_ERROR = "cqrs.error";
-  private static final String HEADER_ERROR_TYPE = "cqrs.error.type";
   private static final String HEADER_NULL_RESULT = "cqrs.result.null";
 
   private final RabbitTemplate rabbitTemplate;
@@ -102,10 +100,10 @@ public class RabbitMqPublisher {
   }
 
   public void checkError(Message reply) {
-    Object errorHeader = reply.getMessageProperties().getHeader(HEADER_ERROR);
+    Object errorHeader = reply.getMessageProperties().getHeader(RabbitMqErrorHeaders.ERROR);
     if (Boolean.TRUE.equals(errorHeader)) {
       String errorMessage = new String(reply.getBody(), StandardCharsets.UTF_8);
-      Object errorType = reply.getMessageProperties().getHeader(HEADER_ERROR_TYPE);
+      Object errorType = reply.getMessageProperties().getHeader(RabbitMqErrorHeaders.ERROR_TYPE);
       throw new RemoteHandlerException(
           errorType != null ? errorType.toString() : null, errorMessage);
     }

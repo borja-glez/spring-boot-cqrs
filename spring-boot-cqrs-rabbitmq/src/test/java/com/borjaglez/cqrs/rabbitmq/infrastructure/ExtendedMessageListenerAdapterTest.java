@@ -16,7 +16,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
 import org.springframework.amqp.support.converter.MessageConverter;
 
 import com.rabbitmq.client.AMQP;
@@ -89,19 +88,6 @@ class ExtendedMessageListenerAdapterTest {
     assertThat(properties.getValue().getHeaders().get("cqrs.error.type").toString())
         .isEqualTo(IllegalStateException.class.getName());
     assertThat(new String(body.getValue(), StandardCharsets.UTF_8)).isEqualTo("Handler failed");
-  }
-
-  @Test
-  void handlerFailureUnwrapsTheListenerAdapterException() {
-    IllegalStateException handlerError = new IllegalStateException("boom");
-
-    assertThat(
-            ExtendedMessageListenerAdapter.handlerFailure(
-                new ListenerExecutionFailedException("wrapped", handlerError)))
-        .isSameAs(handlerError);
-    ListenerExecutionFailedException withoutCause =
-        new ListenerExecutionFailedException("no cause", null);
-    assertThat(ExtendedMessageListenerAdapter.handlerFailure(withoutCause)).isSameAs(withoutCause);
   }
 
   @Test
