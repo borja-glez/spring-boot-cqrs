@@ -48,6 +48,9 @@ public class KafkaCqrsProperties {
   @Setter
   public static class BusProperties {
 
+    /** Whether this bus uses Kafka. Disable commands and queries to use Kafka for events only. */
+    private boolean enabled = true;
+
     private String topic;
     private int partitions;
     private short replicas;
