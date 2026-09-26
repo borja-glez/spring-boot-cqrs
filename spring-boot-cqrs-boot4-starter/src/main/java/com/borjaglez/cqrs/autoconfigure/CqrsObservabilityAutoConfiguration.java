@@ -12,7 +12,15 @@ import com.borjaglez.cqrs.observability.MicrometerBusObservability;
 import io.micrometer.core.instrument.MeterRegistry;
 
 @AutoConfiguration
-@AutoConfigureAfter(CqrsAutoConfiguration.class)
+// The registry comes from Spring Boot's own auto-configuration: without running after it, the
+// @ConditionalOnBean below never matches in an application (finding C29).
+@AutoConfigureAfter(
+    value = CqrsAutoConfiguration.class,
+    name = {
+      "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+      "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration",
+      "org.springframework.boot.micrometer.metrics.autoconfigure.export.simple.SimpleMetricsExportAutoConfiguration"
+    })
 @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
 @ConditionalOnProperty(
     prefix = "cqrs.observability",
