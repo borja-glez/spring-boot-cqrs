@@ -8,6 +8,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 - [Context Propagation Properties](#context-propagation-properties)
 - [Tracing Properties](#tracing-properties)
 - [Actuator Endpoints](#actuator-endpoints)
+- [Kafka Properties](#kafka-properties)
 - [RabbitMQ Properties](#rabbitmq-properties)
 - [Full YAML Example](#full-yaml-example)
 - [Minimal YAML Example](#minimal-yaml-example)
@@ -121,6 +122,38 @@ This library does not introduce its own `cqrs.actuator.*` properties. When `spri
 - `management.endpoints.web.exposure.include` — expose `cqrs` and `info` for HTTP access.
 
 See [actuator.md](actuator.md) for the full guide, response payloads and transport health notes.
+
+## Kafka Properties
+
+Defined in `KafkaCqrsProperties` (`cqrs.kafka.*`). See [kafka-adapter.md](kafka-adapter.md) for topics, request/reply, partition keys and consumer groups.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `cqrs.kafka.enabled` | `boolean` | `true` | Master switch for all Kafka bus adapters. |
+| `cqrs.kafka.prefix` | `String` | `"cqrs"` | Prefix for topic names. Blank means no prefix. |
+| `cqrs.kafka.auto-create-topics` | `boolean` | `true` | Declares `NewTopic` beans for the enabled buses and the reply topic. |
+| `cqrs.kafka.partition-key.strategy` | `MESSAGE_NAME` \| `PAYLOAD_TYPE` \| `NONE` | `MESSAGE_NAME` | Record key used by the default `KafkaPartitionKeyStrategy`. |
+| `cqrs.kafka.replies.topic` | `String` | `"replies"` | Logical name of the reply topic (`{prefix}.{spring.application.name}.{topic}`). |
+| `cqrs.kafka.replies.partitions` | `int` | `1` | Partitions of the reply topic. |
+| `cqrs.kafka.replies.replicas` | `short` | `1` | Replication factor of the reply topic. |
+| `cqrs.kafka.replies.timeout` | `Duration` | `30s` | How long a request waits for its reply. |
+| `cqrs.kafka.{commands,events,queries}.enabled` | `boolean` | `true` | Whether that bus uses Kafka. With commands and queries disabled, no reply topic or reply container is created. |
+| `cqrs.kafka.{commands,events,queries}.topic` | `String` | `"commands"` / `"events"` / `"queries"` | Logical name of the bus topic (`{prefix}.{topic}`). |
+| `cqrs.kafka.{commands,events,queries}.partitions` | `int` | `3` | Partitions of the bus topic. |
+| `cqrs.kafka.{commands,events,queries}.replicas` | `short` | `1` | Replication factor of the bus topic. |
+| `cqrs.kafka.{commands,events,queries}.concurrency` | `int` | `1` | Concurrency of the bus listener container. |
+| `cqrs.kafka.{commands,events,queries}.group-id` | `String` | `""` | Consumer group of the bus listener container; blank means `{spring.application.name}.cqrs.{commands,events,queries}`. |
+
+Kafka for events only:
+
+```yaml
+cqrs:
+  kafka:
+    commands:
+      enabled: false
+    queries:
+      enabled: false
+```
 
 ## RabbitMQ Properties
 
