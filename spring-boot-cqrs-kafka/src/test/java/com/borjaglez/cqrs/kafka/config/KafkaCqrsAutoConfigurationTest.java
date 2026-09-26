@@ -23,7 +23,6 @@ import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import com.borjaglez.cqrs.autoconfigure.CqrsAutoConfiguration;
 import com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
-import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.KafkaCommandBus;
 import com.borjaglez.cqrs.kafka.KafkaEventBus;
@@ -104,7 +103,18 @@ class KafkaCqrsAutoConfigurationTest {
   }
 
   @Test
-  void shouldRespectCustomPrefixAndFallbackEventBus() {
+  void kafkaEventBusShouldNotDependOnTheLocalEventBus() {
+    contextRunner.run(
+        context -> {
+          assertThat(context).hasBean("springEventBus");
+          assertThat(context.getBeanFactory().getDependenciesForBean("kafkaEventBus"))
+              .isNotEmpty()
+              .doesNotContain("springEventBus");
+        });
+  }
+
+  @Test
+  void shouldRespectCustomPrefix() {
     contextRunner
         .withPropertyValues("cqrs.kafka.prefix=custom")
         .run(
@@ -113,7 +123,6 @@ class KafkaCqrsAutoConfigurationTest {
                   context.getBean(KafkaTopicNamingStrategy.class);
               assertThat(namingStrategy.topic("commands")).isEqualTo("custom.commands");
               assertThat(context.getBean(KafkaEventBus.class)).isNotNull();
-              assertThat(context.getBean("springEventBus", EventBus.class)).isNotNull();
             });
   }
 
