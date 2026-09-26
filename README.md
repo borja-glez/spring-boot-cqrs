@@ -33,7 +33,7 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 **Gradle**
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.1")
 ```
 
 **Maven**
@@ -42,7 +42,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.0")
 <dependency>
     <groupId>com.borjaglez.cqrs</groupId>
     <artifactId>spring-boot-cqrs-boot3-starter</artifactId>
-    <version>0.3.0</version>
+    <version>0.3.1</version>
 </dependency>
 ```
 
@@ -51,7 +51,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.0")
 **Gradle**
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.3.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.3.1")
 ```
 
 **Maven**
@@ -60,7 +60,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.3.0")
 <dependency>
     <groupId>com.borjaglez.cqrs</groupId>
     <artifactId>spring-boot-cqrs-boot4-starter</artifactId>
-    <version>0.3.0</version>
+    <version>0.3.1</version>
 </dependency>
 ```
 
@@ -333,7 +333,7 @@ See [docs/middleware.md](docs/middleware.md#message-context--correlation-id) for
 Add the RabbitMQ module to distribute commands, events, and queries across services (alongside your chosen starter):
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq:0.3.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq:0.3.1")
 ```
 
 Configure in `application.yml`:
@@ -372,7 +372,7 @@ The RabbitMQ event bus automatically falls back to the local Spring event bus if
 Add the Kafka module to distribute commands, events, and queries across services (alongside your chosen starter):
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-kafka:0.3.0")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-kafka:0.3.1")
 ```
 
 Configure in `application.yml`:
