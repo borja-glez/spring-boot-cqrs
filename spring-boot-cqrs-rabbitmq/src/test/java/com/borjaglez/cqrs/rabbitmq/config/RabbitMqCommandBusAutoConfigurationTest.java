@@ -14,6 +14,8 @@ import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqCommandBus;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 class RabbitMqCommandBusAutoConfigurationTest {
 
@@ -131,6 +133,47 @@ class RabbitMqCommandBusAutoConfigurationTest {
                   .filteredOn(b -> b.getDestination().startsWith("cqrs.billing.commands."))
                   .extracting(Binding::getRoutingKey)
                   .containsExactlyInAnyOrder("billing", "billing");
+            });
+  }
+
+  @Test
+  void shouldNotCreateCommandBusBeansWhenCommandsAreDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.commands.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(RabbitMqCommandBus.class);
+              assertThat(context).doesNotHaveBean("cqrsCommandDeclarables");
+              assertThat(context).doesNotHaveBean("cqrsCommandListenerContainer");
+              assertThat(context).hasSingleBean(RabbitMqPublisher.class);
+              assertThat(context).hasSingleBean(RabbitMqBusDeclarationBuilder.class);
+            });
+  }
+
+  @Test
+  void shouldCreateCommandBusBeansWhenCommandsAreExplicitlyEnabledAndOtherBusesAreDisabled() {
+    contextRunner
+        .withPropertyValues(
+            "cqrs.rabbitmq.commands.enabled=true",
+            "cqrs.rabbitmq.queries.enabled=false",
+            "cqrs.rabbitmq.events.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(RabbitMqCommandBus.class);
+              assertThat(context).hasBean("cqrsCommandDeclarables");
+              assertThat(context).hasBean("cqrsCommandListenerContainer");
+            });
+  }
+
+  @Test
+  void shouldNotCreateCommandBusBeansWhenRabbitMqIsDisabledEvenIfCommandsAreEnabled() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.enabled=false", "cqrs.rabbitmq.commands.enabled=true")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(RabbitMqCommandBus.class);
+              assertThat(context).doesNotHaveBean("cqrsCommandDeclarables");
+              assertThat(context).doesNotHaveBean("cqrsCommandListenerContainer");
             });
   }
 }

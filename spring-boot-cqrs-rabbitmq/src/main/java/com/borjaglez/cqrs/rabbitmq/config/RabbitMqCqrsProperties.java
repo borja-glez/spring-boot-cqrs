@@ -47,6 +47,13 @@ public class RabbitMqCqrsProperties {
   @Setter
   public static class BusProperties {
 
+    /**
+     * Whether this bus uses RabbitMQ. Disabling it removes the bus bean, its queues and exchanges
+     * and its listener container, so the application can neither send nor receive this kind of
+     * message over RabbitMQ.
+     */
+    private boolean enabled = true;
+
     private String exchange;
     private int concurrentConsumers;
     private int maxConcurrentConsumers;

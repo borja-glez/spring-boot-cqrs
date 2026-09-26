@@ -15,6 +15,7 @@ The RabbitMQ module provides distributed implementations of all three buses. Whe
 - [Consumer Configuration](#consumer-configuration)
 - [Naming Strategy](#naming-strategy)
 - [Auto-Configuration](#auto-configuration)
+  - [Enabling each bus](#enabling-each-bus)
 - [Docker Setup](#docker-setup)
 
 ## Architecture
@@ -245,11 +246,27 @@ The module provides four auto-configuration classes:
 | Class | Condition | Creates |
 |---|---|---|
 | `RabbitMqCqrsAutoConfiguration` | `RabbitTemplate` on classpath + `cqrs.rabbitmq.enabled=true` | `RabbitMqNamingStrategy`, `RabbitMqPublisher`, `RabbitMqBusDeclarationBuilder` |
-| `RabbitMqCommandBusAutoConfiguration` | Above + `CommandHandlerRegistry` bean | `RabbitMqCommandBus`, command `Declarables`, command listener container |
-| `RabbitMqEventBusAutoConfiguration` | Above + `EventHandlerRegistry` bean | `RabbitMqEventBus`, event `Declarables`, event listener container |
-| `RabbitMqQueryBusAutoConfiguration` | Above + `QueryHandlerRegistry` bean | `RabbitMqQueryBus`, query `Declarables`, query listener container |
+| `RabbitMqCommandBusAutoConfiguration` | Above + `CommandHandlerRegistry` bean + `cqrs.rabbitmq.commands.enabled` not `false` | `RabbitMqCommandBus`, command `Declarables`, command listener container |
+| `RabbitMqEventBusAutoConfiguration` | Above + `EventHandlerRegistry` bean + `cqrs.rabbitmq.events.enabled` not `false` | `RabbitMqEventBus`, event `Declarables`, event listener container |
+| `RabbitMqQueryBusAutoConfiguration` | Above + `QueryHandlerRegistry` bean + `cqrs.rabbitmq.queries.enabled` not `false` | `RabbitMqQueryBus`, query `Declarables`, query listener container |
 
 The bus auto-configurations use `@Value("${spring.application.name:cqrs-app}")` for the application name used in queue naming.
+
+### Enabling each bus
+
+Every bus uses RabbitMQ by default. Set `cqrs.rabbitmq.{commands,events,queries}.enabled=false` for a bus the service never uses over RabbitMQ: its `RabbitMq*Bus` bean, its main, retry and dead-letter queues and exchanges, and its listener container (with its 10 to 20 consumers) are not created. The shared beans of `RabbitMqCqrsAutoConfiguration` stay, and `cqrs.rabbitmq.enabled=false` still disables everything.
+
+```yaml
+# A service that only handles commands over RabbitMQ
+cqrs:
+  rabbitmq:
+    queries:
+      enabled: false
+    events:
+      enabled: false
+```
+
+A flag disables the sender as well as the receiver. A service that handles only commands but publishes events over RabbitMQ keeps `events.enabled=true`: its event queues and listener container are still created, even without event handlers.
 
 ## Docker Setup
 
