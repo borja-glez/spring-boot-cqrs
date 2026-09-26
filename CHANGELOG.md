@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.3.0] - 2026-09-26
+
+### Added
+- Enable each bus separately and skip replies for event-only apps (#50) (f0cca6e)
+
+### Fixed
+- Answer 400 for an unknown section or handler kind (#75) (635d169)
+- Retry a failed message in its own application and honour max-attempts (#73) (d80f5e5)
+- Continue the sender's trace in the listener containers (#70) (8a5655e)
+- Reply null results and failures without a message correctly (#58) (6db8b5e)
+- Leave the commands and queries of other services alone (#56) (a295d5a)
+- Carry the trace through the module's template and containers (#54) (04c7e40)
+- Let the Kafka and RabbitMQ modules run in the same application (#52) (630ae40)
+- Support Spring Boot 4 by not depending on Boot's KafkaProperties (#48) (b5e6165)
+- Tell a missing reply from a null result (#46) (dbeb432)
+- Deliver handler failures to RPC callers (#43) (8c235bd)
+- Publish events raised after commit and keep REQUIRES_NEW events apart (#41) (44b370f)
+- Give the dispatch observation its own name (#39) (399a50d)
+- Order bus metrics and tracing after Spring Boot's registries (#37) (2cc1cd0)
+- Register native hints for every message a native image serializes (#35) (9b3832f)
+- Make the JSON converter's trusted packages configurable (#33) (ab5d5f0)
+- Keep message ids when messages are deserialized with Jackson 3 (#31) (6124807)
+- Create the message serializer after Spring Boot's Jackson auto-configuration (#29) (a708adb)
+
+### Miscellaneous
+- Bump version to 0.2.1-SNAPSHOT (98c1f3c)
 ## [0.2.0] - 2026-05-14
 
 ### Added
