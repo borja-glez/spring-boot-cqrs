@@ -5,6 +5,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -27,19 +28,25 @@ abstract class AbstractKafkaConsumer {
             contextHeaderPrefix, KafkaMessagePublisher.DEFAULT_CONTEXT_HEADER_PREFIX);
   }
 
-  protected <T> T deserialize(ConsumerRecord<String, byte[]> record) {
+  /**
+   * The class of the payload, when this application has it. Every service reads the shared
+   * commands, queries and events topics, so a record may well carry a type that only another
+   * service knows: that is not an error, the record is simply not for this application.
+   */
+  protected Optional<Class<?>> localPayloadClass(ConsumerRecord<String, byte[]> record) {
     String payloadType = header(record, KafkaMessageHeaders.PAYLOAD_TYPE);
     if (payloadType == null) {
       throw new IllegalStateException("Missing Kafka CQRS payload type header");
     }
     try {
-      @SuppressWarnings("unchecked")
-      Class<T> payloadClass = (Class<T>) Class.forName(payloadType);
-      return serializer.deserialize(record.value(), payloadClass);
+      return Optional.of(Class.forName(payloadType));
     } catch (ClassNotFoundException e) {
-      throw new IllegalStateException(
-          "Unable to resolve Kafka CQRS payload type " + payloadType, e);
+      return Optional.empty();
     }
+  }
+
+  protected <T> T deserialize(ConsumerRecord<String, byte[]> record, Class<T> payloadClass) {
+    return serializer.deserialize(record.value(), payloadClass);
   }
 
   protected String header(ConsumerRecord<String, byte[]> record, String name) {

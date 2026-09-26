@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka.consumer;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
@@ -35,7 +36,12 @@ public class KafkaEventConsumer extends AbstractKafkaConsumer {
   }
 
   public void consume(ConsumerRecord<String, byte[]> record) {
-    Event event = deserialize(record);
+    // An event type this application does not have cannot have a handler here either.
+    Optional<Class<?>> type = localPayloadClass(record);
+    if (type.isEmpty()) {
+      return;
+    }
+    Event event = (Event) deserialize(record, type.get());
     MessageContext incoming = extractContext(record);
     MessageContext.Scope scope = MessageContext.scope(incoming);
     try {

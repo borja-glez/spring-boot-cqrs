@@ -2,14 +2,17 @@ package com.borjaglez.cqrs.kafka.consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -38,6 +41,9 @@ class KafkaCommandConsumerTest {
     serializer = mock(MessageSerializer.class);
     publisher = mock(KafkaMessagePublisher.class);
     consumer = new KafkaCommandConsumer(registry, Collections.emptyList(), serializer, publisher);
+    // TestCommand is handled here unless a test says otherwise.
+    when(registry.getHandlerInfo(TestCommand.class))
+        .thenReturn(Optional.of(mock(CommandHandlerRegistry.HandlerInfo.class)));
   }
 
   @Test
@@ -292,7 +298,7 @@ class KafkaCommandConsumerTest {
   }
 
   @Test
-  void shouldFailWhenPayloadTypeHeaderCannotBeResolved() {
+  void shouldIgnoreACommandTypeThatOnlyAnotherServiceKnows() {
     ConsumerRecord<String, byte[]> record =
         new ConsumerRecord<>("cqrs.commands", 0, 0L, "key", "payload".getBytes(UTF_8));
     record
@@ -301,9 +307,22 @@ class KafkaCommandConsumerTest {
             new RecordHeader(
                 KafkaMessageHeaders.PAYLOAD_TYPE, "com.example.Missing".getBytes(UTF_8)));
 
-    assertThatThrownBy(() -> consumer.consume(record))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unable to resolve Kafka CQRS payload type com.example.Missing");
+    consumer.consume(record);
+
+    verifyNoInteractions(serializer, publisher);
+  }
+
+  @Test
+  void shouldNotAnswerACommandThatAnotherServiceHandles() {
+    when(registry.getHandlerInfo(TestCommand.class)).thenReturn(Optional.empty());
+    ConsumerRecord<String, byte[]> record =
+        recordFor(new TestCommand("value"), KafkaRequestMode.REPLY, "reply-topic");
+
+    consumer.consume(record);
+
+    // Answering "no handler" here would race the reply of the service that owns the command.
+    verify(registry, never()).handle(any());
+    verifyNoInteractions(serializer, publisher);
   }
 
   private ConsumerRecord<String, byte[]> recordFor(

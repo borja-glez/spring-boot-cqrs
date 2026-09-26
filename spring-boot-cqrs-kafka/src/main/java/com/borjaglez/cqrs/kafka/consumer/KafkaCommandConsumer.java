@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka.consumer;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
@@ -46,7 +47,13 @@ public class KafkaCommandConsumer extends AbstractKafkaConsumer {
   }
 
   public void consume(ConsumerRecord<String, byte[]> record) {
-    Command command = deserialize(record);
+    // Commands of other services arrive here too. Answering them (with "no handler") would race
+    // the reply of the service that owns them, so they are left alone.
+    Optional<Class<?>> type = localPayloadClass(record);
+    if (type.isEmpty() || registry.getHandlerInfo(type.get()).isEmpty()) {
+      return;
+    }
+    Command command = (Command) deserialize(record, type.get());
     KafkaRequestMode requestMode = requestMode(record);
     String replyTopic = header(record, KafkaMessageHeaders.REPLY_TOPIC);
     String correlationId = header(record, KafkaMessageHeaders.CORRELATION_ID);
