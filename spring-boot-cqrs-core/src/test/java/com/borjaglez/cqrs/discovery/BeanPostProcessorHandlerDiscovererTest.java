@@ -223,6 +223,57 @@ class BeanPostProcessorHandlerDiscovererTest {
     assertThat(eventRegistry.getRegisteredEvents()).isEmpty();
   }
 
+  @Test
+  void rejectsAbstractCommandParameter() {
+    Object bean = new AbstractCommandParamHandler();
+
+    assertThatThrownBy(() -> discoverer.postProcessAfterInitialization(bean, "abstractHandler"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("bean 'abstractHandler'")
+        .hasMessageContaining("handle(")
+        .hasMessageContaining(AbstractOrderCommand.class.getName())
+        .hasMessageContaining("abstract class or an interface")
+        .hasMessageContaining("exact message class");
+    assertThat(commandRegistry.getRegisteredCommands()).isEmpty();
+  }
+
+  @Test
+  void rejectsInterfaceEventParameter() {
+    Object bean = new InterfaceEventParamHandler();
+
+    assertThatThrownBy(() -> discoverer.postProcessAfterInitialization(bean, "interfaceHandler"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("bean 'interfaceHandler'")
+        .hasMessageContaining(OrderEventContract.class.getName())
+        .hasMessageContaining("abstract class or an interface")
+        .hasMessageContaining("exact message class");
+    assertThat(eventRegistry.getRegisteredEvents()).isEmpty();
+  }
+
+  @Test
+  void rejectsAbstractQueryParameter() {
+    Object bean = new AbstractQueryParamHandler();
+
+    assertThatThrownBy(() -> discoverer.postProcessAfterInitialization(bean, "abstractQuery"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("bean 'abstractQuery'")
+        .hasMessageContaining(AbstractOrderQuery.class.getName())
+        .hasMessageContaining("abstract class or an interface");
+    assertThat(queryRegistry.getRegisteredQueries()).isEmpty();
+  }
+
+  @Test
+  void concreteBaseClassParameterReceivesOnlyThatExactClass() {
+    TestEventHandler handler = new TestEventHandler();
+    discoverer.postProcessAfterInitialization(handler, "testEventHandler");
+
+    eventRegistry.handle(new SubTestEvent("sub"));
+    assertThat(handler.getLastHandledData()).isNull();
+
+    eventRegistry.handle(new TestEvent("exact"));
+    assertThat(handler.getLastHandledData()).isEqualTo("exact");
+  }
+
   private static Object cglibProxy(Object target, AtomicInteger adviceCalls) {
     ProxyFactory factory = new ProxyFactory(target);
     factory.setProxyTargetClass(true);
@@ -238,6 +289,42 @@ class BeanPostProcessorHandlerDiscovererTest {
   }
 
   // Invalid handler fixtures for validation tests
+
+  abstract static class AbstractOrderCommand extends com.borjaglez.cqrs.command.Command {}
+
+  interface OrderEventContract {}
+
+  abstract static class AbstractOrderQuery extends com.borjaglez.cqrs.query.Query {}
+
+  static class SubTestEvent extends TestEvent {
+    SubTestEvent(String data) {
+      super(data);
+    }
+  }
+
+  @com.borjaglez.cqrs.command.annotation.CommandHandler
+  static class AbstractCommandParamHandler {
+    @com.borjaglez.cqrs.command.annotation.HandleCommand
+    public void handle(AbstractOrderCommand command) {
+      // abstract parameter - never invocable
+    }
+  }
+
+  @com.borjaglez.cqrs.event.annotation.EventHandler
+  static class InterfaceEventParamHandler {
+    @com.borjaglez.cqrs.event.annotation.HandleEvent
+    public void on(OrderEventContract event) {
+      // interface parameter - never invocable
+    }
+  }
+
+  @com.borjaglez.cqrs.query.annotation.QueryHandler
+  static class AbstractQueryParamHandler {
+    @com.borjaglez.cqrs.query.annotation.HandleQuery
+    public String handle(AbstractOrderQuery query) {
+      return "never";
+    }
+  }
 
   @com.borjaglez.cqrs.command.annotation.CommandHandler
   static class InvalidNoParamHandler {

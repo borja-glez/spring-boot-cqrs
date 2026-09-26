@@ -76,7 +76,7 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
 
   private void registerCommandHandler(Object bean, String beanName, Method method) {
     Class<?>[] paramTypes = method.getParameterTypes();
-    validateSingleParameter(method, paramTypes, Command.class);
+    validateSingleParameter(beanName, method, paramTypes, Command.class);
     Class<?> commandClass = paramTypes[0];
     String messageName = namingStrategy.commandName(commandClass);
     boolean requiresValidation = hasValidAnnotation(method);
@@ -86,7 +86,7 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
 
   private void registerEventHandler(Object bean, String beanName, Method method) {
     Class<?>[] paramTypes = method.getParameterTypes();
-    validateSingleParameter(method, paramTypes, Event.class);
+    validateSingleParameter(beanName, method, paramTypes, Event.class);
     Class<?> eventClass = paramTypes[0];
     String messageName = namingStrategy.eventName(eventClass);
     eventHandlerRegistry.register(
@@ -95,7 +95,7 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
 
   private void registerQueryHandler(Object bean, String beanName, Method method) {
     Class<?>[] paramTypes = method.getParameterTypes();
-    validateSingleParameter(method, paramTypes, Query.class);
+    validateSingleParameter(beanName, method, paramTypes, Query.class);
     Class<?> queryClass = paramTypes[0];
     String messageName = namingStrategy.queryName(queryClass);
     queryHandlerRegistry.register(
@@ -148,13 +148,29 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
   }
 
   private void validateSingleParameter(
-      Method method, Class<?>[] paramTypes, Class<?> expectedBaseType) {
+      String beanName, Method method, Class<?>[] paramTypes, Class<?> expectedBaseType) {
     if (paramTypes.length != 1) {
       throw new IllegalStateException(
           "Handler method "
               + method.toGenericString()
               + " must have exactly 1 parameter, but has "
               + paramTypes.length);
+    }
+    // Registries look handlers up by the exact message class, and no message instance has an
+    // abstract class or an interface as its exact class, so such a handler could never run.
+    // Interfaces report the abstract modifier too.
+    if (Modifier.isAbstract(paramTypes[0].getModifiers())) {
+      throw new IllegalStateException(
+          "Handler method "
+              + method.toGenericString()
+              + " on bean '"
+              + beanName
+              + "' has parameter type "
+              + paramTypes[0].getName()
+              + ", which is an abstract class or an interface; handlers match the exact message"
+              + " class, so it could never be invoked. Declare a concrete "
+              + expectedBaseType.getSimpleName()
+              + " subclass as the parameter");
     }
     if (!expectedBaseType.isAssignableFrom(paramTypes[0])) {
       throw new IllegalStateException(

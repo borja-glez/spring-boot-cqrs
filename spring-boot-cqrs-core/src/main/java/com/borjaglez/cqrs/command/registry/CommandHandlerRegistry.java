@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.borjaglez.cqrs.MessageTypeHierarchy;
 import com.borjaglez.cqrs.MethodHandleUtil;
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.CommandAlreadyRegisteredException;
@@ -37,7 +38,7 @@ public class CommandHandlerRegistry {
   public Object handle(Command command) {
     HandlerInfo info = handlers.get(command.getClass());
     if (info == null) {
-      throw new CommandNotRegisteredException(command.getClass());
+      throw notRegistered(command.getClass());
     }
     try {
       return info.handle().invoke(info.bean(), command);
@@ -46,6 +47,14 @@ public class CommandHandlerRegistry {
     } catch (Throwable e) {
       throw new CommandHandlerExecutionException(e);
     }
+  }
+
+  private CommandNotRegisteredException notRegistered(Class<?> commandClass) {
+    Class<?> handledSuperclass =
+        MessageTypeHierarchy.nearestHandledSuperclass(commandClass, handlers);
+    return handledSuperclass == null
+        ? new CommandNotRegisteredException(commandClass)
+        : new CommandNotRegisteredException(commandClass, handledSuperclass);
   }
 
   public Optional<HandlerInfo> getHandlerInfo(Class<?> commandClass) {

@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.borjaglez.cqrs.MessageTypeHierarchy;
 import com.borjaglez.cqrs.MethodHandleUtil;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.QueryAlreadyRegisteredException;
@@ -31,7 +32,7 @@ public class QueryHandlerRegistry {
   public Object handle(Query query) {
     HandlerInfo info = handlers.get(query.getClass());
     if (info == null) {
-      throw new QueryNotRegisteredException(query.getClass());
+      throw notRegistered(query.getClass());
     }
     try {
       return info.handle().invoke(info.bean(), query);
@@ -40,6 +41,14 @@ public class QueryHandlerRegistry {
     } catch (Throwable e) {
       throw new QueryHandlerExecutionException(e);
     }
+  }
+
+  private QueryNotRegisteredException notRegistered(Class<?> queryClass) {
+    Class<?> handledSuperclass =
+        MessageTypeHierarchy.nearestHandledSuperclass(queryClass, handlers);
+    return handledSuperclass == null
+        ? new QueryNotRegisteredException(queryClass)
+        : new QueryNotRegisteredException(queryClass, handledSuperclass);
   }
 
   public Optional<HandlerInfo> getHandlerInfo(Class<?> queryClass) {

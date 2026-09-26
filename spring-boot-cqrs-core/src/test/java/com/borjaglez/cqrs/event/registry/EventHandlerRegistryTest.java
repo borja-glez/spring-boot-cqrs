@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Method;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 import com.borjaglez.cqrs.fixtures.CheckedThrowingEventHandler;
@@ -14,13 +16,56 @@ import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.fixtures.ThrowingEventHandler;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+
 class EventHandlerRegistryTest {
 
   private EventHandlerRegistry registry;
+  private Logger registryLogger;
+  private ListAppender<ILoggingEvent> logs;
 
   @BeforeEach
   void setUp() {
     registry = new EventHandlerRegistry();
+    registryLogger = (Logger) LoggerFactory.getLogger(EventHandlerRegistry.class);
+    logs = new ListAppender<>();
+    logs.start();
+    registryLogger.addAppender(logs);
+  }
+
+  @AfterEach
+  void tearDown() {
+    registryLogger.detachAppender(logs);
+    logs.stop();
+  }
+
+  @Test
+  void eventSubclassWithOnlySuperclassHandlerLogsOneWarningAndIsNotHandled() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    registry.register(TestEvent.class, handler, method, "test.event");
+
+    registry.handle(new SubTestEvent("first"));
+    registry.handle(new SubTestEvent("second"));
+
+    assertThat(handler.getLastHandledData()).isNull();
+    assertThat(logs.list).hasSize(1);
+    ILoggingEvent warning = logs.list.get(0);
+    assertThat(warning.getLevel()).isEqualTo(Level.WARN);
+    assertThat(warning.getFormattedMessage())
+        .contains(SubTestEvent.class.getName())
+        .contains(TestEvent.class.getName())
+        .contains("exact message class");
+  }
+
+  @Test
+  void eventWithoutAnyHandlerInHierarchyLogsNothing() {
+    registry.handle(new TestEvent("nobody-listening"));
+
+    assertThat(logs.list).isEmpty();
   }
 
   @Test
@@ -106,5 +151,11 @@ class EventHandlerRegistryTest {
     assertThatThrownBy(() -> registry.handle(new TestEvent("data")))
         .isInstanceOf(EventHandlerExecutionException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  static class SubTestEvent extends TestEvent {
+    SubTestEvent(String data) {
+      super(data);
+    }
   }
 }
