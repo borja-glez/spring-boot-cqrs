@@ -110,7 +110,7 @@ Middleware beans are collected by Spring and ordered using `@Order`. Lower value
 
 Middleware without `@Order` receives the default order value (`Ordered.LOWEST_PRECEDENCE`), meaning it runs after all explicitly ordered middleware.
 
-The built-in `CommandValidationInterceptor` and `MicrometerBusObservability` are also ordered as middleware beans and participate in the same pipeline.
+The built-in middleware participates in the same pipeline: `ContextPropagationMiddleware` (`HIGHEST_PRECEDENCE`), `TracingMiddleware` (`HIGHEST_PRECEDENCE + 10`), the opt-in `RetryMiddleware` (`LOWEST_PRECEDENCE - 100`), and `CommandValidationInterceptor` and `MicrometerBusObservability` (no `@Order`, so lowest precedence).
 
 ## Middleware on Remote Buses
 
@@ -200,6 +200,46 @@ On entry the middleware:
 3. Mirrors every configured key (see `cqrs.context.mdc-keys`) into SLF4J MDC so downstream logs carry them automatically.
 4. Proceeds through the chain.
 5. Restores the previous MDC state and context on exit (even if the handler throws).
+
+### RetryMiddleware
+
+**Package:** `com.borjaglez.cqrs.retry`
+**Auto-configured:** No, opt-in with `cqrs.retry.enabled=true` (see [Configuration](configuration.md#retry-properties))
+**Order:** `RetryMiddleware.ORDER` = `Ordered.LOWEST_PRECEDENCE - 100`
+
+Retries a failed command or query dispatch in process, with a backoff between attempts. Each attempt calls `chain.proceed(message)` again, so every middleware ordered after it and the handler run once per attempt. Because of the order, context propagation and tracing wrap all the attempts (one correlation id, one span), while validation, `MicrometerBusObservability` and unordered user middleware run on each attempt: three attempts produce three `cqrs.bus.dispatch` samples.
+
+- **Commands and queries only.** Events, and any other message, pass through untouched: an event may have several handlers, and retrying the dispatch would run again those that already succeeded.
+- **Attempts.** `maxAttempts` counts the first attempt (`1` means no retry), like `cqrs.rabbitmq.retry.max-attempts`. When the policy gives up, the exception of the last attempt is rethrown as is, not wrapped.
+- **Classification.** A failure is retriable when the exception, or a cause in its chain, is an instance of a retriable type and neither it nor any cause is an instance of a non-retriable type: non-retriable wins. By default every `RuntimeException` is retriable except `IllegalArgumentException`, `jakarta.validation.ConstraintViolationException`, `CommandNotRegisteredException` and `QueryNotRegisteredException`, so validation failures and missing handlers fail at once. A checked exception thrown by a handler reaches the chain wrapped in `CommandHandlerExecutionException` / `QueryHandlerExecutionException`, a `RuntimeException`, so it is retried unless a cause in the chain is non-retriable; a checked exception thrown by a middleware is classified by its own type (not retried unless listed in `retryOn`).
+- **Backoff.** `BackoffStrategy.fixed(delay)`, `exponential(initial, multiplier, max)` (`min(max, initial * multiplier^(failedAttempts - 1))`) or `exponentialWithJitter(initial, multiplier, max, jitterFactor)` (the exponential delay scaled by a random factor in `[1 - jitterFactor, 1 + jitterFactor]`, capped at `max`). The default is exponential with jitter: 100 ms, x2, capped at 5 s, jitter 0.1.
+- **Interruption.** If the thread is interrupted while waiting, the interrupt flag is restored and the last handler exception is rethrown (with the `InterruptedException` suppressed).
+
+Defining the middleware yourself (an application bean replaces the auto-configured one):
+
+```java
+@Bean
+RetryMiddleware retryMiddleware() {
+    return RetryMiddleware.builder()
+        .defaultPolicy(RetryPolicy.builder()
+            .maxAttempts(4)
+            .backoff(BackoffStrategy.exponentialWithJitter(
+                Duration.ofMillis(50), 2.0, Duration.ofSeconds(2), 0.2))
+            .noRetryOn(PaymentDeclinedException.class)
+            .build())
+        .override(ChargeCardCommand.class, RetryPolicy.builder().maxAttempts(2).build())
+        .override(SendEmailCommand.class, RetryPolicy.noRetry())
+        .build();
+}
+```
+
+`RetryPolicy.Builder.retryOn(...)` replaces the retriable types; `noRetryOn(...)` adds to the non-retriable ones. Overrides are looked up by the exact message class; subclasses fall back to the default policy.
+
+`RetryPolicy` and `BackoffStrategy` do not depend on the bus: `policy.shouldRetry(exception, failedAttempts)` and `backoff.delayAfter(failedAttempts)` can drive any retry loop.
+
+**Remote buses.** With RabbitMQ and Kafka the middleware runs in the consumer (see [Middleware on Remote Buses](#middleware-on-remote-buses)), before the transport's own retry. The attempts multiply: with `cqrs.retry.max-attempts=3` and `cqrs.rabbitmq.retry.max-attempts=3` a failing handler runs up to 9 times before the message is dead-lettered. Lower one of them when you enable both.
+
+**Transactions.** Retrying an optimistic-lock failure only helps when the transaction starts inside the retry: in the handler itself, or in a middleware ordered after `RetryMiddleware`. If the caller's transaction wraps the dispatch, it is already marked rollback-only after the first failure and every retry fails too.
 
 ## Message Context & Correlation ID
 

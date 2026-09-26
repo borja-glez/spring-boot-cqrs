@@ -289,6 +289,7 @@ public class LoggingMiddleware implements BusMiddleware {
 | `MicrometerBusObservability` | Yes (when Micrometer is on classpath) | `cqrs.observability.enabled` |
 | `ContextPropagationMiddleware` | Yes (when SLF4J is on classpath) | `cqrs.context.enabled` |
 | `TracingMiddleware` | Yes (when an `ObservationRegistry` bean is present) | `cqrs.tracing.enabled` |
+| `RetryMiddleware` | No (opt-in; commands and queries only) | `cqrs.retry.enabled` |
 
 ### Message Context & Correlation ID
 
@@ -463,6 +464,15 @@ The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `Comm
 | `cqrs.context.auto-correlation-id` | `true` | Generate a UUID `correlationId` when none is present on dispatch entry |
 | `cqrs.context.mdc-keys` | `[correlationId]` | Context keys mirrored into SLF4J MDC during handler execution |
 | `cqrs.context.header-prefix` | `"cqrs.context."` | Prefix applied to RabbitMQ/Kafka headers when serializing context across services |
+| `cqrs.retry.enabled` | `false` | Enable the in-process retry middleware for commands and queries |
+| `cqrs.retry.max-attempts` | `3` | Total attempts, the first one included |
+| `cqrs.retry.backoff.strategy` | `exponential-jitter` | `fixed`, `exponential` or `exponential-jitter` |
+| `cqrs.retry.backoff.initial-delay` | `100ms` | Delay after the first failed attempt |
+| `cqrs.retry.backoff.multiplier` | `2.0` | Delay growth factor per failed attempt |
+| `cqrs.retry.backoff.max-delay` | `5s` | Upper bound of the delay |
+| `cqrs.retry.backoff.jitter-factor` | `0.1` | Random spread of the delay, in `[0, 1]` |
+| `cqrs.retry.retriable-exceptions` | `[]` | Exception classes retried; empty means `RuntimeException` |
+| `cqrs.retry.non-retriable-exceptions` | `[]` | Exception classes added to the default non-retriable set |
 | `cqrs.kafka.enabled` | `true` | Enable Kafka bus adapters |
 | `cqrs.kafka.prefix` | `"cqrs"` | Prefix for Kafka topic names |
 | `cqrs.kafka.auto-create-topics` | `true` | Auto-register CQRS topics through Spring Kafka |

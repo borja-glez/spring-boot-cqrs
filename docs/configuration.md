@@ -7,6 +7,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 - [Core Properties](#core-properties)
 - [Context Propagation Properties](#context-propagation-properties)
 - [Tracing Properties](#tracing-properties)
+- [Retry Properties](#retry-properties)
 - [Actuator Endpoints](#actuator-endpoints)
 - [Kafka Properties](#kafka-properties)
 - [RabbitMQ Properties](#rabbitmq-properties)
@@ -28,6 +29,15 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | `cqrs.context.header-prefix` | `String` | `"cqrs.context."` | Prefix applied to transport headers (RabbitMQ + Kafka) when serializing/deserializing the context across services. |
 | `cqrs.tracing.enabled` | `boolean` | `true` | Enables the `TracingMiddleware` (wraps each dispatch in a Micrometer `Observation`). Requires an `ObservationRegistry` bean (provided by Spring Boot Actuator). |
 | `cqrs.tracing.observation-name` | `String` | `"cqrs.bus.handle"` | Name of the observation/span created around each bus dispatch. |
+| `cqrs.retry.enabled` | `boolean` | `false` | Registers the `RetryMiddleware` for commands and queries. Opt-in. |
+| `cqrs.retry.max-attempts` | `int` | `3` | Total attempts, the first one included; `1` disables retries. |
+| `cqrs.retry.backoff.strategy` | `fixed` \| `exponential` \| `exponential-jitter` | `exponential-jitter` | Delay between attempts. |
+| `cqrs.retry.backoff.initial-delay` | `Duration` | `100ms` | Delay after the first failed attempt (the constant delay of `fixed`). |
+| `cqrs.retry.backoff.multiplier` | `double` | `2.0` | Growth factor per failed attempt (`exponential*`); at least `1`. |
+| `cqrs.retry.backoff.max-delay` | `Duration` | `5s` | Upper bound of the delay (`exponential*`). |
+| `cqrs.retry.backoff.jitter-factor` | `double` | `0.1` | Random spread of the delay, in `[0, 1]` (`exponential-jitter`). |
+| `cqrs.retry.retriable-exceptions` | `List<String>` | `[]` | Fully-qualified exception classes that are retried. Empty means `java.lang.RuntimeException`. |
+| `cqrs.retry.non-retriable-exceptions` | `List<String>` | `[]` | Fully-qualified exception classes added to the default non-retriable set. |
 
 ### Naming Prefix
 
@@ -112,6 +122,37 @@ cqrs:
 When enabled (the default), and an `ObservationRegistry` bean is present in the context (provided by Spring Boot Actuator), the `TracingMiddleware` is installed with `Ordered.HIGHEST_PRECEDENCE + 10`. It wraps every bus dispatch in a Micrometer `Observation` named after `observation-name`, with low-cardinality key-values `cqrs.message.kind` (one of `command` / `event` / `query` / `unknown`) and `cqrs.message.type` (the message class's simple name).
 
 When Micrometer Tracing is also on the classpath (e.g., via `micrometer-tracing-bridge-otel` + an exporter), the observation becomes a span and stitches into the active trace. See [middleware.md](middleware.md#distributed-tracing) for the complete wiring guide and cross-transport propagation notes.
+
+## Retry Properties
+
+```yaml
+cqrs:
+  retry:
+    enabled: false                   # default; opt-in
+    max-attempts: 3                  # first attempt included; 1 = no retry
+    backoff:
+      strategy: exponential-jitter   # fixed | exponential | exponential-jitter
+      initial-delay: 100ms
+      multiplier: 2.0
+      max-delay: 5s
+      jitter-factor: 0.1
+    retriable-exceptions: []         # fully-qualified names; empty = java.lang.RuntimeException
+    non-retriable-exceptions: []     # added to the default non-retriable set
+```
+
+With `enabled: true`, and no `RetryMiddleware` bean defined by the application, the `RetryMiddleware` is installed with `Ordered.LOWEST_PRECEDENCE - 100` (after context propagation and tracing, before validation, observability and unordered middleware). It retries failed **commands and queries** in process; events are never retried. The delay after the n-th failed attempt is:
+
+| Strategy | Delay |
+|---|---|
+| `fixed` | `initial-delay` |
+| `exponential` | `min(max-delay, initial-delay * multiplier^(n - 1))` |
+| `exponential-jitter` | the `exponential` delay times a random factor in `[1 - jitter-factor, 1 + jitter-factor]`, capped at `max-delay` |
+
+The default non-retriable exceptions are `java.lang.IllegalArgumentException`, `jakarta.validation.ConstraintViolationException`, `CommandNotRegisteredException` and `QueryNotRegisteredException`; a failure whose exception or any cause matches one of them is never retried.
+
+Invalid values fail startup with an `InvalidConfigurationPropertyValueException` naming the property: `max-attempts` below 1, a negative delay, `multiplier` below 1, `jitter-factor` outside `[0, 1]`, or an exception class name that cannot be loaded or is not a `Throwable`.
+
+With RabbitMQ or Kafka the middleware runs in the consumer, before the transport retry: the attempts multiply (`cqrs.retry.max-attempts` x `cqrs.rabbitmq.retry.max-attempts` handler runs before dead-lettering). Per-type policies and the transaction caveat are described in [middleware.md](middleware.md#retrymiddleware).
 
 ## Actuator Endpoints
 
@@ -223,6 +264,13 @@ cqrs:
   tracing:
     enabled: true
     observation-name: "cqrs.bus.handle"
+  retry:
+    enabled: true
+    max-attempts: 3
+    backoff:
+      strategy: exponential-jitter
+      initial-delay: 100ms
+      max-delay: 2s
   rabbitmq:
     enabled: true
     prefix: order-service

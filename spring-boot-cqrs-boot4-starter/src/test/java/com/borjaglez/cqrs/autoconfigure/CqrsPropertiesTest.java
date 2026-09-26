@@ -2,6 +2,8 @@ package com.borjaglez.cqrs.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -141,5 +143,24 @@ class CqrsPropertiesTest {
     assertThat(properties.getNaming().getPrefix()).isEqualTo("new-prefix");
     assertThat(properties.getValidation().isEnabled()).isFalse();
     assertThat(properties.getObservability().isEnabled()).isFalse();
+  }
+
+  @Test
+  void defaultRetryIsDisabledWithJitteredExponentialBackoff() {
+    contextRunner.run(
+        context -> {
+          CqrsProperties.RetryProperties retry = context.getBean(CqrsProperties.class).getRetry();
+          assertThat(retry.isEnabled()).isFalse();
+          assertThat(retry.getMaxAttempts()).isEqualTo(3);
+          assertThat(retry.getRetriableExceptions()).isEmpty();
+          assertThat(retry.getNonRetriableExceptions()).isEmpty();
+          CqrsProperties.BackoffProperties backoff = retry.getBackoff();
+          assertThat(backoff.getStrategy())
+              .isEqualTo(CqrsProperties.BackoffProperties.Strategy.EXPONENTIAL_JITTER);
+          assertThat(backoff.getInitialDelay()).isEqualTo(Duration.ofMillis(100));
+          assertThat(backoff.getMultiplier()).isEqualTo(2.0);
+          assertThat(backoff.getMaxDelay()).isEqualTo(Duration.ofSeconds(5));
+          assertThat(backoff.getJitterFactor()).isEqualTo(0.1);
+        });
   }
 }
