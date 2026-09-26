@@ -17,5 +17,6 @@ dependencies {
     testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.observation)
     testImplementation(libs.micrometer.observation.test)
+    testImplementation(libs.micrometer.registry.prometheus)
     testImplementation(libs.slf4j.api)
 }

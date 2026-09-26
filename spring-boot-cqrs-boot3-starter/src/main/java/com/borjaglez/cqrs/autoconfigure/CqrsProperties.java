@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.tracing.TracingMiddleware;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -65,6 +66,6 @@ public class CqrsProperties {
   @Setter
   public static class TracingProperties {
     private boolean enabled = true;
-    private String observationName = "cqrs.bus.dispatch";
+    private String observationName = TracingMiddleware.DEFAULT_OBSERVATION_NAME;
   }
 }
