@@ -26,6 +26,10 @@ trim = true
 conventional_commits = true
 filter_unconventional = true
 commit_parsers = [
+    # Commits made by the release workflow itself (release.yml) are not changes to the library.
+    { message = "^release: v", skip = true },
+    { message = "^chore: bump version to ", skip = true },
+    { message = "^docs: update README for v", skip = true },
     { message = "^feat", group = "Added" },
     { message = "^fix", group = "Fixed" },
     { message = "^refactor", group = "Changed" },
@@ -33,7 +37,6 @@ commit_parsers = [
     { message = "^docs", group = "Documentation" },
     { message = "^test", group = "Testing" },
     { message = "^chore", group = "Miscellaneous" },
-    { message = "^release", skip = true },
 ]
 filter_commits = false
 tag_pattern = "v[0-9].*"
