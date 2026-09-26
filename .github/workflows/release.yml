@@ -20,13 +20,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.branch }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -88,7 +88,7 @@ jobs:
 
       - name: Commit CHANGELOG and tag release
         if: steps.validate.outputs.type == 'stable'
-        uses: EndBug/add-and-commit@v10
+        uses: EndBug/add-and-commit@v11
         with:
           add: 'CHANGELOG.md'
           message: 'release: v${{ inputs.version }}'
@@ -114,7 +114,7 @@ jobs:
 
       - name: Commit version bump
         if: steps.validate.outputs.type == 'stable'
-        uses: EndBug/add-and-commit@v10
+        uses: EndBug/add-and-commit@v11
         with:
           add: 'gradle.properties'
           message: 'chore: bump version to ${{ steps.bump.outputs.next_snapshot }}'
@@ -172,14 +172,14 @@ jobs:
 
       - name: Commit README update
         if: steps.validate.outputs.type == 'stable' && steps.update_readme.outputs.changed == 'true'
-        uses: EndBug/add-and-commit@v10
+        uses: EndBug/add-and-commit@v11
         with:
           add: 'README.md'
           message: 'docs: update README for v${{ inputs.version }}'
           push: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: v${{ inputs.version }}
