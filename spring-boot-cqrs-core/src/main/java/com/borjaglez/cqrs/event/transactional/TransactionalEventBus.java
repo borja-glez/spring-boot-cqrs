@@ -59,6 +59,18 @@ public class TransactionalEventBus implements EventBus {
             }
           }
 
+          // A REQUIRES_NEW transaction suspends this one: its events must go to its own context,
+          // published or dropped with it, not to this one.
+          @Override
+          public void suspend() {
+            TransactionSynchronizationManager.unbindResource(resourceKey);
+          }
+
+          @Override
+          public void resume() {
+            TransactionSynchronizationManager.bindResource(resourceKey, newContext);
+          }
+
           @Override
           public void afterCompletion(int status) {
             TransactionSynchronizationManager.unbindResourceIfPossible(resourceKey);
