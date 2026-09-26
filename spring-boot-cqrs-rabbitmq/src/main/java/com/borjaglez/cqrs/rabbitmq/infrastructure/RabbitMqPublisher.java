@@ -1,5 +1,6 @@
 package com.borjaglez.cqrs.rabbitmq.infrastructure;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.springframework.amqp.core.Message;
@@ -11,6 +12,7 @@ import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 
 public class RabbitMqPublisher {
 
@@ -18,6 +20,7 @@ public class RabbitMqPublisher {
 
   private static final String HEADER_MESSAGE_TYPE = "cqrs.message.type";
   private static final String HEADER_ERROR = "cqrs.error";
+  private static final String HEADER_ERROR_TYPE = "cqrs.error.type";
 
   private final RabbitTemplate rabbitTemplate;
   private final String contextHeaderPrefix;
@@ -90,8 +93,10 @@ public class RabbitMqPublisher {
   public void checkError(Message reply) {
     Object errorHeader = reply.getMessageProperties().getHeader(HEADER_ERROR);
     if (Boolean.TRUE.equals(errorHeader)) {
-      String errorMessage = new String(reply.getBody());
-      throw new RuntimeException("Remote handler error: " + errorMessage);
+      String errorMessage = new String(reply.getBody(), StandardCharsets.UTF_8);
+      Object errorType = reply.getMessageProperties().getHeader(HEADER_ERROR_TYPE);
+      throw new RemoteHandlerException(
+          errorType != null ? errorType.toString() : null, errorMessage);
     }
   }
 

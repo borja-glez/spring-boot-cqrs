@@ -9,13 +9,17 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
 import org.springframework.amqp.support.converter.MessageConverter;
 
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 
 class ExtendedMessageListenerAdapterTest {
@@ -74,7 +78,30 @@ class ExtendedMessageListenerAdapterTest {
     // Should not throw because replyTo is set - error is sent as response
     adapter.onMessage(message, channel);
 
-    verify(channel).basicPublish(eq("reply-exchange"), eq("reply-key"), any(), any(byte[].class));
+    ArgumentCaptor<AMQP.BasicProperties> properties =
+        ArgumentCaptor.forClass(AMQP.BasicProperties.class);
+    ArgumentCaptor<byte[]> body = ArgumentCaptor.forClass(byte[].class);
+    verify(channel)
+        .basicPublish(eq("reply-exchange"), eq("reply-key"), properties.capture(), body.capture());
+    // Without the correlation id the requester never matches the reply (finding C1).
+    assertThat(properties.getValue().getCorrelationId()).isEqualTo("corr-123");
+    assertThat(properties.getValue().getHeaders()).containsEntry("cqrs.error", true);
+    assertThat(properties.getValue().getHeaders().get("cqrs.error.type").toString())
+        .isEqualTo(IllegalStateException.class.getName());
+    assertThat(new String(body.getValue(), StandardCharsets.UTF_8)).isEqualTo("Handler failed");
+  }
+
+  @Test
+  void handlerFailureUnwrapsTheListenerAdapterException() {
+    IllegalStateException handlerError = new IllegalStateException("boom");
+
+    assertThat(
+            ExtendedMessageListenerAdapter.handlerFailure(
+                new ListenerExecutionFailedException("wrapped", handlerError)))
+        .isSameAs(handlerError);
+    ListenerExecutionFailedException withoutCause =
+        new ListenerExecutionFailedException("no cause", null);
+    assertThat(ExtendedMessageListenerAdapter.handlerFailure(withoutCause)).isSameAs(withoutCause);
   }
 
   @Test
@@ -167,7 +194,7 @@ class ExtendedMessageListenerAdapterTest {
   /** Test delegate that always throws. */
   public static class FailingDelegate {
     public void handle(Message message, Object payload) {
-      throw new RuntimeException("Handler failed");
+      throw new IllegalStateException("Handler failed");
     }
   }
 }

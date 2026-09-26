@@ -8,6 +8,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +23,7 @@ import org.springframework.amqp.support.converter.SmartMessageConverter;
 import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 
 class RabbitMqPublisherTest {
 
@@ -129,6 +132,36 @@ class RabbitMqPublisherTest {
     assertThatThrownBy(() -> publisher.checkError(message))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("Remote handler error: error details");
+  }
+
+  @Test
+  void checkErrorShouldCarryTheRemoteExceptionType() {
+    MessageProperties props = new MessageProperties();
+    props.setHeader("cqrs.error", true);
+    props.setHeader("cqrs.error.type", "com.example.OutOfStockException");
+    Message message =
+        MessageBuilder.withBody("sin stock: café".getBytes(StandardCharsets.UTF_8))
+            .andProperties(props)
+            .build();
+
+    assertThatThrownBy(() -> publisher.checkError(message))
+        .isInstanceOfSatisfying(
+            RemoteHandlerException.class,
+            e -> {
+              assertThat(e.getRemoteExceptionType()).isEqualTo("com.example.OutOfStockException");
+              assertThat(e.getMessage()).isEqualTo("Remote handler error: sin stock: café");
+            });
+  }
+
+  @Test
+  void checkErrorWithoutTypeHeaderLeavesTheTypeUnknown() {
+    MessageProperties props = new MessageProperties();
+    props.setHeader("cqrs.error", true);
+    Message message = MessageBuilder.withBody("boom".getBytes()).andProperties(props).build();
+
+    assertThatThrownBy(() -> publisher.checkError(message))
+        .isInstanceOfSatisfying(
+            RemoteHandlerException.class, e -> assertThat(e.getRemoteExceptionType()).isNull());
   }
 
   @Test
