@@ -413,6 +413,8 @@ cqrs:
       concurrency: 1
 ```
 
+The Kafka event bus throws when the broker does not acknowledge an event; it does not fall back to the local event bus. `publish(List<Event>)` stops at the first failure. For reliable publication, use an outbox (see [Transactional event publishing](#transactional-event-publishing)).
+
 Generic results such as `List<OrderDto>` need a `ParameterizedTypeReference`; see [Generic results over RabbitMQ and Kafka](#generic-results-over-rabbitmq-and-kafka).
 
 Replies are read from the per-application reply topic (`<prefix>.<spring.application.name>.replies`). Each instance consumes it with its own consumer group (`<appName>.cqrs.replies.<random>`), so every instance sees every reply and keeps the ones it is waiting for. On startup the reply consumer starts at the instance start time instead of the beginning of the topic, so replies from previous runs are not read again; `spring.kafka.consumer.auto-offset-reset` keeps applying to the command, event and query consumers. Groups left by previous starts have no members and expire in the broker after `offsets.retention.minutes` (seven days by default). No configuration is needed.

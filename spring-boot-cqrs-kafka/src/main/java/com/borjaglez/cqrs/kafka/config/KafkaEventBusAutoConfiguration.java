@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -20,7 +19,6 @@ import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.MessageListener;
 
-import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.KafkaEventBus;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
@@ -59,13 +57,9 @@ public class KafkaEventBusAutoConfiguration {
   public KafkaEventBus kafkaEventBus(
       KafkaMessagePublisher kafkaMessagePublisher,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
-      KafkaCqrsProperties properties,
-      @Qualifier("springEventBus") EventBus fallbackEventBus) {
+      KafkaCqrsProperties properties) {
     return new KafkaEventBus(
-        kafkaMessagePublisher,
-        kafkaTopicNamingStrategy,
-        properties.getEvents().getTopic(),
-        fallbackEventBus);
+        kafkaMessagePublisher, kafkaTopicNamingStrategy, properties.getEvents().getTopic());
   }
 
   @Bean
