@@ -31,6 +31,7 @@ public class KafkaRequestReplyClient {
   private final MessageNamingStrategy messageNamingStrategy;
   private final String replyTopic;
   private final Duration timeout;
+  private final String contextHeaderPrefix;
   private final ConcurrentHashMap<String, CompletableFuture<ConsumerRecord<String, byte[]>>>
       replies = new ConcurrentHashMap<>();
 
@@ -41,12 +42,38 @@ public class KafkaRequestReplyClient {
       MessageNamingStrategy messageNamingStrategy,
       String replyTopic,
       Duration timeout) {
+    this(
+        kafkaTemplate,
+        serializer,
+        partitionKeyStrategy,
+        messageNamingStrategy,
+        replyTopic,
+        timeout,
+        KafkaContextHeaders.DEFAULT_PREFIX);
+  }
+
+  /**
+   * Creates a client whose requests carry the current {@link
+   * com.borjaglez.cqrs.context.MessageContext} as headers named {@code contextHeaderPrefix + key},
+   * the same headers the publisher adds to fire-and-forget messages. A {@code null} prefix means
+   * {@link KafkaContextHeaders#DEFAULT_PREFIX}.
+   */
+  public KafkaRequestReplyClient(
+      KafkaTemplate<String, byte[]> kafkaTemplate,
+      MessageSerializer serializer,
+      KafkaPartitionKeyStrategy partitionKeyStrategy,
+      MessageNamingStrategy messageNamingStrategy,
+      String replyTopic,
+      Duration timeout,
+      String contextHeaderPrefix) {
     this.kafkaTemplate = kafkaTemplate;
     this.serializer = serializer;
     this.partitionKeyStrategy = partitionKeyStrategy;
     this.messageNamingStrategy = messageNamingStrategy;
     this.replyTopic = replyTopic;
     this.timeout = timeout;
+    this.contextHeaderPrefix =
+        contextHeaderPrefix == null ? KafkaContextHeaders.DEFAULT_PREFIX : contextHeaderPrefix;
   }
 
   public <R> R sendAndReceive(
@@ -92,6 +119,7 @@ public class KafkaRequestReplyClient {
         .headers()
         .add(
             new RecordHeader(KafkaMessageHeaders.REQUEST_MODE, requestMode.name().getBytes(UTF_8)));
+    KafkaContextHeaders.write(record.headers(), contextHeaderPrefix);
 
     CompletableFuture<ConsumerRecord<String, byte[]>> future = new CompletableFuture<>();
     replies.put(correlationId, future);

@@ -241,7 +241,7 @@ Nested dispatches (e.g. a command handler publishes an event whose handler dispa
 
 ### Cross-transport propagation
 
-Both the RabbitMQ and Kafka adapters serialize every context entry into message headers, prefixed by `cqrs.context.header-prefix` (default: `cqrs.context.`). The consuming side rehydrates the context before the middleware chain runs, so the same `correlationId` flows across services without any application code.
+Both the RabbitMQ and Kafka adapters serialize every context entry into the headers of every command, query and event they send, one-way (`dispatch`, `publish`) or with a reply (`dispatchAndWait`, `dispatchAndReceive`, `ask`), prefixed by `cqrs.context.header-prefix` (default: `cqrs.context.`). The consuming side rehydrates the context before the middleware chain runs, so the same `correlationId` flows across services without any application code.
 
 | Transport | Header key on the wire |
 |---|---|

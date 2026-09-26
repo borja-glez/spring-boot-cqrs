@@ -96,7 +96,7 @@ When enabled (the default), the `ContextPropagationMiddleware` is installed with
 - Reads the current `MessageContext` from a `ThreadLocal` on dispatch entry.
 - Generates a `correlationId` (UUID) when missing and `auto-correlation-id=true`.
 - Mirrors every key listed in `mdc-keys` into SLF4J MDC (restoring previous values on exit).
-- Serializes context entries into RabbitMQ/Kafka message headers on publish (prefixed by `header-prefix`) and rehydrates them on the consumer side before the middleware chain runs.
+- Serializes context entries into RabbitMQ/Kafka message headers on every command, query and event sent, one-way or with a reply (prefixed by `header-prefix`) and rehydrates them on the consumer side before the middleware chain runs.
 
 Set `cqrs.context.enabled=false` to disable auto-registration of the `ContextPropagationMiddleware`. This turns off the ThreadLocal/MDC middleware behavior described above, but it does **not** by itself disable RabbitMQ/Kafka transport header propagation; those adapters still serialize the current `MessageContext` into outbound headers and rehydrate it on inbound messages, independently of the middleware. See [middleware.md](middleware.md#message-context--correlation-id) for usage details and code examples.
 
