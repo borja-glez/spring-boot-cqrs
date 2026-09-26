@@ -84,13 +84,16 @@ public class KafkaQueryBusAutoConfiguration {
       KafkaQueryConsumer kafkaQueryConsumer,
       KafkaCqrsProperties properties,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
-      @Value("${spring.application.name:cqrs-app}") String applicationName) {
+      @Value("${spring.application.name:cqrs-app}") String applicationName,
+      @Value("${spring.kafka.listener.observation-enabled:false}") boolean observationEnabled) {
     ContainerProperties containerProperties =
         new ContainerProperties(kafkaTopicNamingStrategy.topic(properties.getQueries().getTopic()));
     containerProperties.setGroupId(
         resolveGroupId(properties.getQueries().getGroupId(), applicationName, "queries"));
     containerProperties.setMessageListener(
         (MessageListener<String, byte[]>) kafkaQueryConsumer::consume);
+    // Same switch as Boot's listener containers: with it the sender's trace continues here.
+    containerProperties.setObservationEnabled(observationEnabled);
     ConcurrentMessageListenerContainer<String, byte[]> container =
         new ConcurrentMessageListenerContainer<>(cqrsKafkaConsumerFactory, containerProperties);
     container.setConcurrency(properties.getQueries().getConcurrency());
