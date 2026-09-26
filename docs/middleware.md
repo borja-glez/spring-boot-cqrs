@@ -248,6 +248,53 @@ Both the RabbitMQ and Kafka adapters serialize every context entry into the head
 | RabbitMQ | `cqrs.context.correlationId`, `cqrs.context.tenantId`, … |
 | Kafka    | `cqrs.context.correlationId`, `cqrs.context.tenantId`, … |
 
+### Crossing threads (`@Async`, executors)
+
+`MessageContext` lives in a `ThreadLocal`, so it does not follow work handed to another thread on its own. Without help, a task submitted to a `TaskExecutor`, an `@Async` method or `CompletableFuture.supplyAsync(..., executor)` runs with an empty context: messages it sends carry no `cqrs.context.*` headers, and a local dispatch gets a fresh `correlationId`. Two ways to carry it across:
+
+**1. Explicit, no extra dependency.** `MessageContext.wrap(Runnable)` and `MessageContext.wrap(Callable)` capture the context that is current when you call them and run the task inside it. The worker thread's own context is replaced for the duration of the task and restored afterwards, so pooled threads never leak context between tasks.
+
+```java
+executor.submit(MessageContext.wrap(() -> commandBus.dispatch(new ReserveStock(orderId))));
+
+CompletableFuture.runAsync(MessageContext.wrap(() -> notifier.send(order)), executor);
+```
+
+To apply it to every task of an executor, set `MessageContextTaskDecorator` as its task decorator:
+
+```java
+@Bean
+ThreadPoolTaskExecutor cqrsWorkers() {
+  ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+  executor.setTaskDecorator(new MessageContextTaskDecorator());
+  return executor;
+}
+```
+
+Spring Boot applies a `TaskDecorator` bean to its auto-configured `applicationTaskExecutor` (the one behind `@Async`). Boot 4 composes every `TaskDecorator` bean; Boot 3.5 applies one only when it is the single `TaskDecorator` bean in the context. Declaring `@Bean TaskDecorator messageContextTaskDecorator() { return new MessageContextTaskDecorator(); }` therefore covers `@Async` unless, on Boot 3.5, you already have another decorator (combine them with Spring's `CompositeTaskDecorator` in that case).
+
+**2. Micrometer context-propagation.** When `io.micrometer:context-propagation` is on the classpath (Micrometer Tracing brings it in; otherwise add it yourself), the starters register `MessageContextThreadLocalAccessor` (key `cqrs.messageContext`) in the global `ContextRegistry`. Any executor decorated with Spring's `ContextPropagatingTaskDecorator`, and Reactor with automatic context propagation, then carries `MessageContext` together with the tracing context. With Spring Boot, `spring.task.execution.propagate-context=true` (Boot 4) adds that decorator to the `applicationTaskExecutor`; on Boot 3.5 declare a `ContextPropagatingTaskDecorator` bean. The accessor does not touch MDC: `ContextPropagationMiddleware` mirrors the context into MDC on the next dispatch. The registration is turned off together with the rest of the context support by `cqrs.context.enabled=false`.
+
+Nothing is decorated automatically: code that does not cross threads, and executors you have not decorated, behave as before.
+
+#### Limit: pollers, schedulers and resumed work
+
+Thread propagation only helps when a caller thread hands work to another thread. Work picked up later by a poller, a `@Scheduled` job, a saga runner or an outbox relay has no parent thread whose context could be captured, so it runs with an empty context. For those cases persist the context with the work item and reopen it when the work runs:
+
+```java
+// When the work is created
+sagaRepository.save(new SagaState(orderId, MessageContext.current().correlationId()));
+
+// When a scheduler/poller picks it up
+MessageContext ctx =
+    MessageContext.empty().with(MessageContext.CORRELATION_ID_KEY, state.correlationId());
+try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
+  commandBus.dispatch(new ReserveStock(state.orderId()));
+}
+```
+
+Middleware runs only on the receiving side of the RabbitMQ and Kafka buses (see [Middleware on Remote Buses](#middleware-on-remote-buses)), so a remote dispatch from a context-less thread sends no `correlationId` at all; the consumer's `ContextPropagationMiddleware` then generates a new one.
+
 ### Logging with MDC
 
 With the default configuration, SLF4J MDC always contains `correlationId` inside the handler execution. A Logback pattern such as:

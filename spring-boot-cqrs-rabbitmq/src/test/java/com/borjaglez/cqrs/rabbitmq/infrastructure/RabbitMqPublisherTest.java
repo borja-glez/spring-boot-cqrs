@@ -21,8 +21,10 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.amqp.support.converter.SmartMessageConverter;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.context.MessageContextTaskDecorator;
 import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 
@@ -353,6 +355,36 @@ class RabbitMqPublisherTest {
         .isEqualTo("acme");
     assertThat((Object) processed.getMessageProperties().getHeader("cqrs.message.type"))
         .isEqualTo("command");
+  }
+
+  @Test
+  void publishFromADecoratedExecutorTaskCarriesTheCallerContext() throws Exception {
+    publisher = new RabbitMqPublisher(rabbitTemplate, "cqrs.context.");
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(1);
+    executor.setTaskDecorator(new MessageContextTaskDecorator());
+    executor.initialize();
+    try (MessageContext.Scope ignored =
+        MessageContext.scope(MessageContext.empty().with("correlationId", "req-1"))) {
+      executor.submit(() -> publisher.publish("exchange", "key", "payload", "command")).get();
+    } finally {
+      executor.shutdown();
+    }
+
+    ArgumentCaptor<MessagePostProcessor> captor =
+        ArgumentCaptor.forClass(MessagePostProcessor.class);
+    verify(rabbitTemplate)
+        .convertAndSend(eq("exchange"), eq("key"), eq("payload"), captor.capture());
+    Message processed =
+        captor
+            .getValue()
+            .postProcessMessage(
+                MessageBuilder.withBody("x".getBytes())
+                    .andProperties(new MessageProperties())
+                    .build());
+    assertThat((Object) processed.getMessageProperties().getHeader("cqrs.context.correlationId"))
+        .isEqualTo("req-1");
   }
 
   @Test

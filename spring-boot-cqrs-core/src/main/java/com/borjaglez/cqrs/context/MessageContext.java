@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 
 public final class MessageContext {
 
@@ -88,6 +89,39 @@ public final class MessageContext {
 
   public static void clear() {
     CURRENT.remove();
+  }
+
+  /**
+   * Returns a task that runs {@code task} with the context that is current on the calling thread
+   * now. The context of the thread that later runs the task is replaced for its duration and
+   * restored afterwards, so pooled threads do not leak context between tasks.
+   */
+  public static Runnable wrap(Runnable task) {
+    Objects.requireNonNull(task, "task");
+    MessageContext captured = current();
+    return () -> {
+      try (Scope ignored = scope(captured)) {
+        task.run();
+      }
+    };
+  }
+
+  /**
+   * Returns a task that calls {@code task} with the context that is current on the calling thread
+   * now. See {@link #wrap(Runnable)}.
+   */
+  public static <V> Callable<V> wrap(Callable<V> task) {
+    Objects.requireNonNull(task, "task");
+    MessageContext captured = current();
+    return () -> {
+      try (Scope ignored = scope(captured)) {
+        return task.call();
+      }
+    };
+  }
+
+  static void set(MessageContext ctx) {
+    CURRENT.set(ctx);
   }
 
   @Override

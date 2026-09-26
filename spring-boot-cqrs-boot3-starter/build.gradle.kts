@@ -12,6 +12,7 @@ dependencies {
     compileOnly(libs.spring.boot.starter.actuator)
     compileOnly(libs.micrometer.core)
     compileOnly(libs.micrometer.observation)
+    compileOnly(libs.context.propagation)
     compileOnly(libs.jackson.databind)
     compileOnly(libs.jackson.datatype.jsr310)
 
@@ -25,6 +26,7 @@ dependencies {
     testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.observation)
     testImplementation(libs.micrometer.observation.test)
+    testImplementation(libs.context.propagation)
     testImplementation(libs.spring.boot3.actuator.autoconfigure)
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.datatype.jsr310)

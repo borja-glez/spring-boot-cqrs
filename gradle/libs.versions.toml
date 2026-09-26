@@ -17,6 +17,9 @@ assertj = "3.27.7"
 mockito = "5.23.0"
 jackson-boot4 = "3.0.1"
 micrometer-boot4 = "1.15.10"
+# Micrometer context-propagation: versions managed by the Spring Boot 3.5.12 and 4.0.4 BOMs
+context-propagation = "1.1.4"
+context-propagation-boot4 = "1.2.1"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
@@ -63,6 +66,8 @@ micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-p
 micrometer-core-versioned = { module = "io.micrometer:micrometer-core", version.ref = "micrometer-boot4" }
 micrometer-observation-versioned = { module = "io.micrometer:micrometer-observation", version.ref = "micrometer-boot4" }
 micrometer-observation-test-versioned = { module = "io.micrometer:micrometer-observation-test", version.ref = "micrometer-boot4" }
+context-propagation = { module = "io.micrometer:context-propagation", version.ref = "context-propagation" }
+context-propagation-versioned = { module = "io.micrometer:context-propagation", version.ref = "context-propagation-boot4" }
 
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
