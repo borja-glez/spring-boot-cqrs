@@ -17,7 +17,13 @@ import io.micrometer.observation.ObservationRegistry;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class TracingMiddleware implements BusObservabilityInterceptor {
 
-  public static final String DEFAULT_OBSERVATION_NAME = "cqrs.bus.dispatch";
+  /**
+   * Default name of the observation, and so of its span and of the timer Micrometer derives from
+   * it. It must differ from {@code cqrs.bus.dispatch}, the timer of {@code
+   * MicrometerBusObservability}: Prometheus rejects two meters with one name and different tags,
+   * and one of them was lost.
+   */
+  public static final String DEFAULT_OBSERVATION_NAME = "cqrs.bus.handle";
 
   private final ObservationRegistry registry;
   private final String observationName;

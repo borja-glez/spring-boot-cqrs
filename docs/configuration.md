@@ -26,7 +26,7 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | `cqrs.context.mdc-keys` | `List<String>` | `[correlationId]` | Context keys mirrored into SLF4J MDC during handler execution. Previous MDC values are restored on exit. |
 | `cqrs.context.header-prefix` | `String` | `"cqrs.context."` | Prefix applied to transport headers (RabbitMQ + Kafka) when serializing/deserializing the context across services. |
 | `cqrs.tracing.enabled` | `boolean` | `true` | Enables the `TracingMiddleware` (wraps each dispatch in a Micrometer `Observation`). Requires an `ObservationRegistry` bean (provided by Spring Boot Actuator). |
-| `cqrs.tracing.observation-name` | `String` | `"cqrs.bus.dispatch"` | Name of the observation/span created around each bus dispatch. |
+| `cqrs.tracing.observation-name` | `String` | `"cqrs.bus.handle"` | Name of the observation/span created around each bus dispatch. |
 
 ### Naming Prefix
 
@@ -105,7 +105,7 @@ Set `cqrs.context.enabled=false` to disable auto-registration of the `ContextPro
 cqrs:
   tracing:
     enabled: true                      # default
-    observation-name: "cqrs.bus.dispatch"  # default
+    observation-name: "cqrs.bus.handle"  # default
 ```
 
 When enabled (the default), and an `ObservationRegistry` bean is present in the context (provided by Spring Boot Actuator), the `TracingMiddleware` is installed with `Ordered.HIGHEST_PRECEDENCE + 10`. It wraps every bus dispatch in a Micrometer `Observation` named after `observation-name`, with low-cardinality key-values `cqrs.message.kind` (one of `command` / `event` / `query` / `unknown`) and `cqrs.message.type` (the message class's simple name).
@@ -185,7 +185,7 @@ cqrs:
     header-prefix: "cqrs.context."
   tracing:
     enabled: true
-    observation-name: "cqrs.bus.dispatch"
+    observation-name: "cqrs.bus.handle"
   rabbitmq:
     enabled: true
     prefix: order-service

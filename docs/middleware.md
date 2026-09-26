@@ -252,10 +252,14 @@ automatically annotates every log line. Mirror additional keys by setting `cqrs.
 
 ## Distributed Tracing
 
-`TracingMiddleware` (in `spring-boot-cqrs-core`) wraps every bus dispatch in a Micrometer `Observation`. When the consumer wires Micrometer Tracing (e.g., `spring-boot-starter-actuator` + `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`), each dispatch becomes a span named `cqrs.bus.dispatch` (configurable via `cqrs.tracing.observation-name`) with:
+`TracingMiddleware` (in `spring-boot-cqrs-core`) wraps every bus dispatch in a Micrometer `Observation`. When the consumer wires Micrometer Tracing (e.g., `spring-boot-starter-actuator` + `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`), each dispatch becomes a span named `cqrs.bus.handle` (configurable via `cqrs.tracing.observation-name`) with:
 
 - `cqrs.message.kind` — one of `command`, `event`, `query`, `unknown`
 - `cqrs.message.type` — the message class's simple name
+
+> **Changed default:** up to this version the observation was called `cqrs.bus.dispatch`. Dashboards, alerts or trace queries that look for spans (or for the timer Micrometer derives from the observation) under that name must use `cqrs.bus.handle`, or set `cqrs.tracing.observation-name` back to a name of their choice. The `MicrometerBusObservability` timer keeps `cqrs.bus.dispatch`.
+
+Keep the name apart from `cqrs.bus.dispatch`, the timer of `MicrometerBusObservability`: Micrometer also derives a timer from the observation, and Prometheus rejects two meters with the same name and different tags.
 
 The span is a child of the active span when the dispatch starts, so an HTTP request → command → event handler chain stitches into a single trace.
 
