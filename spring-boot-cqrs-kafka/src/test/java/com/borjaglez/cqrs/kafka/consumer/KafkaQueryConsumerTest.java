@@ -2,13 +2,17 @@ package com.borjaglez.cqrs.kafka.consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -36,6 +40,33 @@ class KafkaQueryConsumerTest {
     serializer = mock(MessageSerializer.class);
     publisher = mock(KafkaMessagePublisher.class);
     consumer = new KafkaQueryConsumer(registry, Collections.emptyList(), serializer, publisher);
+    when(registry.getHandlerInfo(TestQuery.class))
+        .thenReturn(Optional.of(mock(QueryHandlerRegistry.HandlerInfo.class)));
+  }
+
+  @Test
+  void shouldNotAnswerAQueryThatAnotherServiceHandles() {
+    when(registry.getHandlerInfo(TestQuery.class)).thenReturn(Optional.empty());
+
+    consumer.consume(recordFor());
+
+    verify(registry, never()).handle(any());
+    verifyNoInteractions(serializer, publisher);
+  }
+
+  @Test
+  void shouldIgnoreAQueryTypeThatOnlyAnotherServiceKnows() {
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>("cqrs.queries", 0, 0L, "key", "payload".getBytes(UTF_8));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, "com.example.Missing".getBytes(UTF_8)));
+
+    consumer.consume(record);
+
+    verifyNoInteractions(serializer, publisher);
   }
 
   @Test

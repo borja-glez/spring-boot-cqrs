@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka.consumer;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
@@ -45,7 +46,12 @@ public class KafkaQueryConsumer extends AbstractKafkaConsumer {
   }
 
   public void consume(ConsumerRecord<String, byte[]> record) {
-    Query query = deserialize(record);
+    // Queries of other services arrive here too; only the owner answers them.
+    Optional<Class<?>> type = localPayloadClass(record);
+    if (type.isEmpty() || registry.getHandlerInfo(type.get()).isEmpty()) {
+      return;
+    }
+    Query query = (Query) deserialize(record, type.get());
     String replyTopic = header(record, KafkaMessageHeaders.REPLY_TOPIC);
     String correlationId = header(record, KafkaMessageHeaders.CORRELATION_ID);
     MessageContext incoming = extractContext(record);

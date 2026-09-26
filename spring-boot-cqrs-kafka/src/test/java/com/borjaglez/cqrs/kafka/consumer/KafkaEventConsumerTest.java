@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -32,6 +33,21 @@ class KafkaEventConsumerTest {
     registry = mock(EventHandlerRegistry.class);
     serializer = mock(MessageSerializer.class);
     consumer = new KafkaEventConsumer(registry, Collections.emptyList(), serializer);
+  }
+
+  @Test
+  void shouldIgnoreAnEventTypeThatOnlyAnotherServiceKnows() {
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>("cqrs.events", 0, 0L, "key", "payload".getBytes(UTF_8));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE, "com.example.Missing".getBytes(UTF_8)));
+
+    consumer.consume(record);
+
+    verifyNoInteractions(serializer, registry);
   }
 
   @Test
