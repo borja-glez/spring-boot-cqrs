@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.actuator;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.boot.actuate.endpoint.InvalidEndpointRequestException;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.boot.actuate.endpoint.annotation.Selector;
@@ -35,11 +36,21 @@ public class CqrsEndpoint {
 
   @ReadOperation
   public List<HandlerView> handlersByKind(@Selector String section, @Selector String kind) {
+    // Actuator answers 400 only for InvalidEndpointRequestException; anything else is a 500.
     if (!"handlers".equals(section)) {
-      throw new IllegalArgumentException("Unknown section: " + section);
+      throw new InvalidEndpointRequestException(
+          "Unknown section: " + section, "Unknown section '" + section + "'");
     }
-    HandlerType type = HandlerType.valueOf(kind.toUpperCase(Locale.ROOT));
-    return introspection.getHandlers(type).stream().map(HandlerView::from).toList();
+    return introspection.getHandlers(handlerType(kind)).stream().map(HandlerView::from).toList();
+  }
+
+  private static HandlerType handlerType(String kind) {
+    try {
+      return HandlerType.valueOf(kind.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new InvalidEndpointRequestException(
+          "Unknown handler kind: " + kind, "Unknown handler kind '" + kind + "'");
+    }
   }
 
   public record CqrsDescriptor(

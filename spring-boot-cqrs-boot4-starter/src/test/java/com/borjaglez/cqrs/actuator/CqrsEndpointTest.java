@@ -10,6 +10,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.actuate.endpoint.InvalidEndpointRequestException;
 
 import com.borjaglez.cqrs.actuator.CqrsEndpoint.CqrsDescriptor;
 import com.borjaglez.cqrs.actuator.CqrsEndpoint.HandlerView;
@@ -90,15 +91,21 @@ class CqrsEndpointTest {
 
   @Test
   void handlersByKindRejectsUnknownSection() {
+    // InvalidEndpointRequestException is what Actuator turns into a 400.
     assertThatThrownBy(() -> endpoint.handlersByKind("foo", "command"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Unknown section: foo");
+        .isInstanceOf(InvalidEndpointRequestException.class)
+        .hasMessageContaining("Unknown section: foo")
+        .extracting(e -> ((InvalidEndpointRequestException) e).getReason())
+        .isEqualTo("Unknown section 'foo'");
   }
 
   @Test
   void handlersByKindRejectsUnknownKind() {
     assertThatThrownBy(() -> endpoint.handlersByKind("handlers", "bogus"))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidEndpointRequestException.class)
+        .hasMessageContaining("Unknown handler kind: bogus")
+        .extracting(e -> ((InvalidEndpointRequestException) e).getReason())
+        .isEqualTo("Unknown handler kind 'bogus'");
   }
 
   @Test
