@@ -72,6 +72,27 @@ class CommandHandlerRegistryTest {
   }
 
   @Test
+  void unregisteredCommandSubclassMentionsSuperclassHandler() throws Exception {
+    TestCommandHandler handler = new TestCommandHandler();
+    Method method = TestCommandHandler.class.getMethod("handle", TestCommand.class);
+    registry.register(TestCommand.class, handler, method, "test.command", false);
+
+    assertThatThrownBy(() -> registry.handle(new SubTestCommand("sub")))
+        .isInstanceOf(CommandNotRegisteredException.class)
+        .hasMessageContaining(SubTestCommand.class.getName())
+        .hasMessageContaining("superclass " + TestCommand.class.getName())
+        .hasMessageContaining("exact message class");
+    assertThat(handler.getLastHandledData()).isNull();
+  }
+
+  @Test
+  void unregisteredCommandWithoutSuperclassHandlerKeepsPlainMessage() {
+    assertThatThrownBy(() -> registry.handle(new TestCommand("data")))
+        .isInstanceOf(CommandNotRegisteredException.class)
+        .hasMessage("No handler registered for command: " + TestCommand.class.getName());
+  }
+
+  @Test
   void handleRethrowsRuntimeException() throws Exception {
     ThrowingCommandHandler handler = new ThrowingCommandHandler();
     Method method = ThrowingCommandHandler.class.getMethod("handle", TestCommand.class);
@@ -120,5 +141,11 @@ class CommandHandlerRegistryTest {
         .isInstanceOf(CommandHandlerExecutionException.class)
         .hasCauseInstanceOf(Exception.class)
         .hasRootCauseMessage("checked command error");
+  }
+
+  static class SubTestCommand extends TestCommand {
+    SubTestCommand(String data) {
+      super(data);
+    }
   }
 }

@@ -57,6 +57,26 @@ class QueryHandlerRegistryTest {
   }
 
   @Test
+  void unregisteredQuerySubclassMentionsSuperclassHandler() throws Exception {
+    TestQueryHandler handler = new TestQueryHandler();
+    Method method = TestQueryHandler.class.getMethod("handle", TestQuery.class);
+    registry.register(TestQuery.class, handler, method, "test.query");
+
+    assertThatThrownBy(() -> registry.handle(new SubTestQuery("sub")))
+        .isInstanceOf(QueryNotRegisteredException.class)
+        .hasMessageContaining(SubTestQuery.class.getName())
+        .hasMessageContaining("superclass " + TestQuery.class.getName())
+        .hasMessageContaining("exact message class");
+  }
+
+  @Test
+  void unregisteredQueryWithoutSuperclassHandlerKeepsPlainMessage() {
+    assertThatThrownBy(() -> registry.handle(new TestQuery("data")))
+        .isInstanceOf(QueryNotRegisteredException.class)
+        .hasMessage("No handler registered for query: " + TestQuery.class.getName());
+  }
+
+  @Test
   void handleRethrowsRuntimeException() throws Exception {
     ThrowingQueryHandler handler = new ThrowingQueryHandler();
     Method method = ThrowingQueryHandler.class.getMethod("handle", TestQuery.class);
@@ -103,5 +123,11 @@ class QueryHandlerRegistryTest {
     assertThatThrownBy(() -> registry.handle(new TestQuery("data")))
         .isInstanceOf(QueryHandlerExecutionException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  static class SubTestQuery extends TestQuery {
+    SubTestQuery(String data) {
+      super(data);
+    }
   }
 }
