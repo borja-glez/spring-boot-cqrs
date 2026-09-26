@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -15,8 +16,18 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 
+/**
+ * Opens a {@link MessageContext} scope around the rest of the chain, generating a correlation id
+ * when the context has none and {@code autoCorrelationId} is on, and mirrors the configured keys
+ * into the SLF4J MDC.
+ *
+ * <p>Runs in every {@link DispatchPhase}. On the sending side of a remote bus it runs before the
+ * message is published, so the correlation id it generates is written to the message headers and
+ * the receiver continues it instead of inventing another one.
+ */
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ContextPropagationMiddleware implements BusMiddleware {
 
@@ -37,6 +48,12 @@ public class ContextPropagationMiddleware implements BusMiddleware {
             : Collections.unmodifiableList(new ArrayList<>(mdcKeys));
     this.correlationIdSupplier =
         Objects.requireNonNull(correlationIdSupplier, "correlationIdSupplier");
+  }
+
+  /** Every phase: local dispatches, the sender and the receiver of remote messages. */
+  @Override
+  public Set<DispatchPhase> phases() {
+    return Set.of(DispatchPhase.values());
   }
 
   @Override

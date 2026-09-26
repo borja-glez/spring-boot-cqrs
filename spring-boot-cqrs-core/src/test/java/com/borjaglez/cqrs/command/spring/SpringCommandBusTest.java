@@ -15,8 +15,10 @@ import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
+import com.borjaglez.cqrs.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 @ExtendWith(MockitoExtension.class)
 class SpringCommandBusTest {
@@ -167,5 +169,21 @@ class SpringCommandBusTest {
     String result = bus.dispatchAndReceive(command, new ParameterizedTypeReference<String>() {});
 
     assertThat(result).isEqualTo("result");
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheLocalPhase() {
+    CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
+    RecordingMiddleware local = new RecordingMiddleware(DispatchPhase.LOCAL);
+    RecordingMiddleware remoteOnly =
+        new RecordingMiddleware(DispatchPhase.OUTBOUND, DispatchPhase.INBOUND);
+    SpringCommandBus bus = new SpringCommandBus(registry, List.of(local, remoteOnly));
+    TestCommand command = new TestCommand("data");
+
+    bus.dispatch(command);
+    bus.dispatchAndReceive(command);
+
+    assertThat(local.seen()).containsExactly(command, command);
+    assertThat(remoteOnly.seen()).isEmpty();
   }
 }

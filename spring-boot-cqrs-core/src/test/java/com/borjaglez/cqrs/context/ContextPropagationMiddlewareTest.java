@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 
 class ContextPropagationMiddlewareTest {
@@ -215,5 +216,14 @@ class ContextPropagationMiddlewareTest {
         .isSameAs(MessageContext.empty());
     assertThat(ContextPropagationMiddleware.fromHeaders(Map.of("k", "v"), null).asMap())
         .containsEntry("k", "v");
+  }
+
+  @Test
+  void runsInEveryPhaseIncludingTheSenderOfRemoteMessages() {
+    ContextPropagationMiddleware middleware = new ContextPropagationMiddleware(true, List.of());
+
+    assertThat(middleware.phases())
+        .containsExactlyInAnyOrder(
+            DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND);
   }
 }

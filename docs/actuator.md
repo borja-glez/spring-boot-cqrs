@@ -47,8 +47,8 @@ Returns a snapshot of all registered handlers, middlewares and message types.
     }
   ],
   "middleware": [
-    { "type": "com.borjaglez.cqrs.context.ContextPropagationMiddleware", "order": -2147483638, "observability": false },
-    { "type": "com.borjaglez.cqrs.tracing.TracingMiddleware", "order": -2147483638, "observability": true }
+    { "type": "com.borjaglez.cqrs.context.ContextPropagationMiddleware", "order": -2147483648, "observability": false, "phases": ["LOCAL", "OUTBOUND", "INBOUND"] },
+    { "type": "com.borjaglez.cqrs.tracing.TracingMiddleware", "order": -2147483638, "observability": true, "phases": ["LOCAL", "INBOUND"] }
   ],
   "messageTypes": [
     "com.acme.CreateOrderCommand",
@@ -56,6 +56,8 @@ Returns a snapshot of all registered handlers, middlewares and message types.
   ]
 }
 ```
+
+`phases` lists where each middleware runs, from `BusMiddleware.phases()`: `LOCAL` (in-process buses), `OUTBOUND` (before a RabbitMQ or Kafka bus sends a message) and `INBOUND` (in the RabbitMQ and Kafka consumers); see [Middleware on Remote Buses](middleware.md#middleware-on-remote-buses).
 
 `remote` is `false` for a handler marked `remote = false`, which never receives messages from a broker. For RabbitMQ, a handler with `remote: true` is reached from the broker only if its message is also exposed by `cqrs.rabbitmq.expose` (by default, only messages annotated with `@CqrsMessage`); see [Exposed and local messages](rabbitmq-adapter.md#exposed-and-local-messages).
 

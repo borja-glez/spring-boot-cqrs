@@ -77,9 +77,14 @@ public class KafkaQueryBusAutoConfiguration {
   public KafkaQueryBus kafkaQueryBus(
       KafkaRequestReplyClient kafkaRequestReplyClient,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
-      KafkaCqrsProperties properties) {
+      KafkaCqrsProperties properties,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
+    // The bus keeps the middlewares that declare DispatchPhase.OUTBOUND.
     return new KafkaQueryBus(
-        kafkaRequestReplyClient, kafkaTopicNamingStrategy, properties.getQueries().getTopic());
+        kafkaRequestReplyClient,
+        kafkaTopicNamingStrategy,
+        properties.getQueries().getTopic(),
+        middlewaresProvider.getIfAvailable(Collections::emptyList));
   }
 
   @Bean

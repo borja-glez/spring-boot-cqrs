@@ -76,9 +76,14 @@ public class KafkaEventBusAutoConfiguration {
   public KafkaEventBus kafkaEventBus(
       KafkaMessagePublisher kafkaMessagePublisher,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
-      KafkaCqrsProperties properties) {
+      KafkaCqrsProperties properties,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
+    // The bus keeps the middlewares that declare DispatchPhase.OUTBOUND.
     return new KafkaEventBus(
-        kafkaMessagePublisher, kafkaTopicNamingStrategy, properties.getEvents().getTopic());
+        kafkaMessagePublisher,
+        kafkaTopicNamingStrategy,
+        properties.getEvents().getTopic(),
+        middlewaresProvider.getIfAvailable(Collections::emptyList));
   }
 
   @Bean

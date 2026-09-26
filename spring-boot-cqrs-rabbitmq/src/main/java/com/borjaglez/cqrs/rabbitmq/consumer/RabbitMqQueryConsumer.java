@@ -9,6 +9,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
@@ -64,7 +65,7 @@ public class RabbitMqQueryConsumer extends RabbitMqConsumer {
     super(rabbitTemplate, namingStrategy);
     this.exposure = exposure;
     this.registry = registry;
-    this.middlewares = middlewares;
+    this.middlewares = DispatchPhase.INBOUND.select(middlewares);
     this.contextHeaderPrefix =
         Objects.requireNonNullElse(
             contextHeaderPrefix, RabbitMqPublisher.DEFAULT_CONTEXT_HEADER_PREFIX);

@@ -66,7 +66,8 @@ public class RabbitMqEventBusAutoConfiguration {
       RabbitMqNamingStrategy rabbitNaming,
       MessageNamingStrategy messageNaming,
       RabbitMqCqrsProperties properties,
-      RabbitTemplate rabbitTemplate) {
+      RabbitTemplate rabbitTemplate,
+      ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
     RabbitMqCqrsProperties.ConfirmsProperties confirms = properties.getEvents().getConfirms();
     Duration confirmTimeout = null;
     if (confirms.isEnabled()) {
@@ -82,7 +83,9 @@ public class RabbitMqEventBusAutoConfiguration {
         rabbitNaming,
         messageNaming,
         properties.getEvents().getExchange(),
-        confirmTimeout);
+        confirmTimeout,
+        // The bus keeps the middlewares that declare DispatchPhase.OUTBOUND.
+        middlewaresProvider.getIfAvailable(Collections::emptyList));
   }
 
   @Bean

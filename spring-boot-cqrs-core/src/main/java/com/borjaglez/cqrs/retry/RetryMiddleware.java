@@ -28,6 +28,11 @@ import com.borjaglez.cqrs.query.Query;
  * <p>The policy is looked up by the exact class of the message ({@link Builder#override}), falling
  * back to the default policy.
  *
+ * <p>Runs in the default phases, {@link com.borjaglez.cqrs.middleware.DispatchPhase#LOCAL} and
+ * {@link com.borjaglez.cqrs.middleware.DispatchPhase#INBOUND}: it retries local dispatches and, on
+ * the receiving side of a remote bus, the handler. It does not run on the sending side, so a remote
+ * send that fails is not retried by this middleware.
+ *
  * <p>Ordered at {@link #ORDER}: after context propagation and tracing, so one trace and correlation
  * id cover every attempt, and before validation, observability and unordered user middleware, so
  * each attempt is validated and timed on its own.

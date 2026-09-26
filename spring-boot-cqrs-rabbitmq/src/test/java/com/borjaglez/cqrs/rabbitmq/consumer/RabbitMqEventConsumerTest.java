@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -24,7 +25,9 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEvent;
+import com.borjaglez.cqrs.rabbitmq.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
@@ -224,5 +227,28 @@ class RabbitMqEventConsumerTest {
 
     verify(registry).handleRemote(event);
     verify(registry, never()).handle(any());
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheInboundPhase() {
+    List<String> calls = new ArrayList<>();
+    RabbitMqEventConsumer inbound =
+        new RabbitMqEventConsumer(
+            registry, phased(calls), rabbitTemplate, namingStrategy, "events", "app");
+    TestEvent event = new TestEvent("test-data");
+    Message message =
+        MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+
+    inbound.consume(message, event);
+
+    assertThat(calls).containsExactly("inbound");
+    verify(registry).handleRemote(event);
+  }
+
+  private static List<BusMiddleware> phased(List<String> calls) {
+    return List.of(
+        new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
+        new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
+        new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
 }

@@ -5,12 +5,20 @@ import java.util.List;
 
 import com.borjaglez.cqrs.event.Event;
 import com.borjaglez.cqrs.event.EventBus;
+import com.borjaglez.cqrs.event.EventHandlerExecutionException;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 /**
  * {@link EventBus} that publishes events to the RabbitMQ events exchange.
+ *
+ * <p>Before an event is published, it passes the middlewares that declare {@link
+ * DispatchPhase#OUTBOUND}, in the sending process; a middleware can stop the publication by
+ * throwing.
  *
  * <p>When the send fails (for example, the broker is unreachable), the exception thrown by {@link
  * RabbitMqPublisher} is rethrown unchanged and the event is not delivered anywhere else, so the
@@ -38,6 +46,7 @@ public class RabbitMqEventBus implements EventBus {
   private final MessageNamingStrategy messageNaming;
   private final String exchangeName;
   private final Duration confirmTimeout;
+  private final List<BusMiddleware> middlewares;
 
   /** Creates a bus that publishes without waiting for publisher confirms. */
   public RabbitMqEventBus(
@@ -58,15 +67,42 @@ public class RabbitMqEventBus implements EventBus {
       MessageNamingStrategy messageNaming,
       String exchangeName,
       Duration confirmTimeout) {
+    this(publisher, rabbitNaming, messageNaming, exchangeName, confirmTimeout, List.of());
+  }
+
+  /**
+   * Creates a bus like {@link #RabbitMqEventBus(RabbitMqPublisher, RabbitMqNamingStrategy,
+   * MessageNamingStrategy, String, Duration)} that also runs, before publishing, the middlewares of
+   * {@code middlewares} that declare {@link DispatchPhase#OUTBOUND}, in the order of the list.
+   */
+  public RabbitMqEventBus(
+      RabbitMqPublisher publisher,
+      RabbitMqNamingStrategy rabbitNaming,
+      MessageNamingStrategy messageNaming,
+      String exchangeName,
+      Duration confirmTimeout,
+      List<BusMiddleware> middlewares) {
     this.publisher = publisher;
     this.rabbitNaming = rabbitNaming;
     this.messageNaming = messageNaming;
     this.exchangeName = exchangeName;
     this.confirmTimeout = confirmTimeout;
+    this.middlewares = DispatchPhase.OUTBOUND.select(middlewares);
   }
 
   @Override
   public void publish(Event event) {
+    try {
+      new DefaultMiddlewareChain(middlewares, this::send).proceed(event);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new EventHandlerExecutionException(
+          "Failed to publish event " + event.getClass().getName(), e);
+    }
+  }
+
+  private Object send(Object event) {
     String exchange = rabbitNaming.exchange(exchangeName);
     String routingKey = messageNaming.eventName(event.getClass());
     if (confirmTimeout == null) {
@@ -74,6 +110,7 @@ public class RabbitMqEventBus implements EventBus {
     } else {
       publisher.publishConfirmed(exchange, routingKey, event, "event", confirmTimeout);
     }
+    return null;
   }
 
   @Override

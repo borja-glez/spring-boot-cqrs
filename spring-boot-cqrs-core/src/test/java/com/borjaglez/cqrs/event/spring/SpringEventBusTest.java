@@ -14,9 +14,11 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
+import com.borjaglez.cqrs.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 @ExtendWith(MockitoExtension.class)
 class SpringEventBusTest {
@@ -115,5 +117,19 @@ class SpringEventBusTest {
 
     assertThat(confirmedOnly.getLastHandledData()).isEqualTo("CONFIRMED");
     assertThat(everything.getLastHandledData()).isEqualTo("CONFIRMED");
+  }
+
+  @Test
+  void runsOnlyMiddlewaresDeclaringTheLocalPhase() {
+    EventHandlerRegistry registry = mock(EventHandlerRegistry.class);
+    RecordingMiddleware local = new RecordingMiddleware(DispatchPhase.LOCAL);
+    RecordingMiddleware inboundOnly = new RecordingMiddleware(DispatchPhase.INBOUND);
+    SpringEventBus bus = new SpringEventBus(registry, List.of(local, inboundOnly));
+    TestEvent event = new TestEvent("data");
+
+    bus.publish(event);
+
+    assertThat(local.seen()).containsExactly(event);
+    assertThat(inboundOnly.seen()).isEmpty();
   }
 }

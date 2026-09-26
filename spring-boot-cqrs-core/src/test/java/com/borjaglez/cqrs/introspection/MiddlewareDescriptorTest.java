@@ -2,9 +2,13 @@ package com.borjaglez.cqrs.introspection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 import org.junit.jupiter.api.Test;
 
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 
 class MiddlewareDescriptorTest {
@@ -16,6 +20,19 @@ class MiddlewareDescriptorTest {
     assertThat(descriptor.middlewareType()).isEqualTo(TestMiddleware.class);
     assertThat(descriptor.order()).isEqualTo(100);
     assertThat(descriptor.isObservability()).isTrue();
+    assertThat(descriptor.phases())
+        .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+  }
+
+  @Test
+  void keepsAnUnmodifiableCopyOfThePhases() {
+    EnumSet<DispatchPhase> phases = EnumSet.of(DispatchPhase.OUTBOUND);
+    MiddlewareDescriptor descriptor =
+        new MiddlewareDescriptor(TestMiddleware.class, 1, false, phases);
+
+    phases.add(DispatchPhase.LOCAL);
+
+    assertThat(descriptor.phases()).isEqualTo(Set.of(DispatchPhase.OUTBOUND));
   }
 
   @Test

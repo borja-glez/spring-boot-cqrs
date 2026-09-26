@@ -15,6 +15,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.context.MessageContextThreadLocalAccessor;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 import io.micrometer.context.ContextRegistry;
 
@@ -118,5 +119,14 @@ class CqrsContextAutoConfigurationTest {
             MessageContext.clear();
           }
         });
+  }
+
+  @Test
+  void contextMiddlewareAlsoRunsOnTheSenderOfRemoteBuses() {
+    contextRunner.run(
+        context ->
+            assertThat(context.getBean(ContextPropagationMiddleware.class).phases())
+                .containsExactlyInAnyOrder(
+                    DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND));
   }
 }

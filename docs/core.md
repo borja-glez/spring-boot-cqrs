@@ -308,7 +308,7 @@ In-process implementation that resolves handlers from `EventHandlerRegistry` and
 
 In-process implementation that resolves handlers from `QueryHandlerRegistry` and runs the middleware pipeline before invoking the handler.
 
-All three implementations accept a `List<BusMiddleware>` which is executed in order before the terminal handler invocation.
+All three implementations accept a `List<BusMiddleware>` and run, in order and before the terminal handler invocation, the middlewares that declare `DispatchPhase.LOCAL` (every middleware by default).
 
 ## Handler Discovery
 
@@ -379,7 +379,8 @@ See [middleware.md](middleware.md) for full documentation.
 
 The core module defines:
 
-- `BusMiddleware` -- functional interface for intercepting bus dispatches
+- `BusMiddleware` -- functional interface for intercepting bus dispatches; `phases()` says where it runs
+- `DispatchPhase` -- `LOCAL`, `OUTBOUND` (sending side of remote buses) and `INBOUND` (their consumers); `select(middlewares)` keeps the middlewares of a phase
 - `MiddlewareChain` -- chain-of-responsibility interface
 - `DefaultMiddlewareChain` -- ordered pipeline implementation
 - `CommandValidationInterceptor` -- JSR-380 validation for commands

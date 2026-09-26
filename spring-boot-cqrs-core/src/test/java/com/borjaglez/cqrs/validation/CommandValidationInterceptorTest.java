@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.borjaglez.cqrs.fixtures.ValidatedCommand;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 
 class CommandValidationInterceptorTest {
@@ -59,5 +60,12 @@ class CommandValidationInterceptorTest {
 
     assertThat(result).isEqualTo("passed");
     verify(chain).proceed(nonCommand);
+  }
+
+  @Test
+  void runsInEveryPhaseIncludingTheSenderOfRemoteMessages() {
+    assertThat(interceptor.phases())
+        .containsExactlyInAnyOrder(
+            DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND);
   }
 }

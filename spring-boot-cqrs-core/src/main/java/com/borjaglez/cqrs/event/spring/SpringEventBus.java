@@ -8,15 +8,20 @@ import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 
 public class SpringEventBus implements EventBus {
 
   private final EventHandlerRegistry registry;
   private final List<BusMiddleware> middlewares;
 
+  /**
+   * Creates the bus. Only the middlewares of {@code middlewares} that declare {@link
+   * DispatchPhase#LOCAL} run, in the order of the list.
+   */
   public SpringEventBus(EventHandlerRegistry registry, List<BusMiddleware> middlewares) {
     this.registry = registry;
-    this.middlewares = middlewares;
+    this.middlewares = DispatchPhase.LOCAL.select(middlewares);
   }
 
   @Override

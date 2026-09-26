@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestQuery;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -89,5 +90,11 @@ class MicrometerBusObservabilityTest {
     Timer timer = meterRegistry.find("cqrs.bus.dispatch").tag("cqrs.type", "unknown").timer();
     assertThat(timer).isNotNull();
     assertThat(timer.count()).isEqualTo(1);
+  }
+
+  @Test
+  void doesNotRunOnTheSenderOfRemoteMessages() {
+    assertThat(observability.phases())
+        .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
   }
 }

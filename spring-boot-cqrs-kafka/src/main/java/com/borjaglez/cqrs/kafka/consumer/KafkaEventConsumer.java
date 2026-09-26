@@ -11,6 +11,7 @@ import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 public class KafkaEventConsumer extends AbstractKafkaConsumer {
@@ -32,7 +33,7 @@ public class KafkaEventConsumer extends AbstractKafkaConsumer {
       String contextHeaderPrefix) {
     super(serializer, contextHeaderPrefix);
     this.registry = registry;
-    this.middlewares = middlewares;
+    this.middlewares = DispatchPhase.INBOUND.select(middlewares);
   }
 
   public void consume(ConsumerRecord<String, byte[]> record) {

@@ -13,6 +13,7 @@ import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestMode;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 public class KafkaCommandConsumer extends AbstractKafkaConsumer {
@@ -42,7 +43,7 @@ public class KafkaCommandConsumer extends AbstractKafkaConsumer {
       String contextHeaderPrefix) {
     super(serializer, contextHeaderPrefix);
     this.registry = registry;
-    this.middlewares = middlewares;
+    this.middlewares = DispatchPhase.INBOUND.select(middlewares);
     this.publisher = publisher;
   }
 

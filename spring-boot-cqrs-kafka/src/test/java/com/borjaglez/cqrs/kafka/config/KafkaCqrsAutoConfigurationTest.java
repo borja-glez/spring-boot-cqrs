@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
@@ -32,9 +33,14 @@ import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.kafka.KafkaCommandBus;
 import com.borjaglez.cqrs.kafka.KafkaEventBus;
 import com.borjaglez.cqrs.kafka.KafkaQueryBus;
+import com.borjaglez.cqrs.kafka.fixtures.OutboundBlocker;
+import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
+import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
+import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaPartitionKeyStrategy;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestReplyClient;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaTopicNamingStrategy;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
 import com.borjaglez.cqrs.rabbitmq.config.RabbitMqCommandBusAutoConfiguration;
@@ -434,5 +440,22 @@ class KafkaCqrsAutoConfigurationTest {
     assertThat(context).doesNotHaveBean("cqrsCommandsDeadLetterTopic");
     assertThat(context).doesNotHaveBean("cqrsEventsDeadLetterTopic");
     assertThat(context).doesNotHaveBean("cqrsQueriesDeadLetterTopic");
+  }
+
+  @Test
+  void remoteBusesRunTheOutboundMiddlewareBeansBeforeSending() {
+    contextRunner
+        .withBean("outboundBlocker", BusMiddleware.class, OutboundBlocker::new)
+        .run(
+            context -> {
+              assertThatThrownBy(
+                      () -> context.getBean(KafkaCommandBus.class).dispatch(new TestCommand("v")))
+                  .hasMessage(OutboundBlocker.MESSAGE);
+              assertThatThrownBy(() -> context.getBean(KafkaQueryBus.class).ask(new TestQuery("v")))
+                  .hasMessage(OutboundBlocker.MESSAGE);
+              assertThatThrownBy(
+                      () -> context.getBean(KafkaEventBus.class).publish(new TestEvent("v")))
+                  .hasMessage(OutboundBlocker.MESSAGE);
+            });
   }
 }

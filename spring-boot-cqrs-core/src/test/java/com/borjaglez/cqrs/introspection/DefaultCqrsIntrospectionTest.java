@@ -14,6 +14,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
+import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestCommandHandler;
@@ -22,6 +23,7 @@ import com.borjaglez.cqrs.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.fixtures.TestQuery;
 import com.borjaglez.cqrs.fixtures.TestQueryHandler;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.middleware.MiddlewareChain;
 import com.borjaglez.cqrs.observability.BusObservabilityInterceptor;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
@@ -230,6 +232,22 @@ class DefaultCqrsIntrospectionTest {
     assertThat(middleware.get(0).order()).isEqualTo(42);
     assertThat(middleware.get(0).middlewareType()).isEqualTo(OrderAnnotatedMiddleware.class);
     assertThat(middleware.get(0).isObservability()).isFalse();
+    assertThat(middleware.get(0).phases())
+        .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+  }
+
+  @Test
+  void middlewarePhasesAreTheOnesItDeclares() {
+    DefaultCqrsIntrospection introspection =
+        new DefaultCqrsIntrospection(
+            commandRegistry,
+            eventRegistry,
+            queryRegistry,
+            List.of(new ContextPropagationMiddleware(true, List.of())));
+
+    assertThat(introspection.getMiddleware().get(0).phases())
+        .containsExactlyInAnyOrder(
+            DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND);
   }
 
   @Test

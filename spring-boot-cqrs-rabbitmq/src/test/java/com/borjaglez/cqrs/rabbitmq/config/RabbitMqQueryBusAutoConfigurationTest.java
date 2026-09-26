@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 
@@ -12,12 +13,14 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQuery;
 import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQueryHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.OutboundBlocker;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQuery;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQueryHandler;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
@@ -212,5 +215,17 @@ class RabbitMqQueryBusAutoConfigurationTest {
                   .extracting("exposure")
                   .isEqualTo(RabbitMqExposure.ALL);
             });
+  }
+
+  @Test
+  void queryBusRunsTheOutboundMiddlewareBeansBeforeSending() {
+    contextRunner
+        .withBean("outboundBlocker", BusMiddleware.class, OutboundBlocker::new)
+        .run(
+            context ->
+                assertThatThrownBy(
+                        () -> context.getBean(RabbitMqQueryBus.class).ask(new TestQuery("data")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage(OutboundBlocker.MESSAGE));
   }
 }
