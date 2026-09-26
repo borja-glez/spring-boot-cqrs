@@ -28,6 +28,26 @@ class CommandHandlerRegistryTest {
   }
 
   @Test
+  void handlersAreRemoteUnlessRegisteredAsLocal() throws Exception {
+    Method method = TestCommandHandler.class.getMethod("handle", TestCommand.class);
+    registry.register(TestCommand.class, new TestCommandHandler(), method, "test.command", false);
+    CommandHandlerRegistry localRegistry = new CommandHandlerRegistry();
+    localRegistry.register(
+        TestCommand.class, new TestCommandHandler(), method, "test.command", false, false);
+
+    assertThat(registry.getHandlerInfo(TestCommand.class).orElseThrow().remote()).isTrue();
+    assertThat(localRegistry.getHandlerInfo(TestCommand.class).orElseThrow().remote()).isFalse();
+  }
+
+  @Test
+  void handlerInfoWithoutTheRemoteFlagIsRemote() {
+    var info = new CommandHandlerRegistry.HandlerInfo(new Object(), null, "test.command", true);
+
+    assertThat(info.remote()).isTrue();
+    assertThat(info.requiresValidation()).isTrue();
+  }
+
+  @Test
   void registerAndHandle() throws Exception {
     TestCommandHandler handler = new TestCommandHandler();
     Method method = TestCommandHandler.class.getMethod("handle", TestCommand.class);

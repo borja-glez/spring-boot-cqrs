@@ -2,14 +2,19 @@ package com.borjaglez.cqrs.rabbitmq.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
@@ -19,7 +24,9 @@ import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQuery;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 
 class RabbitMqQueryConsumerTest {
@@ -143,5 +150,59 @@ class RabbitMqQueryConsumerTest {
 
     assertThat(result).isEqualTo("r");
     assertThat(observed.get()).isEqualTo("cid-q");
+  }
+
+  @Test
+  void consumeShouldRejectUnannotatedQueriesWithoutHandlingThem() {
+    LocalQuery query = new LocalQuery("local");
+    Message message =
+        MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+
+    assertThatThrownBy(() -> consumer.consume(message, query))
+        .isInstanceOf(AmqpRejectAndDontRequeueException.class)
+        .hasMessageContaining(LocalQuery.class.getName());
+
+    verify(registry, never()).handle(any());
+  }
+
+  @Test
+  void consumeShouldRejectQueriesWhoseHandlerIsLocalEvenWhenExposingAll() {
+    TestQuery query = new TestQuery("internal");
+    when(registry.getHandlerInfo(TestQuery.class))
+        .thenReturn(
+            Optional.of(new QueryHandlerRegistry.HandlerInfo(new Object(), null, "q", false)));
+    RabbitMqQueryConsumer exposingAll =
+        new RabbitMqQueryConsumer(
+            registry,
+            Collections.emptyList(),
+            mock(RabbitTemplate.class),
+            mock(RabbitMqNamingStrategy.class),
+            "cqrs.context.",
+            RabbitMqExposure.ALL);
+    Message message =
+        MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+
+    assertThatThrownBy(() -> exposingAll.consume(message, query))
+        .isInstanceOf(AmqpRejectAndDontRequeueException.class);
+
+    verify(registry, never()).handle(any());
+  }
+
+  @Test
+  void consumeShouldHandleUnannotatedQueriesWhenExposingAll() {
+    LocalQuery query = new LocalQuery("local");
+    when(registry.handle(query)).thenReturn("local-result");
+    RabbitMqQueryConsumer exposingAll =
+        new RabbitMqQueryConsumer(
+            registry,
+            Collections.emptyList(),
+            mock(RabbitTemplate.class),
+            mock(RabbitMqNamingStrategy.class),
+            "cqrs.context.",
+            RabbitMqExposure.ALL);
+    Message message =
+        MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+
+    assertThat(exposingAll.consume(message, query)).isEqualTo("local-result");
   }
 }

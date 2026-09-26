@@ -121,6 +121,21 @@ class CqrsEndpointTest {
     assertThat(view.messageName()).isEqualTo("create_order");
     assertThat(view.handlerBeanType()).isEqualTo(Handler.class.getName());
     assertThat(view.requiresValidation()).isTrue();
+    assertThat(view.remote()).isTrue();
+  }
+
+  @Test
+  void handlerViewShowsLocalOnlyHandlers() {
+    HandlerDescriptor descriptor =
+        new HandlerDescriptor(
+            CreateOrderCommand.class,
+            HandlerType.COMMAND,
+            "create_order",
+            Handler.class,
+            false,
+            false);
+
+    assertThat(HandlerView.from(descriptor).remote()).isFalse();
   }
 
   private static final class CreateOrderCommand {}

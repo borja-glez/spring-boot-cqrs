@@ -2,6 +2,9 @@ package com.borjaglez.cqrs.rabbitmq.consumer;
 
 import java.time.Instant;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -29,6 +32,8 @@ public abstract class RabbitMqConsumer {
   public static final int DEFAULT_MAX_ATTEMPTS = 3;
 
   private static final String HEADER_REDELIVERY_COUNT = "cqrs.redelivery.count";
+
+  private static final Logger log = LoggerFactory.getLogger(RabbitMqConsumer.class);
 
   private final RabbitTemplate rabbitTemplate;
   private final RabbitMqNamingStrategy namingStrategy;
@@ -111,6 +116,28 @@ public abstract class RabbitMqConsumer {
    */
   protected int getMaxRetries() {
     return getMaxAttempts() - 1;
+  }
+
+  /**
+   * Logs a message that is not exposed over RabbitMQ and returns the exception that rejects it
+   * without requeue, so that it is dead-lettered if the queue has a dead-letter exchange and
+   * dropped otherwise. It is never handled nor retried.
+   *
+   * @param message the message received from the broker
+   * @param messageType the class of the message
+   * @return the exception to throw from the listener
+   */
+  protected AmqpRejectAndDontRequeueException rejectNotExposed(
+      Message message, Class<?> messageType) {
+    MessageProperties properties = message.getMessageProperties();
+    log.warn(
+        "Rejected {} received from exchange '{}' with routing key '{}': it is not exposed over"
+            + " RabbitMQ (see cqrs.rabbitmq.expose, @CqrsMessage and remote = false)",
+        messageType.getName(),
+        properties.getReceivedExchange(),
+        properties.getReceivedRoutingKey());
+    return new AmqpRejectAndDontRequeueException(
+        messageType.getName() + " is not exposed over RabbitMQ");
   }
 
   private static void recordFailure(MessageProperties properties, int attempts, Throwable failure) {

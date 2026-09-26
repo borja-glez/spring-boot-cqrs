@@ -42,7 +42,8 @@ Returns a snapshot of all registered handlers, middlewares and message types.
       "messageType": "com.acme.CreateOrderCommand",
       "messageName": "orders.command.create",
       "handlerBeanType": "com.acme.OrderCommandHandler",
-      "requiresValidation": true
+      "requiresValidation": true,
+      "remote": true
     }
   ],
   "middleware": [
@@ -55,6 +56,8 @@ Returns a snapshot of all registered handlers, middlewares and message types.
   ]
 }
 ```
+
+`remote` is `false` for a handler marked `remote = false`, which never receives messages from a broker. For RabbitMQ, a handler with `remote: true` is reached from the broker only if its message is also exposed by `cqrs.rabbitmq.expose` (by default, only messages annotated with `@CqrsMessage`); see [Exposed and local messages](rabbitmq-adapter.md#exposed-and-local-messages).
 
 The data comes straight from `CqrsIntrospection` (the same source that `CqrsIntrospectionLogger` uses to log the registry summary on startup), so what you see in the endpoint is what's actually wired in the running JVM.
 
@@ -73,7 +76,8 @@ GET /actuator/cqrs/handlers/command
     "messageType": "com.acme.CreateOrderCommand",
     "messageName": "orders.command.create",
     "handlerBeanType": "com.acme.OrderCommandHandler",
-    "requiresValidation": true
+    "requiresValidation": true,
+    "remote": true
   }
 ]
 ```

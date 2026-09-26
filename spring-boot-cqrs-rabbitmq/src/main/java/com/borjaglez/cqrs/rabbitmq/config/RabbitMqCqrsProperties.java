@@ -6,6 +6,8 @@ import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,6 +25,15 @@ public class RabbitMqCqrsProperties {
    * producers.
    */
   private List<String> trustedPackages = new ArrayList<>(List.of("*"));
+
+  /**
+   * Which handled messages are exposed over RabbitMQ: bound to this application's queues and
+   * handled when they arrive from the broker. {@code annotated} (the default) exposes only messages
+   * annotated with {@code @CqrsMessage}; {@code all} exposes every handled message. Handlers marked
+   * {@code remote = false} are never exposed. Other messages stay local, and are rejected without
+   * requeue if they reach a queue anyway.
+   */
+  private RabbitMqExposure expose = RabbitMqExposure.ANNOTATED;
 
   private RetryProperties retry = new RetryProperties();
   private BusProperties commands = new BusProperties("commands", 10, 20);

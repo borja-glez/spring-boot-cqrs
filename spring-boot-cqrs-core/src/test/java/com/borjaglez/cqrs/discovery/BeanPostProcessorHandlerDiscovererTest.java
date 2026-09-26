@@ -353,6 +353,57 @@ class BeanPostProcessorHandlerDiscovererTest {
     };
   }
 
+  @Test
+  void handlersAreRemoteByDefault() {
+    discoverer.postProcessAfterInitialization(new TestCommandHandler(), "testCommandHandler");
+    discoverer.postProcessAfterInitialization(new TestEventHandler(), "testEventHandler");
+    discoverer.postProcessAfterInitialization(new TestQueryHandler(), "testQueryHandler");
+
+    assertThat(commandRegistry.getHandlerInfo(TestCommand.class).orElseThrow().remote()).isTrue();
+    assertThat(eventRegistry.getHandlerInfos(TestEvent.class))
+        .singleElement()
+        .extracting(EventHandlerRegistry.HandlerInfo::remote)
+        .isEqualTo(true);
+    assertThat(queryRegistry.getHandlerInfo(TestQuery.class).orElseThrow().remote()).isTrue();
+  }
+
+  @Test
+  void handlerMethodsMarkedNotRemoteAreRegisteredAsLocal() {
+    discoverer.postProcessAfterInitialization(new LocalMethodHandlers(), "localMethodHandlers");
+
+    assertThat(commandRegistry.getHandlerInfo(TestCommand.class).orElseThrow().remote()).isFalse();
+    assertThat(eventRegistry.getHandlerInfos(TestEvent.class))
+        .singleElement()
+        .extracting(EventHandlerRegistry.HandlerInfo::remote)
+        .isEqualTo(false);
+    assertThat(queryRegistry.getHandlerInfo(TestQuery.class).orElseThrow().remote()).isFalse();
+  }
+
+  @Test
+  void handlerClassesMarkedNotRemoteRegisterEveryMethodAsLocal() {
+    discoverer.postProcessAfterInitialization(new LocalClassHandlers(), "localClassHandlers");
+
+    assertThat(commandRegistry.getHandlerInfo(TestCommand.class).orElseThrow().remote()).isFalse();
+    assertThat(eventRegistry.getHandlerInfos(TestEvent.class))
+        .singleElement()
+        .extracting(EventHandlerRegistry.HandlerInfo::remote)
+        .isEqualTo(false);
+    assertThat(queryRegistry.getHandlerInfo(TestQuery.class).orElseThrow().remote()).isFalse();
+  }
+
+  @Test
+  void localHandlersStillHandleLocalDispatch() {
+    LocalMethodHandlers handler = new LocalMethodHandlers();
+    discoverer.postProcessAfterInitialization(handler, "localMethodHandlers");
+
+    commandRegistry.handle(new TestCommand("c"));
+    eventRegistry.handle(new TestEvent("e"));
+    Object result = queryRegistry.handle(new TestQuery("q"));
+
+    assertThat(handler.handled).containsExactly("c", "e");
+    assertThat(result).isEqualTo("local:q");
+  }
+
   // Invalid handler fixtures for validation tests
 
   abstract static class AbstractOrderCommand extends com.borjaglez.cqrs.command.Command {}
@@ -566,6 +617,50 @@ class BeanPostProcessorHandlerDiscovererTest {
     @com.borjaglez.cqrs.event.annotation.HandleEvent
     public void handle(TestEvent event) {
       // not reachable through a JDK proxy
+    }
+  }
+
+  // Local-only fixtures
+
+  @com.borjaglez.cqrs.command.annotation.CommandHandler
+  @com.borjaglez.cqrs.event.annotation.EventHandler
+  @com.borjaglez.cqrs.query.annotation.QueryHandler
+  static class LocalMethodHandlers {
+    final java.util.List<String> handled = new java.util.ArrayList<>();
+
+    @com.borjaglez.cqrs.command.annotation.HandleCommand(remote = false)
+    public void handle(TestCommand command) {
+      handled.add(command.getData());
+    }
+
+    @com.borjaglez.cqrs.event.annotation.HandleEvent(remote = false)
+    public void on(TestEvent event) {
+      handled.add(event.getData());
+    }
+
+    @com.borjaglez.cqrs.query.annotation.HandleQuery(remote = false)
+    public String ask(TestQuery query) {
+      return "local:" + query.getData();
+    }
+  }
+
+  @com.borjaglez.cqrs.command.annotation.CommandHandler(remote = false)
+  @com.borjaglez.cqrs.event.annotation.EventHandler(remote = false)
+  @com.borjaglez.cqrs.query.annotation.QueryHandler(remote = false)
+  static class LocalClassHandlers {
+    @com.borjaglez.cqrs.command.annotation.HandleCommand
+    public void handle(TestCommand command) {
+      // local only
+    }
+
+    @com.borjaglez.cqrs.event.annotation.HandleEvent
+    public void on(TestEvent event) {
+      // local only
+    }
+
+    @com.borjaglez.cqrs.query.annotation.HandleQuery
+    public String ask(TestQuery query) {
+      return "local";
     }
   }
 }

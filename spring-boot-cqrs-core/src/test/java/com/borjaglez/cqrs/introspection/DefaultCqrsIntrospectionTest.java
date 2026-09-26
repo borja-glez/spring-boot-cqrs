@@ -40,6 +40,41 @@ class DefaultCqrsIntrospectionTest {
   }
 
   @Test
+  void handlersReportWhetherTheyAreRemote() throws Exception {
+    commandRegistry.register(
+        TestCommand.class,
+        new TestCommandHandler(),
+        TestCommandHandler.class.getMethod("handle", TestCommand.class),
+        "test.command",
+        false,
+        false);
+    Method eventMethod = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    eventRegistry.register(TestEvent.class, new TestEventHandler(), eventMethod, "test.event");
+    eventRegistry.register(
+        TestEvent.class, new TestEventHandler(), eventMethod, "test.event", false);
+    queryRegistry.register(
+        TestQuery.class,
+        new TestQueryHandler(),
+        TestQueryHandler.class.getMethod("handle", TestQuery.class),
+        "test.query",
+        false);
+
+    DefaultCqrsIntrospection introspection =
+        new DefaultCqrsIntrospection(
+            commandRegistry, eventRegistry, queryRegistry, Collections.emptyList());
+
+    assertThat(introspection.getHandlers(HandlerType.COMMAND))
+        .extracting(HandlerDescriptor::remote)
+        .containsExactly(false);
+    assertThat(introspection.getHandlers(HandlerType.EVENT))
+        .extracting(HandlerDescriptor::remote)
+        .containsExactly(true, false);
+    assertThat(introspection.getHandlers(HandlerType.QUERY))
+        .extracting(HandlerDescriptor::remote)
+        .containsExactly(false);
+  }
+
+  @Test
   void emptyRegistriesReturnEmptyCollections() {
     DefaultCqrsIntrospection introspection =
         new DefaultCqrsIntrospection(

@@ -16,13 +16,38 @@ import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 
 public class QueryHandlerRegistry {
 
-  public record HandlerInfo(Object bean, MethodHandle handle, String messageName) {}
+  /**
+   * A registered query handler.
+   *
+   * @param bean the handler bean
+   * @param handle the handler method
+   * @param messageName the logical name of the query
+   * @param remote whether the handler may receive the query from a remote transport; {@code false}
+   *     when it is marked {@code remote = false}
+   */
+  public record HandlerInfo(Object bean, MethodHandle handle, String messageName, boolean remote) {
+
+    /** Creates the information of a remote handler. */
+    public HandlerInfo(Object bean, MethodHandle handle, String messageName) {
+      this(bean, handle, messageName, true);
+    }
+  }
 
   private final ConcurrentHashMap<Class<?>, HandlerInfo> handlers = new ConcurrentHashMap<>();
 
   public void register(Class<?> queryClass, Object bean, Method method, String messageName) {
+    register(queryClass, bean, method, messageName, true);
+  }
+
+  /**
+   * Registers the handler of a query.
+   *
+   * @param remote whether the handler may receive the query from a remote transport
+   */
+  public void register(
+      Class<?> queryClass, Object bean, Method method, String messageName, boolean remote) {
     MethodHandle handle = MethodHandleUtil.unreflect(method);
-    HandlerInfo info = new HandlerInfo(bean, handle, messageName);
+    HandlerInfo info = new HandlerInfo(bean, handle, messageName, remote);
     HandlerInfo existing = handlers.putIfAbsent(queryClass, info);
     if (existing != null) {
       throw new QueryAlreadyRegisteredException(queryClass);

@@ -66,7 +66,8 @@ public class CqrsEndpoint {
       String messageType,
       String messageName,
       String handlerBeanType,
-      boolean requiresValidation) {
+      boolean requiresValidation,
+      boolean remote) {
 
     static HandlerView from(HandlerDescriptor descriptor) {
       return new HandlerView(
@@ -74,7 +75,8 @@ public class CqrsEndpoint {
           descriptor.messageType().getName(),
           descriptor.messageName(),
           descriptor.handlerBeanType().getName(),
-          descriptor.requiresValidation());
+          descriptor.requiresValidation(),
+          descriptor.remote());
     }
   }
 

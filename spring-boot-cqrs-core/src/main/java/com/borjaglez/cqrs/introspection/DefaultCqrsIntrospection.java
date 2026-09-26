@@ -90,7 +90,8 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
                           HandlerType.COMMAND,
                           info.messageName(),
                           ClassUtils.getUserClass(info.bean()),
-                          info.requiresValidation())));
+                          info.requiresValidation(),
+                          info.remote())));
     }
 
     for (Class<?> eventClass : eventRegistry.getRegisteredEvents()) {
@@ -101,7 +102,8 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
                 HandlerType.EVENT,
                 info.messageName(),
                 ClassUtils.getUserClass(info.bean()),
-                false));
+                false,
+                info.remote()));
       }
     }
 
@@ -116,7 +118,8 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
                           HandlerType.QUERY,
                           info.messageName(),
                           ClassUtils.getUserClass(info.bean()),
-                          false)));
+                          false,
+                          info.remote())));
     }
 
     return result;

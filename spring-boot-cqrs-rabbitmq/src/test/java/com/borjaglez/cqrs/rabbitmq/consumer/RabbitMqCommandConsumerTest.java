@@ -2,15 +2,20 @@ package com.borjaglez.cqrs.rabbitmq.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
@@ -19,7 +24,10 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.rabbitmq.fixtures.InternalCommand;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 
 class RabbitMqCommandConsumerTest {
@@ -317,5 +325,60 @@ class RabbitMqCommandConsumerTest {
                     0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("max-attempts");
+  }
+
+  private RabbitMqCommandConsumer consumerExposing(RabbitMqExposure exposure) {
+    return new RabbitMqCommandConsumer(
+        registry,
+        Collections.emptyList(),
+        rabbitTemplate,
+        namingStrategy,
+        "commands",
+        "app",
+        "cqrs.context.",
+        3,
+        exposure);
+  }
+
+  @Test
+  void consumeShouldRejectUnannotatedCommandsWithoutHandlingOrRetryingThem() {
+    LocalCommand command = new LocalCommand("local");
+
+    for (String messageType : List.of("command", "command_wait", "command_reply")) {
+      assertThatThrownBy(() -> consumer.consume(createMessage(messageType), command))
+          .isInstanceOf(AmqpRejectAndDontRequeueException.class)
+          .hasMessageContaining(LocalCommand.class.getName());
+    }
+
+    verify(registry, never()).handle(any());
+    verifyNoInteractions(rabbitTemplate);
+  }
+
+  @Test
+  void consumeShouldRejectCommandsWhoseHandlerIsLocalEvenWhenExposingAll() {
+    InternalCommand command = new InternalCommand("internal");
+    when(registry.getHandlerInfo(InternalCommand.class))
+        .thenReturn(
+            Optional.of(
+                new CommandHandlerRegistry.HandlerInfo(
+                    new Object(), null, "internal", false, false)));
+
+    assertThatThrownBy(
+            () -> consumerExposing(RabbitMqExposure.ALL).consume(createMessage("command"), command))
+        .isInstanceOf(AmqpRejectAndDontRequeueException.class);
+
+    verify(registry, never()).handle(any());
+    verifyNoInteractions(rabbitTemplate);
+  }
+
+  @Test
+  void consumeShouldHandleUnannotatedCommandsWhenExposingAll() {
+    LocalCommand command = new LocalCommand("local");
+    when(registry.handle(command)).thenReturn("result");
+
+    Object result =
+        consumerExposing(RabbitMqExposure.ALL).consume(createMessage("command_reply"), command);
+
+    assertThat(result).isEqualTo("result");
   }
 }

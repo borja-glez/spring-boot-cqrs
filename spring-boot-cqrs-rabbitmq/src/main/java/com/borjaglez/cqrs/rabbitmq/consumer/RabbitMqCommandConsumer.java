@@ -11,6 +11,7 @@ import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
@@ -23,6 +24,7 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
   private final String exchangeName;
   private final String appName;
   private final String contextHeaderPrefix;
+  private final RabbitMqExposure exposure;
 
   public RabbitMqCommandConsumer(
       CommandHandlerRegistry registry,
@@ -62,7 +64,8 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
 
   /**
    * Creates the consumer. {@code maxAttempts} is the total number of deliveries of a failed
-   * message, including the first one, and must be at least 1.
+   * message, including the first one, and must be at least 1. Only commands annotated with {@code
+   * CqrsMessage} are accepted ({@link RabbitMqExposure#ANNOTATED}).
    */
   public RabbitMqCommandConsumer(
       CommandHandlerRegistry registry,
@@ -73,7 +76,35 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
       String appName,
       String contextHeaderPrefix,
       int maxAttempts) {
+    this(
+        registry,
+        middlewares,
+        rabbitTemplate,
+        namingStrategy,
+        exchangeName,
+        appName,
+        contextHeaderPrefix,
+        maxAttempts,
+        RabbitMqExposure.ANNOTATED);
+  }
+
+  /**
+   * Creates the consumer. {@code maxAttempts} is the total number of deliveries of a failed
+   * message, including the first one, and must be at least 1. A command that {@code exposure} does
+   * not expose is rejected without requeue and never handled.
+   */
+  public RabbitMqCommandConsumer(
+      CommandHandlerRegistry registry,
+      List<BusMiddleware> middlewares,
+      RabbitTemplate rabbitTemplate,
+      RabbitMqNamingStrategy namingStrategy,
+      String exchangeName,
+      String appName,
+      String contextHeaderPrefix,
+      int maxAttempts,
+      RabbitMqExposure exposure) {
     super(rabbitTemplate, namingStrategy, maxAttempts);
+    this.exposure = exposure;
     this.registry = registry;
     this.middlewares = middlewares;
     this.exchangeName = exchangeName;
@@ -84,6 +115,9 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
   }
 
   public Object consume(Message message, Command command) {
+    if (!exposure.exposesCommand(registry, command.getClass())) {
+      throw rejectNotExposed(message, command.getClass());
+    }
     String messageType = getMessageType(message);
     MessageContext incoming = RabbitMqContextHeaders.extract(message, contextHeaderPrefix);
     MessageContext.Scope scope = MessageContext.scope(incoming);

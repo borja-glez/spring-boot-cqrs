@@ -9,6 +9,7 @@ The RabbitMQ module provides distributed implementations of all three buses. Whe
 
 - [Architecture](#architecture)
 - [Exchanges, Queues, and Routing](#exchanges-queues-and-routing)
+- [Exposed and local messages](#exposed-and-local-messages)
 - [Bus Implementations](#bus-implementations)
   - [Generic results](#generic-results)
 - [Retry and Dead-Letter Queue Strategy](#retry-and-dead-letter-queue-strategy)
@@ -62,7 +63,48 @@ DLX:         order-service.commands.dead_letter
 DL Queue:    order-service.my-app.commands.dead_letter
 ```
 
-Bindings are created for each registered handler's routing key. For example, if a service has handlers for `CreateOrderCommand` and `ConfirmOrderCommand`, two bindings are created on the main queue.
+Bindings are created for the routing key of each **exposed** message (see [Exposed and local messages](#exposed-and-local-messages)). For example, if a service has handlers for `CreateOrderCommand` and `ConfirmOrderCommand`, both annotated with `@CqrsMessage`, two bindings are created on the main queue.
+
+## Exposed and local messages
+
+A handler registered in the application is not automatically reachable from the broker. `cqrs.rabbitmq.expose` decides which handled messages the application exposes over RabbitMQ:
+
+| Value | Exposed messages |
+|---|---|
+| `annotated` (default) | Only messages annotated with `@CqrsMessage`. They form the public contract of the service and have a service-qualified routing key. |
+| `all` | Every handled message. Messages without `@CqrsMessage` are routed by their kebab-case simple class name (`adjust-stock-command`), which can collide between services that share the exchange. |
+
+In both modes a handler marked `remote = false` is never exposed, even if its message is annotated:
+
+```java
+@CommandHandler
+class StockHandlers {
+
+  @HandleCommand // exposed: ReserveStockCommand is annotated with @CqrsMessage
+  void on(ReserveStockCommand command) { ... }
+
+  @HandleCommand(remote = false) // local only, although the command is annotated
+  void on(RecountStockCommand command) { ... }
+}
+
+@EventHandler(remote = false) // every handler of the class is local only
+class AuditTrail { ... }
+```
+
+`remote` exists on `@CommandHandler`, `@EventHandler`, `@QueryHandler` and on `@HandleCommand`, `@HandleEvent`, `@HandleQuery`; a handler is remote only when both its class and its method allow it.
+
+For each bus:
+
+- **Bindings.** The main queue is bound only to the routing keys of exposed messages. An event is exposed while at least one of its handlers is remote.
+- **Consumption.** A message that reaches the queue anyway (through the default exchange with the queue name as routing key, or through a binding left by an earlier version) and is not exposed is **rejected without requeue** and logged with a `WARN`. It never reaches the handler and is not retried: it is dead-lettered if the queue has a dead-letter exchange (for example through a broker policy) and dropped otherwise. A request that expects a reply (`command_reply`, `command_wait`, queries) is answered with an error, which the requester sees as a `RemoteHandlerException`.
+- **Events.** For an exposed event received from the broker only the remote handlers run; handlers marked `remote = false` run only for events published through the local bus.
+- **Local dispatch** through `SpringCommandBus`, `SpringQueryBus` and `springEventBus` is not affected: local-only messages are still handled in-process.
+
+The exposure only filters incoming messages. The `RabbitMq*Bus` beans still publish any message: sending a local-only message through them publishes it to a routing key that no exposing service binds, so dispatch local-only messages through the local buses.
+
+> **Shared brokers.** Every producer that can publish to the exchanges, or to the default exchange, can reach the exposed handlers of every service. Keep `expose=annotated`, mark internal handlers `remote = false`, restrict `cqrs.rabbitmq.trusted-packages` to the packages of your messages, and use broker permissions (vhosts, user permissions) to decide who may publish at all.
+
+> **Upgrading from 0.3.x.** Before 0.4.0 every handled message was exposed. Messages without `@CqrsMessage` are now local by default: annotate the messages other services send (or publish events for) with `@CqrsMessage`, or set `cqrs.rabbitmq.expose=all` to keep the previous behavior. RabbitMQ keeps existing bindings of a durable queue when the application stops declaring them, so the old bindings of messages that are no longer exposed remain; the consumer rejects what they deliver, and you can remove them from the management UI or with `rabbitmqadmin`.
 
 ## Bus Implementations
 
@@ -211,7 +253,7 @@ cqrs:
 | `RabbitMqEventConsumer` | Events | Routes to `EventHandlerRegistry`; fire-and-forget only |
 | `RabbitMqQueryConsumer` | Queries | Routes to `QueryHandlerRegistry`; always returns a reply |
 
-All consumers extend `RabbitMqConsumer`, which provides the `handleConsumptionError()` method for retry/dead-letter logic.
+All consumers extend `RabbitMqConsumer`, which provides the `handleConsumptionError()` method for retry/dead-letter logic. Every consumer first checks that the message is exposed (see [Exposed and local messages](#exposed-and-local-messages)) and rejects it without requeue otherwise; its constructors take a `RabbitMqExposure`, and those without one use `ANNOTATED`.
 
 Message types (set via the `cqrs.message.type` header):
 

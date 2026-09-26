@@ -46,6 +46,58 @@ class EventHandlerRegistryTest {
   }
 
   @Test
+  void handlersAreRemoteUnlessRegisteredAsLocal() throws Exception {
+    Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    registry.register(TestEvent.class, new TestEventHandler(), method, "test.event");
+    registry.register(TestEvent.class, new TestEventHandler(), method, "test.event", false);
+
+    assertThat(registry.getHandlerInfos(TestEvent.class))
+        .extracting(EventHandlerRegistry.HandlerInfo::remote)
+        .containsExactly(true, false);
+  }
+
+  @Test
+  void handlerInfoWithoutTheRemoteFlagIsRemote() {
+    assertThat(new EventHandlerRegistry.HandlerInfo(new Object(), null, "test.event").remote())
+        .isTrue();
+  }
+
+  @Test
+  void handleRunsLocalAndRemoteHandlers() throws Exception {
+    Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    TestEventHandler remote = new TestEventHandler();
+    TestEventHandler local = new TestEventHandler();
+    registry.register(TestEvent.class, remote, method, "test.event");
+    registry.register(TestEvent.class, local, method, "test.event", false);
+
+    registry.handle(new TestEvent("both"));
+
+    assertThat(remote.getLastHandledData()).isEqualTo("both");
+    assertThat(local.getLastHandledData()).isEqualTo("both");
+  }
+
+  @Test
+  void handleRemoteRunsOnlyRemoteHandlers() throws Exception {
+    Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    TestEventHandler remote = new TestEventHandler();
+    TestEventHandler local = new TestEventHandler();
+    registry.register(TestEvent.class, remote, method, "test.event");
+    registry.register(TestEvent.class, local, method, "test.event", false);
+
+    registry.handleRemote(new TestEvent("remote"));
+
+    assertThat(remote.getLastHandledData()).isEqualTo("remote");
+    assertThat(local.getLastHandledData()).isNull();
+  }
+
+  @Test
+  void handleRemoteOfAnUnhandledEventDoesNothing() {
+    registry.handleRemote(new TestEvent("nobody"));
+
+    assertThat(logs.list).isEmpty();
+  }
+
+  @Test
   void eventSubclassWithOnlySuperclassHandlerLogsOneWarningAndIsNotHandled() throws Exception {
     TestEventHandler handler = new TestEventHandler();
     Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);

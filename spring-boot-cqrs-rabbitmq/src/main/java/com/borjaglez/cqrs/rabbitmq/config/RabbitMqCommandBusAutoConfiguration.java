@@ -51,7 +51,10 @@ public class RabbitMqCommandBusAutoConfiguration {
       @Value("${spring.application.name:cqrs-app}") String appName) {
     List<String> routingKeys =
         new ArrayList<>(
-            registry.getRegisteredCommands().stream().map(messageNaming::commandName).toList());
+            registry.getRegisteredCommands().stream()
+                .filter(type -> properties.getExpose().exposesCommand(registry, type))
+                .map(messageNaming::commandName)
+                .toList());
     return builder.buildWithRetryAndDeadLetter(
         appName,
         properties.getCommands().getExchange(),
@@ -91,7 +94,8 @@ public class RabbitMqCommandBusAutoConfiguration {
             properties.getCommands().getExchange(),
             appName,
             contextHeaderPrefix,
-            properties.getRetry().getMaxAttempts());
+            properties.getRetry().getMaxAttempts(),
+            properties.getExpose());
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");
