@@ -25,6 +25,7 @@ dependencies {
     testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.observation)
     testImplementation(libs.micrometer.observation.test)
+    testImplementation(libs.spring.boot3.actuator.autoconfigure)
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.datatype.jsr310)
 }

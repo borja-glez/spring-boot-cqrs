@@ -14,7 +14,13 @@ import com.borjaglez.cqrs.tracing.TracingMiddleware;
 import io.micrometer.observation.ObservationRegistry;
 
 @AutoConfiguration
-@AutoConfigureAfter(CqrsAutoConfiguration.class)
+// The registry comes from Spring Boot's own auto-configuration: without running after it, the
+// @ConditionalOnBean below never matches in an application (finding C29).
+@AutoConfigureAfter(
+    value = CqrsAutoConfiguration.class,
+    name = {
+      "org.springframework.boot.actuate.autoconfigure.observation.ObservationAutoConfiguration"
+    })
 @ConditionalOnClass(name = "io.micrometer.observation.ObservationRegistry")
 @ConditionalOnProperty(
     prefix = "cqrs.tracing",
