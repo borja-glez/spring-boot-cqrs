@@ -3,13 +3,20 @@ package com.borjaglez.cqrs.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
+import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.context.MessageContextThreadLocalAccessor;
+
+import io.micrometer.context.ContextRegistry;
 
 class CqrsContextAutoConfigurationTest {
 
@@ -55,5 +62,61 @@ class CqrsContextAutoConfigurationTest {
               assertThat(ctx.getMdcKeys()).isEqualTo(List.of("correlationId", "tenantId"));
               assertThat(ctx.getHeaderPrefix()).isEqualTo("cqrs.ctx.");
             });
+  }
+
+  @Test
+  void threadLocalAccessorIsRegisteredInTheGlobalContextRegistry() {
+    contextRunner.run(
+        context -> {
+          assertThat(context).hasSingleBean(MessageContextThreadLocalAccessor.class);
+          assertThat(ContextRegistry.getInstance().getThreadLocalAccessors())
+              .anyMatch(accessor -> MessageContextThreadLocalAccessor.KEY.equals(accessor.key()));
+        });
+  }
+
+  @Test
+  void threadLocalAccessorIsNotRegisteredWhenContextPropagationIsMissing() {
+    contextRunner
+        .withClassLoader(new FilteredClassLoader("io.micrometer.context."))
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(ContextPropagationMiddleware.class);
+              assertThat(context).doesNotHaveBean(MessageContextThreadLocalAccessor.class);
+            });
+  }
+
+  @Test
+  void threadLocalAccessorIsNotRegisteredWhenContextIsDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.context.enabled=false")
+        .run(
+            context ->
+                assertThat(context).doesNotHaveBean(MessageContextThreadLocalAccessor.class));
+  }
+
+  @Test
+  void contextPropagatingTaskDecoratorCarriesTheMessageContext() {
+    contextRunner.run(
+        context -> {
+          ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+          executor.setCorePoolSize(1);
+          executor.setMaxPoolSize(1);
+          executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
+          executor.initialize();
+          AtomicReference<String> seen = new AtomicReference<>("unset");
+          try {
+            try (MessageContext.Scope ignored =
+                MessageContext.scope(MessageContext.empty().with("correlationId", "req-1"))) {
+              executor.submit(() -> seen.set(MessageContext.current().correlationId())).get();
+            }
+            assertThat(seen.get()).isEqualTo("req-1");
+
+            executor.submit(() -> seen.set(MessageContext.current().correlationId())).get();
+            assertThat(seen.get()).isNull();
+          } finally {
+            executor.shutdown();
+            MessageContext.clear();
+          }
+        });
   }
 }

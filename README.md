@@ -327,6 +327,14 @@ try (MessageContext.Scope ignored = MessageContext.scope(ctx)) {
 }
 ```
 
+The context does not follow work to another thread by itself. Carry it into executors and `@Async` methods with `MessageContext.wrap(...)` or `MessageContextTaskDecorator`, or, with `io.micrometer:context-propagation` on the classpath, with Spring's `ContextPropagatingTaskDecorator` (the starters register a `ThreadLocalAccessor` for `MessageContext`):
+
+```java
+executor.submit(MessageContext.wrap(() -> commandBus.dispatch(new ReserveStock(orderId))));
+```
+
+Work picked up later by a poller or a scheduled job has no caller thread to copy from: store the `correlationId` with the work item and reopen a `MessageContext.scope` when it runs.
+
 See [docs/middleware.md](docs/middleware.md#message-context--correlation-id) for the full API and [docs/configuration.md](docs/configuration.md#context-propagation-properties) for tuning.
 
 ### RabbitMQ

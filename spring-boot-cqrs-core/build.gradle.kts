@@ -12,6 +12,7 @@ dependencies {
     compileOnly(libs.micrometer.core)
     compileOnly(libs.micrometer.observation)
     compileOnly(libs.slf4j.api)
+    compileOnly(libs.context.propagation)
 
     testImplementation(libs.spring.boot3.starter.validation)
     testImplementation(libs.micrometer.core)
@@ -19,4 +20,5 @@ dependencies {
     testImplementation(libs.micrometer.observation.test)
     testImplementation(libs.micrometer.registry.prometheus)
     testImplementation(libs.slf4j.api)
+    testImplementation(libs.context.propagation)
 }

@@ -11,6 +11,7 @@ dependencies {
     compileOnly(libs.spring.boot4.starter.actuator)
     compileOnly(libs.micrometer.core.versioned)
     compileOnly(libs.micrometer.observation.versioned)
+    compileOnly(libs.context.propagation.versioned)
     compileOnly(libs.jackson.databind.versioned)
 
     annotationProcessor(libs.spring.boot4.configuration.processor)
@@ -22,6 +23,7 @@ dependencies {
     testImplementation(libs.micrometer.core.versioned)
     testImplementation(libs.micrometer.observation.versioned)
     testImplementation(libs.micrometer.observation.test.versioned)
+    testImplementation(libs.context.propagation.versioned)
     testImplementation(libs.spring.boot4.micrometer.metrics)
     testImplementation(libs.spring.boot4.micrometer.observation)
     testImplementation(libs.jackson.databind.versioned)

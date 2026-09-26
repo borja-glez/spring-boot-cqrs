@@ -110,6 +110,10 @@ When enabled (the default), the `ContextPropagationMiddleware` is installed with
 
 Set `cqrs.context.enabled=false` to disable auto-registration of the `ContextPropagationMiddleware`. This turns off the ThreadLocal/MDC middleware behavior described above, but it does **not** by itself disable RabbitMQ/Kafka transport header propagation; those adapters still serialize the current `MessageContext` into outbound headers and rehydrate it on inbound messages, independently of the middleware. See [middleware.md](middleware.md#message-context--correlation-id) for usage details and code examples.
 
+### Cross-thread propagation
+
+When `io.micrometer:context-propagation` is on the classpath and `cqrs.context.enabled` is `true`, the starters register a `MessageContextThreadLocalAccessor` (key `cqrs.messageContext`) in the global Micrometer `ContextRegistry`. Executors decorated with Spring's `ContextPropagatingTaskDecorator` (with Spring Boot 4: `spring.task.execution.propagate-context=true`) then carry the `MessageContext` to worker threads. Without that library, use `MessageContext.wrap(...)` or apply `MessageContextTaskDecorator` to your executors. No executor is decorated automatically. Pollers and scheduled jobs have no caller thread to copy from: persist the correlation id with the work item instead. See [middleware.md](middleware.md#crossing-threads-async-executors).
+
 ## Tracing Properties
 
 ```yaml
