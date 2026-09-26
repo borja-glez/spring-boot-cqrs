@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.discovery;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 import jakarta.validation.Valid;
 
@@ -54,48 +55,96 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
     if (AnnotationUtils.findAnnotation(targetClass, CommandHandler.class) != null) {
       ReflectionUtils.doWithMethods(
           targetClass,
-          method -> registerCommandHandler(bean, method),
+          method -> registerCommandHandler(bean, beanName, method),
           method -> method.isAnnotationPresent(HandleCommand.class));
     }
 
     if (AnnotationUtils.findAnnotation(targetClass, EventHandler.class) != null) {
       ReflectionUtils.doWithMethods(
           targetClass,
-          method -> registerEventHandler(bean, method),
+          method -> registerEventHandler(bean, beanName, method),
           method -> method.isAnnotationPresent(HandleEvent.class));
     }
 
     if (AnnotationUtils.findAnnotation(targetClass, QueryHandler.class) != null) {
       ReflectionUtils.doWithMethods(
           targetClass,
-          method -> registerQueryHandler(bean, method),
+          method -> registerQueryHandler(bean, beanName, method),
           method -> method.isAnnotationPresent(HandleQuery.class));
     }
   }
 
-  private void registerCommandHandler(Object bean, Method method) {
+  private void registerCommandHandler(Object bean, String beanName, Method method) {
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(method, paramTypes, Command.class);
     Class<?> commandClass = paramTypes[0];
     String messageName = namingStrategy.commandName(commandClass);
     boolean requiresValidation = hasValidAnnotation(method);
-    commandHandlerRegistry.register(commandClass, bean, method, messageName, requiresValidation);
+    Method invocable = invocableMethod(bean, beanName, method);
+    commandHandlerRegistry.register(commandClass, bean, invocable, messageName, requiresValidation);
   }
 
-  private void registerEventHandler(Object bean, Method method) {
+  private void registerEventHandler(Object bean, String beanName, Method method) {
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(method, paramTypes, Event.class);
     Class<?> eventClass = paramTypes[0];
     String messageName = namingStrategy.eventName(eventClass);
-    eventHandlerRegistry.register(eventClass, bean, method, messageName);
+    eventHandlerRegistry.register(
+        eventClass, bean, invocableMethod(bean, beanName, method), messageName);
   }
 
-  private void registerQueryHandler(Object bean, Method method) {
+  private void registerQueryHandler(Object bean, String beanName, Method method) {
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(method, paramTypes, Query.class);
     Class<?> queryClass = paramTypes[0];
     String messageName = namingStrategy.queryName(queryClass);
-    queryHandlerRegistry.register(queryClass, bean, method, messageName);
+    queryHandlerRegistry.register(
+        queryClass, bean, invocableMethod(bean, beanName, method), messageName);
+  }
+
+  /**
+   * Returns the method to invoke on {@code bean} (which may be an AOP proxy) for the handler method
+   * {@code method} declared on the target class. Annotations are still read from {@code method}.
+   *
+   * <p>Fails fast when the handler could not be invoked correctly: a static method has no receiver;
+   * a private or final method on a proxied bean would run on the proxy instance itself (skipping
+   * the advice and seeing uninitialized fields); and a JDK dynamic proxy only exposes the methods
+   * of its interfaces.
+   */
+  private Method invocableMethod(Object bean, String beanName, Method method) {
+    int modifiers = method.getModifiers();
+    if (Modifier.isStatic(modifiers)) {
+      throw new IllegalStateException(
+          "Handler method "
+              + method.toGenericString()
+              + " on bean '"
+              + beanName
+              + "' must not be static; make it an instance method");
+    }
+    if (!AopUtils.isAopProxy(bean)) {
+      return method;
+    }
+    if (Modifier.isPrivate(modifiers) || Modifier.isFinal(modifiers)) {
+      throw new IllegalStateException(
+          "Handler method "
+              + method.toGenericString()
+              + " on bean '"
+              + beanName
+              + "' is private/final and the bean is proxied (e.g. @Transactional); make it public"
+              + " and non-final");
+    }
+    try {
+      return AopUtils.selectInvocableMethod(method, bean.getClass());
+    } catch (IllegalStateException e) {
+      throw new IllegalStateException(
+          "Handler method "
+              + method.toGenericString()
+              + " on bean '"
+              + beanName
+              + "' cannot be invoked through the bean's proxy: "
+              + e.getMessage(),
+          e);
+    }
   }
 
   private void validateSingleParameter(

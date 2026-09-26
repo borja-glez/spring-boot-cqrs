@@ -106,6 +106,8 @@ eventBus.publish(order.pullEvents());
 
 Handler methods must accept **exactly one parameter** that extends the corresponding base type (`Command`, `Event`, or `Query`). The parameter type determines which message class is routed to the method.
 
+Handler methods must be instance methods: `static` handler methods are rejected at startup. When the handler bean is proxied (for example because of `@Transactional`, `@Async` or `@Secured`), handler methods must also be `public` and non-`final`, so that the call goes through the proxy and its advice; with a JDK dynamic proxy (`proxyTargetClass=false`) the handler method must also be declared on one of the proxied interfaces. Otherwise the application fails at startup with an error naming the bean and the method.
+
 ### @CqrsMessage
 
 ```java
@@ -241,6 +243,8 @@ Implements Spring's `BeanPostProcessor` to scan beans at startup. For each bean:
 Each handler method is validated:
 - Must have exactly one parameter.
 - The parameter must extend the corresponding base type (`Command`, `Event`, or `Query`).
+- Must not be `static`.
+- If the bean is an AOP proxy, must be `public` and non-`final`, and reachable through the proxy (declared on a proxied interface for JDK dynamic proxies). The proxy's invocable method is registered, so dispatch runs through the advice.
 
 For command handlers, if the parameter is annotated with `@Valid` (JSR-380), the `requiresValidation` flag is set to `true` in the registry.
 
