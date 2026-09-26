@@ -10,6 +10,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.expression.BeanResolver;
+import org.springframework.expression.Expression;
 
 import com.borjaglez.cqrs.MessageTypeHierarchy;
 import com.borjaglez.cqrs.MethodHandleUtil;
@@ -18,7 +20,19 @@ import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 
 public class EventHandlerRegistry {
 
-  public record HandlerInfo(Object bean, MethodHandle handle, String messageName) {}
+  /**
+   * A registered event handler.
+   *
+   * @param condition the handler's {@code @HandleEvent} condition, or {@code null} when it always
+   *     runs
+   */
+  public record HandlerInfo(
+      Object bean, MethodHandle handle, String messageName, EventHandlerCondition condition) {
+
+    public HandlerInfo(Object bean, MethodHandle handle, String messageName) {
+      this(bean, handle, messageName, null);
+    }
+  }
 
   private static final Log LOG = LogFactory.getLog(EventHandlerRegistry.class);
 
@@ -26,8 +40,28 @@ public class EventHandlerRegistry {
   private final Set<Class<?>> warnedUnhandledSubclasses = ConcurrentHashMap.newKeySet();
 
   public void register(Class<?> eventClass, Object bean, Method method, String messageName) {
+    register(eventClass, bean, method, messageName, null, null);
+  }
+
+  /**
+   * Registers an event handler that only runs when {@code condition} evaluates to {@code true}.
+   *
+   * @param condition the parsed condition, or {@code null} for a handler that always runs
+   * @param beanResolver resolves {@code @beanName} references in the condition; may be {@code null}
+   */
+  public void register(
+      Class<?> eventClass,
+      Object bean,
+      Method method,
+      String messageName,
+      Expression condition,
+      BeanResolver beanResolver) {
     MethodHandle handle = MethodHandleUtil.unreflect(method);
-    HandlerInfo info = new HandlerInfo(bean, handle, messageName);
+    EventHandlerCondition handlerCondition =
+        condition == null
+            ? null
+            : new EventHandlerCondition(condition, beanResolver, method.toGenericString());
+    HandlerInfo info = new HandlerInfo(bean, handle, messageName, handlerCondition);
     handlers.computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>()).add(info);
   }
 
@@ -38,6 +72,9 @@ public class EventHandlerRegistry {
       return;
     }
     for (HandlerInfo info : handlerList) {
+      if (info.condition() != null && !info.condition().matches(event)) {
+        continue;
+      }
       try {
         info.handle().invoke(info.bean(), event);
       } catch (RuntimeException e) {

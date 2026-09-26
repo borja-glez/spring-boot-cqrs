@@ -9,6 +9,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.expression.BeanResolver;
+import org.springframework.expression.Expression;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 import com.borjaglez.cqrs.fixtures.CheckedThrowingEventHandler;
@@ -151,6 +154,153 @@ class EventHandlerRegistryTest {
     assertThatThrownBy(() -> registry.handle(new TestEvent("data")))
         .isInstanceOf(EventHandlerExecutionException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  private static final SpelExpressionParser PARSER = new SpelExpressionParser();
+
+  private static Method handleMethod() throws NoSuchMethodException {
+    return TestEventHandler.class.getMethod("handle", TestEvent.class);
+  }
+
+  private static Expression condition(String expression) {
+    return PARSER.parseExpression(expression);
+  }
+
+  @Test
+  void conditionOnEventPropertyTrueInvokesHandler() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    registry.register(
+        TestEvent.class, handler, handleMethod(), "test.event", condition("data == 'go'"), null);
+
+    registry.handle(new TestEvent("go"));
+
+    assertThat(handler.getLastHandledData()).isEqualTo("go");
+  }
+
+  @Test
+  void conditionFalseSkipsOnlyThatHandler() throws Exception {
+    TestEventHandler filtered = new TestEventHandler();
+    TestEventHandler unconditional = new TestEventHandler();
+    registry.register(
+        TestEvent.class,
+        filtered,
+        handleMethod(),
+        "test.event",
+        condition("#event.data == 'go'"),
+        null);
+    registry.register(TestEvent.class, unconditional, handleMethod(), "test.event");
+
+    registry.handle(new TestEvent("stop"));
+
+    assertThat(filtered.getLastHandledData()).isNull();
+    assertThat(unconditional.getLastHandledData()).isEqualTo("stop");
+  }
+
+  @Test
+  void nullConditionBehavesLikeNoCondition() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    registry.register(TestEvent.class, handler, handleMethod(), "test.event", null, null);
+
+    registry.handle(new TestEvent("always"));
+
+    assertThat(handler.getLastHandledData()).isEqualTo("always");
+    assertThat(registry.getHandlerInfos(TestEvent.class).get(0).condition()).isNull();
+  }
+
+  @Test
+  void conditionResolvesBeanReferencesThroughBeanResolver() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    FeatureFlags flags = new FeatureFlags("notify");
+    BeanResolver beanResolver = (context, beanName) -> flags;
+    registry.register(
+        TestEvent.class,
+        handler,
+        handleMethod(),
+        "test.event",
+        condition("@featureFlags.enabled(data)"),
+        beanResolver);
+
+    registry.handle(new TestEvent("other"));
+    assertThat(handler.getLastHandledData()).isNull();
+
+    registry.handle(new TestEvent("notify"));
+    assertThat(handler.getLastHandledData()).isEqualTo("notify");
+  }
+
+  @Test
+  void conditionReturningNullRaisesEventHandlerExecutionException() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    registry.register(
+        TestEvent.class, handler, handleMethod(), "test.event", condition("data"), null);
+
+    assertThatThrownBy(() -> registry.handle(new TestEvent(null)))
+        .isInstanceOf(EventHandlerExecutionException.class)
+        .hasMessageContaining("'data'")
+        .hasMessageContaining("TestEventHandler.handle(")
+        .hasMessageContaining("null");
+    assertThat(handler.getLastHandledData()).isNull();
+  }
+
+  @Test
+  void conditionReturningNonBooleanRaisesEventHandlerExecutionException() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    registry.register(
+        TestEvent.class, handler, handleMethod(), "test.event", condition("data"), null);
+
+    assertThatThrownBy(() -> registry.handle(new TestEvent("text")))
+        .isInstanceOf(EventHandlerExecutionException.class)
+        .hasMessageContaining("'data'")
+        .hasMessageContaining("TestEventHandler.handle(")
+        .hasMessageContaining(String.class.getName());
+    assertThat(handler.getLastHandledData()).isNull();
+  }
+
+  @Test
+  void conditionThrowingDuringEvaluationRaisesEventHandlerExecutionException() throws Exception {
+    TestEventHandler handler = new TestEventHandler();
+    registry.register(
+        TestEvent.class, handler, handleMethod(), "test.event", condition("missing == 1"), null);
+
+    assertThatThrownBy(() -> registry.handle(new TestEvent("x")))
+        .isInstanceOf(EventHandlerExecutionException.class)
+        .hasMessageContaining("'missing == 1'")
+        .hasMessageContaining("TestEventHandler.handle(")
+        .hasCauseInstanceOf(org.springframework.expression.EvaluationException.class);
+    assertThat(handler.getLastHandledData()).isNull();
+  }
+
+  @Test
+  void handlerInfoExposesCondition() throws Exception {
+    Expression expression = condition("data == 'go'");
+    registry.register(
+        TestEvent.class, new TestEventHandler(), handleMethod(), "test.event", expression, null);
+
+    var info = registry.getHandlerInfos(TestEvent.class).get(0);
+
+    assertThat(info.condition()).isNotNull();
+    assertThat(info.condition().expression()).isSameAs(expression);
+    assertThat(info.condition().handler()).contains("TestEventHandler.handle(");
+  }
+
+  @Test
+  void handlerInfoThreeArgumentConstructorHasNoCondition() {
+    var info = new EventHandlerRegistry.HandlerInfo("bean", null, "test.event");
+
+    assertThat(info.bean()).isEqualTo("bean");
+    assertThat(info.messageName()).isEqualTo("test.event");
+    assertThat(info.condition()).isNull();
+  }
+
+  public static class FeatureFlags {
+    private final String enabledFeature;
+
+    FeatureFlags(String enabledFeature) {
+      this.enabledFeature = enabledFeature;
+    }
+
+    public boolean enabled(String feature) {
+      return enabledFeature.equals(feature);
+    }
   }
 
   static class SubTestEvent extends TestEvent {

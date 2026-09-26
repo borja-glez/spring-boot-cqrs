@@ -9,6 +9,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
@@ -274,6 +275,70 @@ class BeanPostProcessorHandlerDiscovererTest {
     assertThat(handler.getLastHandledData()).isEqualTo("exact");
   }
 
+  @Test
+  void conditionIsParsedAtRegistration() {
+    ConditionalEventHandler handler = new ConditionalEventHandler();
+    discoverer.postProcessAfterInitialization(handler, "conditionalHandler");
+
+    var infos = eventRegistry.getHandlerInfos(TestEvent.class);
+    assertThat(infos).hasSize(1);
+    assertThat(infos.get(0).condition()).isNotNull();
+    assertThat(infos.get(0).condition().expression().getExpressionString())
+        .isEqualTo("data == 'go'");
+
+    eventRegistry.handle(new TestEvent("stop"));
+    assertThat(handler.handled).isNull();
+    eventRegistry.handle(new TestEvent("go"));
+    assertThat(handler.handled).isEqualTo("go");
+  }
+
+  @Test
+  void emptyConditionRegistersWithoutCondition() {
+    discoverer.postProcessAfterInitialization(new TestEventHandler(), "testEventHandler");
+    discoverer.postProcessAfterInitialization(new BlankConditionEventHandler(), "blankHandler");
+
+    assertThat(eventRegistry.getHandlerInfos(TestEvent.class))
+        .hasSize(2)
+        .allSatisfy(info -> assertThat(info.condition()).isNull());
+  }
+
+  @Test
+  void malformedConditionFailsWithMessageNamingTheMethod() {
+    Object bean = new MalformedConditionEventHandler();
+
+    assertThatThrownBy(() -> discoverer.postProcessAfterInitialization(bean, "malformedHandler"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("MalformedConditionEventHandler.on(")
+        .hasMessageContaining("'malformedHandler'")
+        .hasMessageContaining("data ==")
+        .hasCauseInstanceOf(org.springframework.expression.ParseException.class);
+    assertThat(eventRegistry.getRegisteredEvents()).isEmpty();
+  }
+
+  @Test
+  void conditionResolvesBeanReferenceThroughBeanFactory() {
+    DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+    beanFactory.registerSingleton("featureFlags", new FeatureFlags("notify"));
+    discoverer.setBeanFactory(beanFactory);
+    BeanReferenceConditionEventHandler handler = new BeanReferenceConditionEventHandler();
+    discoverer.postProcessAfterInitialization(handler, "beanRefHandler");
+
+    eventRegistry.handle(new TestEvent("other"));
+    assertThat(handler.handled).isNull();
+    eventRegistry.handle(new TestEvent("notify"));
+    assertThat(handler.handled).isEqualTo("notify");
+  }
+
+  @Test
+  void beanReferenceWithoutBeanFactoryFailsAtDispatch() {
+    discoverer.postProcessAfterInitialization(
+        new BeanReferenceConditionEventHandler(), "beanRefHandler");
+
+    assertThatThrownBy(() -> eventRegistry.handle(new TestEvent("notify")))
+        .isInstanceOf(com.borjaglez.cqrs.event.EventHandlerExecutionException.class)
+        .hasMessageContaining("@featureFlags");
+  }
+
   private static Object cglibProxy(Object target, AtomicInteger adviceCalls) {
     ProxyFactory factory = new ProxyFactory(target);
     factory.setProxyTargetClass(true);
@@ -339,6 +404,56 @@ class BeanPostProcessorHandlerDiscovererTest {
     @com.borjaglez.cqrs.command.annotation.HandleCommand
     public void handle(String notACommand) {
       // wrong parameter type - invalid
+    }
+  }
+
+  // Conditional handler fixtures
+
+  public static class FeatureFlags {
+    private final String enabledFeature;
+
+    FeatureFlags(String enabledFeature) {
+      this.enabledFeature = enabledFeature;
+    }
+
+    public boolean enabled(String feature) {
+      return enabledFeature.equals(feature);
+    }
+  }
+
+  @com.borjaglez.cqrs.event.annotation.EventHandler
+  static class ConditionalEventHandler {
+    String handled;
+
+    @com.borjaglez.cqrs.event.annotation.HandleEvent(condition = "data == 'go'")
+    public void on(TestEvent event) {
+      handled = event.getData();
+    }
+  }
+
+  @com.borjaglez.cqrs.event.annotation.EventHandler
+  static class BlankConditionEventHandler {
+    @com.borjaglez.cqrs.event.annotation.HandleEvent(condition = "  ")
+    public void on(TestEvent event) {
+      // blank condition - always runs
+    }
+  }
+
+  @com.borjaglez.cqrs.event.annotation.EventHandler
+  static class MalformedConditionEventHandler {
+    @com.borjaglez.cqrs.event.annotation.HandleEvent(condition = "data ==")
+    public void on(TestEvent event) {
+      // never registered
+    }
+  }
+
+  @com.borjaglez.cqrs.event.annotation.EventHandler
+  static class BeanReferenceConditionEventHandler {
+    String handled;
+
+    @com.borjaglez.cqrs.event.annotation.HandleEvent(condition = "@featureFlags.enabled(data)")
+    public void on(TestEvent event) {
+      handled = event.getData();
     }
   }
 

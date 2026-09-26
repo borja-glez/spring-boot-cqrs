@@ -10,10 +10,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.fixtures.TestEvent;
+import com.borjaglez.cqrs.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 
 @ExtendWith(MockitoExtension.class)
@@ -86,5 +88,32 @@ class SpringEventBusTest {
     assertThatThrownBy(() -> bus.publish(new TestEvent("data")))
         .isInstanceOf(EventHandlerExecutionException.class)
         .hasCauseInstanceOf(Exception.class);
+  }
+
+  @Test
+  void conditionFiltersOneOfTwoHandlersOfTheSameEvent() throws Exception {
+    EventHandlerRegistry registry = new EventHandlerRegistry();
+    TestEventHandler confirmedOnly = new TestEventHandler();
+    TestEventHandler everything = new TestEventHandler();
+    var method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    registry.register(
+        TestEvent.class,
+        confirmedOnly,
+        method,
+        "test.event",
+        new SpelExpressionParser().parseExpression("data == 'CONFIRMED'"),
+        null);
+    registry.register(TestEvent.class, everything, method, "test.event");
+    SpringEventBus bus = new SpringEventBus(registry, List.of());
+
+    bus.publish(new TestEvent("PENDING"));
+
+    assertThat(confirmedOnly.getLastHandledData()).isNull();
+    assertThat(everything.getLastHandledData()).isEqualTo("PENDING");
+
+    bus.publish(new TestEvent("CONFIRMED"));
+
+    assertThat(confirmedOnly.getLastHandledData()).isEqualTo("CONFIRMED");
+    assertThat(everything.getLastHandledData()).isEqualTo("CONFIRMED");
   }
 }

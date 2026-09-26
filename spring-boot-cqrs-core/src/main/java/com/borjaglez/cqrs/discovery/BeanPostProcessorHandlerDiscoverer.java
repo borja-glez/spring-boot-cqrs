@@ -6,9 +6,17 @@ import java.lang.reflect.Modifier;
 import jakarta.validation.Valid;
 
 import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.context.expression.BeanFactoryResolver;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.expression.BeanResolver;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ParseException;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.util.ReflectionUtils;
+import org.springframework.util.StringUtils;
 
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.annotation.CommandHandler;
@@ -24,12 +32,16 @@ import com.borjaglez.cqrs.query.annotation.HandleQuery;
 import com.borjaglez.cqrs.query.annotation.QueryHandler;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 
-public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, HandlerDiscoverer {
+public class BeanPostProcessorHandlerDiscoverer
+    implements BeanPostProcessor, BeanFactoryAware, HandlerDiscoverer {
+
+  private static final SpelExpressionParser CONDITION_PARSER = new SpelExpressionParser();
 
   private final CommandHandlerRegistry commandHandlerRegistry;
   private final EventHandlerRegistry eventHandlerRegistry;
   private final QueryHandlerRegistry queryHandlerRegistry;
   private final MessageNamingStrategy namingStrategy;
+  private BeanResolver beanResolver;
 
   public BeanPostProcessorHandlerDiscoverer(
       CommandHandlerRegistry commandHandlerRegistry,
@@ -40,6 +52,12 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
     this.eventHandlerRegistry = eventHandlerRegistry;
     this.queryHandlerRegistry = queryHandlerRegistry;
     this.namingStrategy = namingStrategy;
+  }
+
+  /** Enables {@code @beanName} references in {@code @HandleEvent} conditions. */
+  @Override
+  public void setBeanFactory(BeanFactory beanFactory) {
+    this.beanResolver = new BeanFactoryResolver(beanFactory);
   }
 
   @Override
@@ -89,8 +107,32 @@ public class BeanPostProcessorHandlerDiscoverer implements BeanPostProcessor, Ha
     validateSingleParameter(beanName, method, paramTypes, Event.class);
     Class<?> eventClass = paramTypes[0];
     String messageName = namingStrategy.eventName(eventClass);
+    Method invocable = invocableMethod(bean, beanName, method);
+    Expression condition = parseCondition(beanName, method);
     eventHandlerRegistry.register(
-        eventClass, bean, invocableMethod(bean, beanName, method), messageName);
+        eventClass, bean, invocable, messageName, condition, beanResolver);
+  }
+
+  /** Parses the {@code @HandleEvent} condition once, failing startup when it is malformed. */
+  private Expression parseCondition(String beanName, Method method) {
+    String condition = method.getAnnotation(HandleEvent.class).condition();
+    if (!StringUtils.hasText(condition)) {
+      return null;
+    }
+    try {
+      return CONDITION_PARSER.parseExpression(condition);
+    } catch (ParseException e) {
+      throw new IllegalStateException(
+          "Handler method "
+              + method.toGenericString()
+              + " on bean '"
+              + beanName
+              + "' has an invalid condition '"
+              + condition
+              + "': "
+              + e.getMessage(),
+          e);
+    }
   }
 
   private void registerQueryHandler(Object bean, String beanName, Method method) {
