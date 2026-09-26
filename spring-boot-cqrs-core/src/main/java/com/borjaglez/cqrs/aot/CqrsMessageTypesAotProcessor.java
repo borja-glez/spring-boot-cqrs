@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.aot;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
 import org.springframework.aot.hint.RuntimeHints;
@@ -43,16 +44,27 @@ public class CqrsMessageTypesAotProcessor implements BeanFactoryInitializationAo
     types.forEach(type -> bindings.registerReflectionHints(hints.reflection(), type));
   }
 
+  /**
+   * The packages, written either as one comma separated value or as a list ({@code
+   * cqrs.aot.message-packages[0]}, as YAML lists and Spring Boot's binder produce).
+   */
   private static Set<String> packages(ConfigurableListableBeanFactory beanFactory) {
     if (!beanFactory.containsBean("environment")) {
       return Set.of();
     }
-    String value =
-        beanFactory.getBean("environment", Environment.class).getProperty(PACKAGES_PROPERTY);
-    return StringUtils.commaDelimitedListToSet(value).stream()
+    Environment environment = beanFactory.getBean("environment", Environment.class);
+    Set<String> packages = new LinkedHashSet<>();
+    packages.addAll(
+        StringUtils.commaDelimitedListToSet(environment.getProperty(PACKAGES_PROPERTY)));
+    for (int i = 0; environment.containsProperty(PACKAGES_PROPERTY + "[" + i + "]"); i++) {
+      packages.addAll(
+          StringUtils.commaDelimitedListToSet(
+              environment.getProperty(PACKAGES_PROPERTY + "[" + i + "]")));
+    }
+    return packages.stream()
         .map(String::trim)
         .filter(StringUtils::hasText)
-        .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   static Set<Class<?>> scan(Set<String> packages, ClassLoader classLoader) {

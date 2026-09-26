@@ -244,3 +244,23 @@ cqrs:
 ## Spring Boot 4 Notes
 
 The configuration properties are the same for Spring Boot 4. Use `spring-boot-cqrs-boot4-starter` instead of `spring-boot-cqrs-boot3-starter` in your dependency declaration. Spring Boot 4 (4.0.x) uses the same `cqrs.*` property namespace, so existing configuration files work without changes when migrating from Boot 3 to Boot 4.
+
+## Native Images (GraalVM)
+
+The AOT processors of `spring-boot-cqrs-core` register what a native image needs to (de)serialize messages:
+
+- Handler classes, and the parameter and return types of every `@HandleCommand`, `@HandleEvent` and `@HandleQuery` method, with binding hints: the types they contain (nested records, collections, generics) are included.
+- Every concrete type in the packages listed in `cqrs.aot.message-packages`. A service also sends commands it does not handle, receives replies that are plain records (nothing says which command a reply answers), and records events in an outbox. Only a scan finds those types, so list the packages of your shared contracts here.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `cqrs.aot.message-packages` | `String` (comma separated) or YAML list | none | Packages scanned at build time; every concrete type in them gets binding hints. Read during AOT processing only. |
+
+```yaml
+cqrs:
+  aot:
+    message-packages:
+      - com.acme.contracts.orders
+      - com.acme.contracts.payments
+```
+
