@@ -415,6 +415,8 @@ cqrs:
 
 Kafka request/reply supports `ParameterizedTypeReference`, so generic responses such as `List<OrderDto>` or nested wrapper types are preserved during deserialization.
 
+Replies are read from the per-application reply topic (`<prefix>.<spring.application.name>.replies`). Each instance consumes it with its own consumer group (`<appName>.cqrs.replies.<random>`), so every instance sees every reply and keeps the ones it is waiting for. On startup the reply consumer starts at the instance start time instead of the beginning of the topic, so replies from previous runs are not read again; `spring.kafka.consumer.auto-offset-reset` keeps applying to the command, event and query consumers. Groups left by previous starts have no members and expire in the broker after `offsets.retention.minutes` (seven days by default). No configuration is needed.
+
 Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
 
 - `MESSAGE_NAME` -- route by CQRS message name (default)

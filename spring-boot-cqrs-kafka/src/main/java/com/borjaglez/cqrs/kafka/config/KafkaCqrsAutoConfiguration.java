@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.kafka.config;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.kafka.clients.CommonClientConfigs;
@@ -29,12 +30,12 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.ContainerProperties;
-import org.springframework.kafka.listener.MessageListener;
 
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.infrastructure.DefaultKafkaPartitionKeyStrategy;
 import com.borjaglez.cqrs.kafka.infrastructure.DefaultKafkaTopicNamingStrategy;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaPartitionKeyStrategy;
+import com.borjaglez.cqrs.kafka.infrastructure.KafkaReplyListener;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestReplyClient;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaTopicNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -166,6 +167,16 @@ public class KafkaCqrsAutoConfiguration {
         properties.getReplies().getReplicas());
   }
 
+  /**
+   * Listener container of this instance's reply topic.
+   *
+   * <p>Each instance uses its own consumer group ({@code <appName>.cqrs.replies.<random>}) so that
+   * every instance receives every reply. The container starts reading at the time the bean is
+   * created (see {@link KafkaReplyListener}), with {@code auto.offset.reset=latest} as the
+   * fallback, so replies produced before the instance started are not read again. Groups left
+   * behind by previous starts have no members and expire in the broker after {@code
+   * offsets.retention.minutes} (seven days by default).
+   */
   @Conditional(RequestReplyBusEnabled.class)
   @Bean(name = "cqrsKafkaReplyContainer")
   public ConcurrentMessageListenerContainer<String, byte[]> cqrsKafkaReplyContainer(
@@ -182,7 +193,10 @@ public class KafkaCqrsAutoConfiguration {
     containerProperties.setGroupId(
         applicationName + ".cqrs.replies." + UUID.randomUUID().toString().replace('-', '.'));
     containerProperties.setMessageListener(
-        (MessageListener<String, byte[]>) kafkaRequestReplyClient::handleReply);
+        new KafkaReplyListener(kafkaRequestReplyClient, System.currentTimeMillis()));
+    Properties consumerProperties = new Properties();
+    consumerProperties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+    containerProperties.setKafkaConsumerProperties(consumerProperties);
     // Same switch as Boot's listener containers: with it the sender's trace continues here.
     containerProperties.setObservationEnabled(observationEnabled);
     ConcurrentMessageListenerContainer<String, byte[]> container =
