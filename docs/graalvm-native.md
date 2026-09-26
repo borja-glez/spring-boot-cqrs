@@ -108,4 +108,6 @@ The native image starts significantly faster and uses less memory than the JVM v
 
 4. **Lambda-based handlers** are not supported. Handlers must be concrete classes annotated with the appropriate class-level annotation.
 
-5. The library requires Spring Boot 3.x or later for AOT support (both boot3-starter and boot4-starter are supported). Spring Boot 2.x does not support `RuntimeHintsRegistrar` or `BeanRegistrationAotProcessor`.
+5. **`@HandleEvent` conditions** are evaluated with SpEL in interpreted mode. Property and method access on the event works because the handler parameter types are registered for reflection. A bean referenced from a condition (`@featureFlags.enabled('notify')`) is not registered automatically: the methods the expression calls on it must be reachable by reflection, for example through `@RegisterReflectionForBinding`, `@Reflective` or a `RuntimeHintsRegistrar`. The same applies to any other type the expression navigates beyond the event.
+
+6. The library requires Spring Boot 3.x or later for AOT support (both boot3-starter and boot4-starter are supported). Spring Boot 2.x does not support `RuntimeHintsRegistrar` or `BeanRegistrationAotProcessor`.

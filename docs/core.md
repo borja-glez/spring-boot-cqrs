@@ -108,6 +108,33 @@ Handler methods must accept **exactly one parameter** that extends the correspon
 
 Handler methods must be instance methods: `static` handler methods are rejected at startup. When the handler bean is proxied (for example because of `@Transactional`, `@Async` or `@Secured`), handler methods must also be `public` and non-`final`, so that the call goes through the proxy and its advice; with a JDK dynamic proxy (`proxyTargetClass=false`) the handler method must also be declared on one of the proxied interfaces. Otherwise the application fails at startup with an error naming the bean and the method.
 
+### Conditional event handlers
+
+`@HandleEvent` accepts an optional SpEL `condition`. The handler only runs for events for which the expression evaluates to `true`; other handlers of the same event are not affected.
+
+```java
+@EventHandler
+class OrderNotifications {
+
+  @HandleEvent(condition = "newStatus == 'CONFIRMED'")          // property of the event (root object)
+  void onConfirmed(OrderStatusChanged event) { ... }
+
+  @HandleEvent(condition = "#event.priority > 5")               // the event as the #event variable
+  void onUrgent(OrderStatusChanged event) { ... }
+
+  @HandleEvent(condition = "@featureFlags.enabled('notify')")   // reference to a bean
+  void onNotify(OrderStatusChanged event) { ... }
+}
+```
+
+- An empty condition (the default) means the handler always runs; no expression is evaluated.
+- The expression is parsed once, when the handler is registered. A malformed expression fails startup with an `IllegalStateException` naming the handler method, its bean and the expression.
+- On each dispatch the expression is evaluated with a `StandardEvaluationContext`: the root object is the event, the `#event` variable is the event too, and `@beanName` resolves beans of the application context.
+- `true` invokes the handler and `false` skips it silently. A `null` or non-boolean result, or an exception thrown while evaluating the expression, raises an `EventHandlerExecutionException` naming the handler and the expression.
+- Conditions apply wherever `EventHandlerRegistry.handle` dispatches: `SpringEventBus`, `TransactionalEventBus` and the RabbitMQ and Kafka event consumers. They are evaluated after the event has reached the application: there is no broker-side filtering, so the event is still delivered (and deserialized) before the condition discards it.
+- Conditions are only available on event handlers; commands and queries have exactly one handler each.
+- In a native image, a bean referenced from a condition needs the methods the expression calls to be reachable by reflection (see [graalvm-native.md](graalvm-native.md#known-limitations)).
+
 ### @CqrsMessage
 
 ```java
@@ -153,15 +180,17 @@ Stores the mapping from event class to handler(s). An event can have **multiple*
 
 ```java
 public class EventHandlerRegistry {
-    record HandlerInfo(Object bean, MethodHandle handle, String messageName) {}
+    record HandlerInfo(Object bean, MethodHandle handle, String messageName, EventHandlerCondition condition) {}
 
     void register(Class<?> eventClass, Object bean, Method method, String messageName);
+    void register(Class<?> eventClass, Object bean, Method method, String messageName,
+                  Expression condition, BeanResolver beanResolver);
     void handle(Event event);
     Set<Class<?>> getRegisteredEvents();
 }
 ```
 
-Events with no registered handlers are silently ignored.
+Events with no registered handlers are silently ignored. A handler registered with a `condition` (see [Conditional event handlers](#conditional-event-handlers)) is skipped when the condition evaluates to `false`; `HandlerInfo.condition()` is `null` for handlers without one, and the three-argument `HandlerInfo` constructor still creates such a handler.
 
 ### QueryHandlerRegistry
 
@@ -264,6 +293,8 @@ Each handler method is validated:
 
 For command handlers, if the parameter is annotated with `@Valid` (JSR-380), the `requiresValidation` flag is set to `true` in the registry.
 
+For event handlers, a non-empty `@HandleEvent(condition = ...)` is parsed with a shared `SpelExpressionParser` and registered with the handler; a malformed expression fails startup. The discoverer is `BeanFactoryAware`, so conditions can reference beans with `@beanName`.
+
 The discoverer uses `AopUtils.getTargetClass()` to handle proxied beans correctly.
 
 ## Message Naming
@@ -325,7 +356,7 @@ The core module defines:
 | `CommandAlreadyRegisteredException` | A second handler is registered for the same command class |
 | `CommandNotRegisteredException` | No handler is found for a dispatched command |
 | `CommandHandlerExecutionException` | A checked exception occurs during command handler invocation |
-| `EventHandlerExecutionException` | A checked exception occurs during event handler invocation |
+| `EventHandlerExecutionException` | A checked exception occurs during event handler invocation, or a `@HandleEvent` condition fails to evaluate or does not return a boolean |
 | `QueryAlreadyRegisteredException` | A second handler is registered for the same query class |
 | `QueryNotRegisteredException` | No handler is found for a dispatched query |
 | `QueryHandlerExecutionException` | A checked exception occurs during query handler invocation |
