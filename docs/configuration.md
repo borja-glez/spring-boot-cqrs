@@ -156,7 +156,7 @@ The default non-retriable exceptions are `java.lang.IllegalArgumentException`, `
 
 Invalid values fail startup with an `InvalidConfigurationPropertyValueException` naming the property: `max-attempts` below 1, a negative delay, `multiplier` below 1, `jitter-factor` outside `[0, 1]`, or an exception class name that cannot be loaded or is not a `Throwable`.
 
-With RabbitMQ or Kafka the middleware runs in the consumer, before the transport retry: the attempts multiply (`cqrs.retry.max-attempts` x `cqrs.rabbitmq.retry.max-attempts` handler runs before dead-lettering). Per-type policies and the transaction caveat are described in [middleware.md](middleware.md#retrymiddleware).
+With RabbitMQ or Kafka the middleware runs in the consumer, before the transport retry: the attempts multiply (`cqrs.retry.max-attempts` x `cqrs.rabbitmq.retry.max-attempts`, or x `cqrs.kafka.error-handling.max-attempts`, handler runs before dead-lettering). Per-type policies and the transaction caveat are described in [middleware.md](middleware.md#retrymiddleware).
 
 ## Actuator Endpoints
 
@@ -188,6 +188,15 @@ Defined in `KafkaCqrsProperties` (`cqrs.kafka.*`). See [kafka-adapter.md](kafka-
 | `cqrs.kafka.{commands,events,queries}.replicas` | `short` | `1` | Replication factor of the bus topic. |
 | `cqrs.kafka.{commands,events,queries}.concurrency` | `int` | `1` | Concurrency of the bus listener container. |
 | `cqrs.kafka.{commands,events,queries}.group-id` | `String` | `""` | Consumer group of the bus listener container; blank means `{spring.application.name}.cqrs.{commands,events,queries}`. |
+| `cqrs.kafka.error-handling.max-attempts` | `int` | `3` | Deliveries of a failed command, event or query record, the first one included; `1` dead-letters on the first failure. Must be at least 1. |
+| `cqrs.kafka.error-handling.back-off.initial-interval` | `Duration` | `1s` | Wait before the first retry. |
+| `cqrs.kafka.error-handling.back-off.multiplier` | `double` | `2.0` | Factor applied to the wait after every retry. Must be at least 1. |
+| `cqrs.kafka.error-handling.back-off.max-interval` | `Duration` | `10s` | Upper bound of the wait between two deliveries. |
+| `cqrs.kafka.error-handling.dead-letter.enabled` | `boolean` | `true` | Publish exhausted and unprocessable records to the application's dead-letter topic `{prefix}.{spring.application.name}.{topic}.dlt`; when `false` they are logged and skipped. |
+| `cqrs.kafka.error-handling.dead-letter.partitions` | `int` | `1` | Partitions of the dead-letter topics created with `auto-create-topics`. |
+| `cqrs.kafka.error-handling.dead-letter.replicas` | `short` | `1` | Replication factor of the dead-letter topics. |
+
+A `CommonErrorHandler` bean defined by the application replaces these settings on the command, event and query containers. See [Retry and Dead-Letter Topics](kafka-adapter.md#retry-and-dead-letter-topics).
 
 Kafka for events only:
 

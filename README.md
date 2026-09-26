@@ -524,6 +524,13 @@ The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `Comm
 | `cqrs.kafka.queries.replicas` | `1` | Query topic replication factor |
 | `cqrs.kafka.queries.concurrency` | `1` | Query listener concurrency |
 | `cqrs.kafka.queries.group-id` | `""` | Query consumer group; blank means `{spring.application.name}.cqrs.queries` |
+| `cqrs.kafka.error-handling.max-attempts` | `3` | Deliveries of a failed command, event or query record, the first one included |
+| `cqrs.kafka.error-handling.back-off.initial-interval` | `1s` | Wait before the first retry |
+| `cqrs.kafka.error-handling.back-off.multiplier` | `2.0` | Factor applied to the wait after every retry |
+| `cqrs.kafka.error-handling.back-off.max-interval` | `10s` | Upper bound of the wait between two deliveries |
+| `cqrs.kafka.error-handling.dead-letter.enabled` | `true` | Publish exhausted records to the per-application dead-letter topic `{prefix}.{spring.application.name}.{topic}.dlt` |
+| `cqrs.kafka.error-handling.dead-letter.partitions` | `1` | Dead-letter topic partition count |
+| `cqrs.kafka.error-handling.dead-letter.replicas` | `1` | Dead-letter topic replication factor |
 | `cqrs.rabbitmq.enabled` | `true` | Enable RabbitMQ bus adapters |
 | `cqrs.rabbitmq.prefix` | `"cqrs"` | Prefix for RabbitMQ exchange and queue names |
 | `cqrs.rabbitmq.retry.max-attempts` | `3` | Max retry attempts before dead-lettering |

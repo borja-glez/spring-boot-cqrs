@@ -1,9 +1,12 @@
 package com.borjaglez.cqrs.kafka.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import java.time.Duration;
 import java.util.List;
 
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
@@ -18,7 +21,9 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 
 import com.borjaglez.cqrs.autoconfigure.CqrsAutoConfiguration;
 import com.borjaglez.cqrs.autoconfigure.CqrsSerializationAutoConfiguration;
@@ -44,7 +49,10 @@ class KafkaCqrsAutoConfigurationTest {
       new ApplicationContextRunner()
           .withPropertyValues(
               "spring.application.name=orders-service",
-              "spring.kafka.bootstrap-servers=localhost:9092")
+              "spring.kafka.bootstrap-servers=localhost:9092",
+              // No broker runs here: do not wait for one when declaring the topics.
+              "spring.kafka.admin.operation-timeout=1s",
+              "spring.kafka.admin.close-timeout=1s")
           .withBean(ObjectMapper.class, ObjectMapper::new)
           .withBean(CommandHandlerRegistry.class, CommandHandlerRegistry::new)
           .withBean(EventHandlerRegistry.class, EventHandlerRegistry::new)
@@ -277,5 +285,154 @@ class KafkaCqrsAutoConfigurationTest {
                     .isTrue();
               }
             });
+  }
+
+  private static final String[] BUS_CONTAINERS = {
+    "cqrsKafkaCommandListenerContainer",
+    "cqrsKafkaEventListenerContainer",
+    "cqrsKafkaQueryListenerContainer"
+  };
+
+  @Test
+  void shouldDeclareAPerApplicationDeadLetterTopicPerBus() {
+    contextRunner.run(
+        context -> {
+          assertThat(context.getBean("cqrsCommandsDeadLetterTopic", NewTopic.class).name())
+              .isEqualTo("cqrs.orders-service.commands.dlt");
+          assertThat(context.getBean("cqrsEventsDeadLetterTopic", NewTopic.class).name())
+              .isEqualTo("cqrs.orders-service.events.dlt");
+          assertThat(context.getBean("cqrsQueriesDeadLetterTopic", NewTopic.class).name())
+              .isEqualTo("cqrs.orders-service.queries.dlt");
+        });
+  }
+
+  @Test
+  void shouldNotDeclareDeadLetterTopicsWhenTopicsAreNotCreated() {
+    contextRunner
+        .withPropertyValues("cqrs.kafka.auto-create-topics=false")
+        .run(context -> assertNoDeadLetterTopics(context));
+  }
+
+  @Test
+  void shouldNotDeclareDeadLetterTopicsWhenDeadLetteringIsDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.kafka.error-handling.dead-letter.enabled=false")
+        .run(
+            context -> {
+              assertNoDeadLetterTopics(context);
+              assertThat(context).hasBean("cqrsEventsTopic");
+            });
+  }
+
+  @Test
+  void shouldApplyItsOwnErrorHandlerWithoutExposingItAsABean() {
+    // A CommonErrorHandler bean would also be applied to the application's @KafkaListeners.
+    contextRunner.run(
+        context -> {
+          assertThat(context).doesNotHaveBean(CommonErrorHandler.class);
+          for (String name : BUS_CONTAINERS) {
+            ConcurrentMessageListenerContainer<?, ?> container =
+                context.getBean(name, ConcurrentMessageListenerContainer.class);
+            assertThat(container.getCommonErrorHandler())
+                .as(name)
+                .isInstanceOf(DefaultErrorHandler.class);
+            assertThat(container.getContainerProperties().isDeliveryAttemptHeader()).isTrue();
+          }
+          assertThat(
+                  context
+                      .getBean("cqrsKafkaReplyContainer", ConcurrentMessageListenerContainer.class)
+                      .getCommonErrorHandler())
+              .isNull();
+        });
+  }
+
+  @Test
+  void shouldApplyTheApplicationsErrorHandlerToTheBusContainers() {
+    CommonErrorHandler errorHandler = mock(CommonErrorHandler.class);
+    contextRunner
+        .withBean("myErrorHandler", CommonErrorHandler.class, () -> errorHandler)
+        .run(
+            context -> {
+              for (String name : BUS_CONTAINERS) {
+                assertThat(
+                        context
+                            .getBean(name, ConcurrentMessageListenerContainer.class)
+                            .getCommonErrorHandler())
+                    .as(name)
+                    .isSameAs(errorHandler);
+              }
+              assertThat(
+                      context
+                          .getBean(
+                              "cqrsKafkaReplyContainer", ConcurrentMessageListenerContainer.class)
+                          .getCommonErrorHandler())
+                  .isNotSameAs(errorHandler);
+            });
+  }
+
+  @Test
+  void shouldPreferTheErrorHandlerNamedForTheCqrsContainers() {
+    CommonErrorHandler cqrsErrorHandler = mock(CommonErrorHandler.class);
+    contextRunner
+        .withBean(
+            "otherErrorHandler", CommonErrorHandler.class, () -> mock(CommonErrorHandler.class))
+        .withBean("cqrsKafkaErrorHandler", CommonErrorHandler.class, () -> cqrsErrorHandler)
+        .run(
+            context -> {
+              for (String name : BUS_CONTAINERS) {
+                assertThat(
+                        context
+                            .getBean(name, ConcurrentMessageListenerContainer.class)
+                            .getCommonErrorHandler())
+                    .as(name)
+                    .isSameAs(cqrsErrorHandler);
+              }
+            });
+  }
+
+  @Test
+  void shouldBindTheErrorHandlingProperties() {
+    contextRunner
+        .withPropertyValues(
+            "cqrs.kafka.error-handling.max-attempts=5",
+            "cqrs.kafka.error-handling.back-off.initial-interval=250ms",
+            "cqrs.kafka.error-handling.back-off.multiplier=3",
+            "cqrs.kafka.error-handling.back-off.max-interval=2s",
+            "cqrs.kafka.error-handling.dead-letter.partitions=2",
+            "cqrs.kafka.error-handling.dead-letter.replicas=3")
+        .run(
+            context -> {
+              KafkaCqrsProperties.ErrorHandlingProperties errorHandling =
+                  context.getBean(KafkaCqrsProperties.class).getErrorHandling();
+              assertThat(errorHandling.getMaxAttempts()).isEqualTo(5);
+              assertThat(errorHandling.getBackOff().getInitialInterval())
+                  .isEqualTo(Duration.ofMillis(250));
+              assertThat(errorHandling.getBackOff().getMultiplier()).isEqualTo(3.0);
+              assertThat(errorHandling.getBackOff().getMaxInterval())
+                  .isEqualTo(Duration.ofSeconds(2));
+              NewTopic deadLetterTopic =
+                  context.getBean("cqrsEventsDeadLetterTopic", NewTopic.class);
+              assertThat(deadLetterTopic.numPartitions()).isEqualTo(2);
+              assertThat(deadLetterTopic.replicationFactor()).isEqualTo((short) 3);
+            });
+  }
+
+  @Test
+  void shouldFailToStartWithFewerThanOneAttempt() {
+    contextRunner
+        .withPropertyValues("cqrs.kafka.error-handling.max-attempts=0")
+        .run(
+            context ->
+                assertThat(context)
+                    .getFailure()
+                    .rootCause()
+                    .hasMessageContaining("cqrs.kafka.error-handling.max-attempts"));
+  }
+
+  private static void assertNoDeadLetterTopics(
+      org.springframework.boot.test.context.assertj.AssertableApplicationContext context) {
+    assertThat(context).doesNotHaveBean("cqrsCommandsDeadLetterTopic");
+    assertThat(context).doesNotHaveBean("cqrsEventsDeadLetterTopic");
+    assertThat(context).doesNotHaveBean("cqrsQueriesDeadLetterTopic");
   }
 }

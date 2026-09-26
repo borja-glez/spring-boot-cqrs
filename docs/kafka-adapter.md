@@ -15,6 +15,7 @@ The Kafka module provides distributed implementations of all three buses. When a
   - [Generic results](#generic-results)
 - [Partition Keys](#partition-keys)
 - [Consumers and Consumer Groups](#consumers-and-consumer-groups)
+- [Retry and Dead-Letter Topics](#retry-and-dead-letter-topics)
 - [Record Headers](#record-headers)
 - [Producer and Consumer Settings](#producer-and-consumer-settings)
 - [Observation](#observation)
@@ -66,6 +67,10 @@ public class OrderController {
 public interface KafkaTopicNamingStrategy {
     String topic(String logicalName);
     String replyTopic(String applicationName, String logicalName);
+
+    default String deadLetterTopic(String applicationName, String logicalName) {
+        return topic(applicationName + "." + logicalName + ".dlt");
+    }
 }
 ```
 
@@ -79,12 +84,13 @@ Prefixes every name with `cqrs.kafka.prefix`. With a blank prefix the logical na
 | `topic("events")` | `{prefix}.{events.topic}` | `cqrs.events` |
 | `topic("queries")` | `{prefix}.{queries.topic}` | `cqrs.queries` |
 | `replyTopic(app, "replies")` | `{prefix}.{app}.{replies.topic}` | `cqrs.orders-service.replies` |
+| `deadLetterTopic(app, "events")` | `{prefix}.{app}.{events.topic}.dlt` | `cqrs.orders-service.events.dlt` |
 
 The application name is read from `spring.application.name` (defaults to `cqrs-app` if not set). You can provide a custom `KafkaTopicNamingStrategy` bean to override the default naming.
 
 ### Topic creation
 
-With `cqrs.kafka.auto-create-topics=true` (the default) the module declares one `NewTopic` bean per enabled bus (`cqrsCommandsTopic`, `cqrsEventsTopic`, `cqrsQueriesTopic`) and one for the reply topic (`cqrsRepliesTopic`), with the partitions and replicas configured for each. Spring Kafka's `KafkaAdmin`, which Spring Boot's Kafka auto-configuration provides, creates them at startup. Set the property to `false` when topics are managed outside the application.
+With `cqrs.kafka.auto-create-topics=true` (the default) the module declares one `NewTopic` bean per enabled bus (`cqrsCommandsTopic`, `cqrsEventsTopic`, `cqrsQueriesTopic`) one for the reply topic (`cqrsRepliesTopic`) and, while dead-lettering is enabled, one dead-letter topic per enabled bus (`cqrsCommandsDeadLetterTopic`, `cqrsEventsDeadLetterTopic`, `cqrsQueriesDeadLetterTopic`), with the partitions and replicas configured for each. Spring Kafka's `KafkaAdmin`, which Spring Boot's Kafka auto-configuration provides, creates them at startup. Set the property to `false` when topics are managed outside the application.
 
 The listener containers are created with `missingTopicsFatal=false`, so the application starts even if a topic does not exist yet.
 
@@ -244,9 +250,37 @@ Each enabled bus has its own `ConcurrentMessageListenerContainer`:
 
 Before invoking the handler every consumer rehydrates the `MessageContext` from the context headers and runs the full middleware chain (`BusMiddleware` beans) on this side. See [Middleware on remote buses](middleware.md#middleware-on-remote-buses).
 
-A command dispatched with `dispatch` whose handler fails, or a failing event handler, is not answered: the exception is rethrown to the listener container and handled by its error handler. The module declares no retry or dead-letter topic.
+A command dispatched with `dispatch` whose handler fails, or a failing event handler, is not answered: the exception is rethrown to the listener container, which retries the record and then publishes it to the application's dead-letter topic (see [Retry and Dead-Letter Topics](#retry-and-dead-letter-topics)).
 
-A record without the `cqrs.payload.type` header is rejected with an `IllegalStateException`.
+A record without the `cqrs.payload.type` header, or whose payload cannot be deserialized into that type, is rejected with an `UnprocessableRecordException` (an `IllegalStateException`), which is never retried.
+
+## Retry and Dead-Letter Topics
+
+The command, event and query listener containers share one error-handling policy, configured under `cqrs.kafka.error-handling.*`:
+
+1. A record whose processing throws is delivered again, up to `max-attempts` deliveries in total (default `3`: the first one plus two retries). The container seeks back to the record, so the partition waits during the back-off and records keep their order.
+2. The wait after the n-th failed delivery is `min(max-interval, initial-interval * multiplier^(n - 1))`: `1s`, then `2s`, capped at `10s` with the defaults. It is computed by the core `BackoffStrategy.exponential`, the type behind the `RetryMiddleware` (see [Retry Properties](configuration.md#retry-properties)).
+3. Once the attempts are exhausted, the record is published to the dead-letter topic of this application and bus, `{prefix}.{app}.{bus-topic}.dlt` (for example `cqrs.orders-service.events.dlt`), and the container moves on. With `dead-letter.enabled=false` the record is logged and skipped instead.
+4. An `UnprocessableRecordException` (no payload type header, payload that cannot be deserialized) and Spring Kafka's own fatal exceptions (`DeserializationException`, `ClassCastException`, ...) are not retried: the record goes to the dead-letter topic after its first delivery.
+
+**Why per application.** The commands, events and queries topics are shared by every service, each reading them with its own consumer group. A record that failed in one service usually succeeded in the others, so a shared `<topic>-dlt` would mix the failures of every service, and replaying it to the source topic would deliver the record again to services that had already processed it. The dead-letter topic therefore belongs to the application whose handler failed, like the per-application dead-letter queues of the RabbitMQ module.
+
+**What a dead-lettered record carries.** The original key, value and headers (`cqrs.payload.type`, `cqrs.message.*`, context headers, ...), the `kafka_dlt-*` headers added by Spring Kafka's `DeadLetterPublishingRecoverer` (original topic, partition, offset, timestamp, exception class, message and stack trace), and the failure headers shared with the RabbitMQ dead-letter queues, so one replay design fits both transports:
+
+| Header | Value |
+|---|---|
+| `cqrs.error.type` | Class name of the handler's exception, without the listener container's wrapper |
+| `cqrs.error.message` | Exception message truncated to 1000 characters; absent when the exception has no message |
+| `cqrs.error.attempts` | Number of deliveries made, as a decimal string (`1` for a record that is not retried) |
+| `cqrs.error.timestamp` | ISO-8601 instant at which the record was dead-lettered |
+
+The dead-letter record is published with no explicit partition, so the dead-letter topic does not need as many partitions as the source topic. The containers set `deliveryAttemptHeader`, so records also carry Spring Kafka's `kafka_deliveryAttempt` header.
+
+**What is not dead-lettered.** Request/reply commands and queries whose handler fails are answered with an error reply (see [Request/Reply](#requestreply)) and are neither retried nor dead-lettered. The reply container has no retry or dead-letter topic: a reply nobody waits for is dropped. Records whose payload type is unknown locally are skipped, as before: they belong to other services.
+
+**Using your own error handler.** Declare a `CommonErrorHandler` bean (for example a `DefaultErrorHandler` with another recoverer) and it is applied to the three containers instead; `cqrs.kafka.error-handling.*` is then ignored, but the dead-letter `NewTopic` beans are still declared while `dead-letter.enabled=true`. If the application has several `CommonErrorHandler` beans, the one named `cqrsKafkaErrorHandler` wins, then a `@Primary` one; without either, the module's own handler is used. The module's handler is deliberately not a bean: Spring Boot applies a unique `CommonErrorHandler` bean to its `@KafkaListener` container factory, and the CQRS dead-letter publishing is not meant for the application's own listeners.
+
+**With the `RetryMiddleware`.** `cqrs.retry.*` runs inside each delivery, so the handler runs up to `cqrs.retry.max-attempts x cqrs.kafka.error-handling.max-attempts` times before the record is dead-lettered. Keep the total back-off of one record well below the consumer's `max.poll.interval.ms` (5 minutes by default).
 
 ## Record Headers
 
@@ -260,7 +294,10 @@ A record without the `cqrs.payload.type` header is rejected with an `IllegalStat
 | `cqrs.reply.topic` | Requests | Reply topic of the sending application |
 | `cqrs.request.mode` | Requests | `WAIT` or `REPLY` |
 | `cqrs.error` | Error replies | `true` |
-| `cqrs.error.type` | Error replies | Class name of the handler's exception |
+| `cqrs.error.type` | Error replies, dead-lettered records | Class name of the handler's exception |
+| `cqrs.error.message` | Dead-lettered records | Exception message, truncated to 1000 characters; absent when there is none |
+| `cqrs.error.attempts` | Dead-lettered records | Number of deliveries made |
+| `cqrs.error.timestamp` | Dead-lettered records | ISO-8601 instant of dead-lettering |
 | `{cqrs.context.header-prefix}{key}` | Requests and one-way records, when there is a current `MessageContext` (not on replies) | One header per `MessageContext` entry (for example `cqrs.context.correlationId`) |
 
 The constants are in `KafkaMessageHeaders`.
@@ -318,6 +355,13 @@ Defined in `KafkaCqrsProperties` (`cqrs.kafka.*`):
 | `cqrs.kafka.queries.replicas` | `short` | `1` | Replication factor of the queries topic. |
 | `cqrs.kafka.queries.concurrency` | `int` | `1` | Concurrency of the query listener container. |
 | `cqrs.kafka.queries.group-id` | `String` | `""` | Consumer group; blank means `{app}.cqrs.queries`. |
+| `cqrs.kafka.error-handling.max-attempts` | `int` | `3` | Deliveries of a failed record, the first one included; `1` dead-letters on the first failure. Must be at least 1. |
+| `cqrs.kafka.error-handling.back-off.initial-interval` | `Duration` | `1s` | Wait before the first retry. |
+| `cqrs.kafka.error-handling.back-off.multiplier` | `double` | `2.0` | Factor applied to the wait after every retry. Must be at least 1. |
+| `cqrs.kafka.error-handling.back-off.max-interval` | `Duration` | `10s` | Upper bound of the wait between two deliveries. |
+| `cqrs.kafka.error-handling.dead-letter.enabled` | `boolean` | `true` | Publish exhausted and unprocessable records to `{prefix}.{app}.{bus-topic}.dlt`; when `false` they are logged and skipped. |
+| `cqrs.kafka.error-handling.dead-letter.partitions` | `int` | `1` | Partitions of the dead-letter topics created with `auto-create-topics`. |
+| `cqrs.kafka.error-handling.dead-letter.replicas` | `short` | `1` | Replication factor of the dead-letter topics. |
 
 The module also reads `spring.application.name` (default `cqrs-app`), `cqrs.context.header-prefix` (default `cqrs.context.`), `spring.kafka.bootstrap-servers` and the two [observation](#observation) switches.
 
@@ -341,6 +385,11 @@ cqrs:
       concurrency: 3
     events:
       group-id: orders-projections
+    error-handling:
+      max-attempts: 5
+      back-off:
+        initial-interval: 500ms
+        max-interval: 5s
 ```
 
 Kafka for events only (no command or query topic, no reply topic or reply container):
@@ -361,11 +410,11 @@ The module provides four auto-configuration classes. All of them require `KafkaT
 | Class | Additional condition | Creates |
 |---|---|---|
 | `KafkaCqrsAutoConfiguration` | -- | `KafkaTopicNamingStrategy`, `KafkaPartitionKeyStrategy`, `cqrsKafkaProducerFactory`, `cqrsKafkaConsumerFactory`, `cqrsKafkaTemplate`, `KafkaMessagePublisher`; when commands or queries are enabled, `KafkaRequestReplyClient`, `cqrsRepliesTopic` and `cqrsKafkaReplyContainer` |
-| `KafkaCommandBusAutoConfiguration` | `CommandHandlerRegistry` bean + `cqrs.kafka.commands.enabled=true` | `KafkaCommandBus`, `KafkaCommandConsumer`, `cqrsCommandsTopic`, `cqrsKafkaCommandListenerContainer` |
-| `KafkaEventBusAutoConfiguration` | `EventHandlerRegistry` bean + `cqrs.kafka.events.enabled=true` | `KafkaEventBus`, `KafkaEventConsumer`, `cqrsEventsTopic`, `cqrsKafkaEventListenerContainer` |
-| `KafkaQueryBusAutoConfiguration` | `QueryHandlerRegistry` bean + `cqrs.kafka.queries.enabled=true` | `KafkaQueryBus`, `KafkaQueryConsumer`, `cqrsQueriesTopic`, `cqrsKafkaQueryListenerContainer` |
+| `KafkaCommandBusAutoConfiguration` | `CommandHandlerRegistry` bean + `cqrs.kafka.commands.enabled=true` | `KafkaCommandBus`, `KafkaCommandConsumer`, `cqrsCommandsTopic`, `cqrsCommandsDeadLetterTopic`, `cqrsKafkaCommandListenerContainer` |
+| `KafkaEventBusAutoConfiguration` | `EventHandlerRegistry` bean + `cqrs.kafka.events.enabled=true` | `KafkaEventBus`, `KafkaEventConsumer`, `cqrsEventsTopic`, `cqrsEventsDeadLetterTopic`, `cqrsKafkaEventListenerContainer` |
+| `KafkaQueryBusAutoConfiguration` | `QueryHandlerRegistry` bean + `cqrs.kafka.queries.enabled=true` | `KafkaQueryBus`, `KafkaQueryConsumer`, `cqrsQueriesTopic`, `cqrsQueriesDeadLetterTopic`, `cqrsKafkaQueryListenerContainer` |
 
-`KafkaTopicNamingStrategy`, `KafkaPartitionKeyStrategy`, `KafkaTemplate<String, byte[]>`, `KafkaMessagePublisher` and `KafkaRequestReplyClient` are `@ConditionalOnMissingBean` and can be replaced with your own bean. The topic beans are only created when `cqrs.kafka.auto-create-topics=true`.
+`KafkaTopicNamingStrategy`, `KafkaPartitionKeyStrategy`, `KafkaTemplate<String, byte[]>`, `KafkaMessagePublisher` and `KafkaRequestReplyClient` are `@ConditionalOnMissingBean` and can be replaced with your own bean. The topic beans are only created when `cqrs.kafka.auto-create-topics=true`; the dead-letter topic beans also require `cqrs.kafka.error-handling.dead-letter.enabled=true`. A `CommonErrorHandler` bean replaces the module's error handler on the command, event and query containers (see [Retry and Dead-Letter Topics](#retry-and-dead-letter-topics)).
 
 ## Running Next to the RabbitMQ Module
 
