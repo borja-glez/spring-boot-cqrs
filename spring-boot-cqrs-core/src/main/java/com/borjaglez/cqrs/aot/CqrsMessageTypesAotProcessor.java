@@ -10,21 +10,17 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcess
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.env.Environment;
-import org.springframework.core.type.filter.AnnotationTypeFilter;
-import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
-import com.borjaglez.cqrs.command.Command;
-import com.borjaglez.cqrs.event.Event;
-import com.borjaglez.cqrs.naming.CqrsMessage;
-import com.borjaglez.cqrs.query.Query;
-
 /**
- * Registers binding hints for the messages an application only sends or records, which no local
- * handler declares: a command sent to another service, an event stored in an outbox. Handler
- * parameters are covered by {@link CqrsBeanRegistrationAotProcessor}; these types can only be found
- * by scanning, so list their packages in {@value #PACKAGES_PROPERTY} (comma separated).
+ * Registers binding hints for the types an application sends or receives without declaring them in
+ * a handler: a command sent to another service, the reply it gets back, an event stored in an
+ * outbox. Handler parameters and results are covered by {@link CqrsBeanRegistrationAotProcessor};
+ * these types can only be found by scanning, so list the packages that hold them (usually the
+ * shared contracts) in {@value #PACKAGES_PROPERTY}, comma separated. Every concrete type in those
+ * packages is registered: a reply is a plain record, not a message, and nothing says which command
+ * it answers.
  */
 public class CqrsMessageTypesAotProcessor implements BeanFactoryInitializationAotProcessor {
 
@@ -62,10 +58,7 @@ public class CqrsMessageTypesAotProcessor implements BeanFactoryInitializationAo
   static Set<Class<?>> scan(Set<String> packages, ClassLoader classLoader) {
     ClassPathScanningCandidateComponentProvider scanner =
         new ClassPathScanningCandidateComponentProvider(false);
-    scanner.addIncludeFilter(new AssignableTypeFilter(Command.class));
-    scanner.addIncludeFilter(new AssignableTypeFilter(Event.class));
-    scanner.addIncludeFilter(new AssignableTypeFilter(Query.class));
-    scanner.addIncludeFilter(new AnnotationTypeFilter(CqrsMessage.class));
+    scanner.addIncludeFilter((reader, factory) -> true);
     Set<Class<?>> types = new LinkedHashSet<>();
     for (String basePackage : packages) {
       scanner

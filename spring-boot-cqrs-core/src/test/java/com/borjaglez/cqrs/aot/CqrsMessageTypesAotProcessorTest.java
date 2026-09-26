@@ -17,8 +17,8 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 
+import com.borjaglez.cqrs.aot.scanned.CardCharged;
 import com.borjaglez.cqrs.aot.scanned.ChargeCard;
-import com.borjaglez.cqrs.aot.scanned.NotAMessage;
 import com.borjaglez.cqrs.aot.scanned.OrderLine;
 import com.borjaglez.cqrs.aot.scanned.OrderPlaced;
 import com.borjaglez.cqrs.aot.scanned.Tagged;
@@ -52,13 +52,14 @@ class CqrsMessageTypesAotProcessorTest {
   }
 
   @Test
-  void findsTheMessagesOfTheConfiguredPackagesOnly() {
+  void findsEveryTypeOfTheConfiguredPackagesOnly() {
     Set<Class<?>> types =
         CqrsMessageTypesAotProcessor.scan(Set.of(PACKAGE), getClass().getClassLoader());
 
     assertThat(types)
-        .contains(OrderPlaced.class, ChargeCard.class, Tagged.class)
-        .doesNotContain(NotAMessage.class, OrderLine.class);
+        .contains(
+            OrderPlaced.class, ChargeCard.class, Tagged.class, OrderLine.class, CardCharged.class)
+        .doesNotContain(Unlisted.class, CqrsMessageTypesAotProcessorTest.class);
   }
 
   @Test
@@ -71,6 +72,8 @@ class CqrsMessageTypesAotProcessorTest {
     assertThat(RuntimeHintsPredicates.reflection().onType(OrderPlaced.class)).accepts(hints);
     assertThat(RuntimeHintsPredicates.reflection().onType(ChargeCard.class)).accepts(hints);
     assertThat(RuntimeHintsPredicates.reflection().onType(OrderLine.class)).accepts(hints);
+    assertThat(RuntimeHintsPredicates.reflection().onMethod(CardCharged.class, "charged").invoke())
+        .accepts(hints);
     assertThat(RuntimeHintsPredicates.reflection().onMethod(OrderLine.class, "sku").invoke())
         .accepts(hints);
   }
