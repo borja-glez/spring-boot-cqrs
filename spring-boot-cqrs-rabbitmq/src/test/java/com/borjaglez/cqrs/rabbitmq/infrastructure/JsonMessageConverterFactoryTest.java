@@ -11,6 +11,8 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.amqp.support.converter.MessageConverter;
 
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
+
 class JsonMessageConverterFactoryTest {
 
   @Test
@@ -55,6 +57,44 @@ class JsonMessageConverterFactoryTest {
   }
 
   @Test
+  void createShouldPassTheTrustedPackages() {
+    MessageConverter converter =
+        JsonMessageConverterFactory.create(
+            JsonMessageConverterFactory.class.getClassLoader(),
+            List.of(
+                new JsonMessageConverterFactory.ConverterCandidate(
+                    TestMessageConverter.class.getName(), TestObjectMapper.class.getName())),
+            "com.example.contracts");
+
+    assertThat(((TestMessageConverter) converter).trustedPackages)
+        .containsExactly("com.example.contracts");
+  }
+
+  @Test
+  void byDefaultEveryPackageIsTrusted() {
+    MessageConverter converter =
+        JsonMessageConverterFactory.create(
+            JsonMessageConverterFactory.class.getClassLoader(),
+            List.of(
+                new JsonMessageConverterFactory.ConverterCandidate(
+                    TestMessageConverter.class.getName(), TestObjectMapper.class.getName())));
+
+    assertThat(((TestMessageConverter) converter).trustedPackages).containsExactly("*");
+  }
+
+  @Test
+  void onlyTrustedPackagesAreDeserialized() {
+    MessageConverter trusting = JsonMessageConverterFactory.create();
+    MessageConverter restricted = JsonMessageConverterFactory.create("com.example.contracts");
+    Message message = trusting.toMessage(new TestCommand("data"), new MessageProperties());
+
+    assertThat(trusting.fromMessage(message)).isInstanceOf(TestCommand.class);
+    assertThatThrownBy(() -> restricted.fromMessage(message))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("not in the trusted packages");
+  }
+
+  @Test
   void createShouldFailWhenNoCompatibleConverterExists() {
     assertThatThrownBy(
             () ->
@@ -84,6 +124,12 @@ class JsonMessageConverterFactoryTest {
   static class TestObjectMapper {}
 
   static class TestMessageConverter implements MessageConverter {
+
+    final String[] trustedPackages;
+
+    TestMessageConverter(String... trustedPackages) {
+      this.trustedPackages = trustedPackages;
+    }
 
     @Override
     public Message toMessage(Object object, MessageProperties messageProperties)

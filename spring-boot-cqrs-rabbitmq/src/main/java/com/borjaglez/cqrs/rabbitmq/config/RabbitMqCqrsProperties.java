@@ -1,5 +1,8 @@
 package com.borjaglez.cqrs.rabbitmq.config;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import lombok.Getter;
@@ -12,6 +15,14 @@ public class RabbitMqCqrsProperties {
 
   private boolean enabled = true;
   private String prefix = "cqrs";
+
+  /**
+   * Packages whose types may be deserialized from incoming messages, {@code "*"} for all. Limit it
+   * to the packages of your messages and results when the broker is shared with untrusted
+   * producers.
+   */
+  private List<String> trustedPackages = new ArrayList<>(List.of("*"));
+
   private RetryProperties retry = new RetryProperties();
   private BusProperties commands = new BusProperties("commands", 10, 20);
   private BusProperties events = new BusProperties("events", 10, 20);
