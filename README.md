@@ -579,7 +579,6 @@ The repository includes five example applications:
 - [Testing](docs/testing.md) -- Test utilities: spy buses, in-memory buses, AssertJ assertions, `@CqrsTest` slice
 - [GraalVM Native](docs/graalvm-native.md) -- AOT support, native image builds
 - [Upgrading](docs/upgrading.md) -- Breaking changes of each release and how to migrate
-- [Migration Guide](docs/migration-guide.md) -- Migrating from the original amj-bus implementation
 
 ## GraalVM Native
 
