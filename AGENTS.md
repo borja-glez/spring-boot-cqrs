@@ -182,3 +182,19 @@ class ClassNameTest {
 - GitHub Actions: CI runs on PR + push to `main` against Java 21 and 22
 - `./gradlew quality` is the gate — must pass with 100% coverage
 - JaCoCo reports and test results uploaded as artifacts (14-day retention)
+
+## Working on an issue
+
+Issues are written as work orders: Context, Reproduction, Expected behaviour, Where to look, Proposed approach, Acceptance criteria, Compatibility, Dependencies, Out of scope. Follow them; they are the spec.
+
+1. **Check the labels first.** `agent-ready` means implement it. `needs-design` means do **not** implement unless the issue body has a `### Decision` section recorded by the maintainer; otherwise stop and report the open questions.
+2. **Check `Dependencies`.** If an issue listed there is still open, stop and report it instead of re-implementing it.
+3. **Branch** from the latest `main`: `fix/<issue-number>-<short-slug>` for bugs, `feat/<issue-number>-<short-slug>` for features, `docs/<issue-number>-<short-slug>` for documentation.
+4. **Regression test first.** Write the test named in the acceptance criteria, see it fail for the reason described, then fix. Keep the test in the same change.
+5. **Both starters.** When auto-configuration or starter code changes, apply and test it in the Boot 3 and the Boot 4 starter.
+6. **Verify before pushing:** `./gradlew spotlessApplyAll`, then `./gradlew quality` (tests, 100% line and branch coverage, Spotless). If a starter or an example changed, also run `./gradlew verifyBoot3Compatibility verifyBoot4Compatibility`.
+7. **Commits:** Conventional Commits with a scope (`fix(http): ...`, `feat(kafka): ...`). The subject says what changes; the body, when needed, says why and how. A breaking change uses `!` in the subject and a `BREAKING CHANGE:` footer.
+8. **Never** add `Co-Authored-By` lines, "Generated with ..." footers, session links, or any mention of Claude, AI, a model or a session in commits, pull request titles or pull request descriptions.
+9. **Pull request:** title equal to the commit subject; body from `.github/pull_request_template.md` with `Closes #<issue>` and a short explanation of how it was solved; same labels as the issue. Do not merge it: the maintainer squash-merges once CI is green.
+10. **Stay in scope.** Do not touch `CHANGELOG.md` (generated from commits), the version in `gradle.properties`, the workflows, or code outside the issue's `Where to look` unless the acceptance criteria need it.
+11. **When blocked** (ambiguous behaviour, an acceptance criterion that cannot be met, a failing test you cannot explain), open the pull request as a draft and describe the blocker instead of guessing.
