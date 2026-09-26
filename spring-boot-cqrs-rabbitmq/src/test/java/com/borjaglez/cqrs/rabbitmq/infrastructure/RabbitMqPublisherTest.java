@@ -24,6 +24,7 @@ import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
+import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 
 class RabbitMqPublisherTest {
 
@@ -81,7 +82,7 @@ class RabbitMqPublisherTest {
   }
 
   @Test
-  void publishAndReceiveShouldReturnNullWhenNoReply() {
+  void publishAndReceiveShouldTimeOutWhenNoReply() {
     MessageConverter converter = mock(MessageConverter.class);
     when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
 
@@ -92,9 +93,9 @@ class RabbitMqPublisherTest {
     when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any(Message.class)))
         .thenReturn(null);
 
-    Object result = publisher.publishAndReceive("exchange", "key", "payload", "query");
-
-    assertThat(result).isNull();
+    assertThatThrownBy(() -> invoke())
+        .isInstanceOf(RemoteReplyTimeoutException.class)
+        .hasMessageContaining("key");
   }
 
   @Test
@@ -120,6 +121,34 @@ class RabbitMqPublisherTest {
             () -> publisher.publishAndReceive("exchange", "key", "payload", "command_reply"))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("Remote handler error: Something went wrong");
+  }
+
+  @Test
+  void publishAndReceiveShouldReturnNullForAnExplicitNullResult() {
+    MessageConverter converter = mock(MessageConverter.class);
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+    when(converter.toMessage(any(), any()))
+        .thenReturn(MessageBuilder.withBody(new byte[0]).build());
+    MessageProperties replyProps = new MessageProperties();
+    replyProps.setHeader("cqrs.result.null", true);
+    Message nullReply = MessageBuilder.withBody(new byte[0]).andProperties(replyProps).build();
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any(Message.class)))
+        .thenReturn(nullReply);
+
+    assertThat(publisher.publishAndReceive("exchange", "key", "payload", "command_reply")).isNull();
+    assertThat(
+            publisher.publishAndReceive(
+                "exchange", "key", "payload", "query", new ParameterizedTypeReference<String>() {}))
+        .isNull();
+  }
+
+  private Object invoke() {
+    return publisher.publishAndReceive("exchange", "key", "payload", "command_reply");
+  }
+
+  private Object invokeWithType() {
+    return publisher.publishAndReceive(
+        "exchange", "key", "payload", "query", new ParameterizedTypeReference<String>() {});
   }
 
   @Test
@@ -253,7 +282,7 @@ class RabbitMqPublisherTest {
   }
 
   @Test
-  void publishAndReceiveWithTypeReferenceShouldReturnNullWhenNoReply() {
+  void publishAndReceiveWithTypeReferenceShouldTimeOutWhenNoReply() {
     MessageConverter converter = mock(MessageConverter.class);
     when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
 
@@ -264,10 +293,9 @@ class RabbitMqPublisherTest {
     when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("key"), any(Message.class)))
         .thenReturn(null);
 
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
-    Object result = publisher.publishAndReceive("exchange", "key", "payload", "query", typeRef);
-
-    assertThat(result).isNull();
+    assertThatThrownBy(() -> invokeWithType())
+        .isInstanceOf(RemoteReplyTimeoutException.class)
+        .hasMessageContaining("key");
   }
 
   @Test
@@ -337,7 +365,10 @@ class RabbitMqPublisherTest {
     Message requestMessage =
         MessageBuilder.withBody("req".getBytes()).andProperties(new MessageProperties()).build();
     when(converter.toMessage(any(), any())).thenReturn(requestMessage);
-    when(rabbitTemplate.sendAndReceive(any(), any(), any(Message.class))).thenReturn(null);
+    MessageProperties nullResult = new MessageProperties();
+    nullResult.setHeader("cqrs.result.null", true);
+    when(rabbitTemplate.sendAndReceive(any(), any(), any(Message.class)))
+        .thenReturn(MessageBuilder.withBody(new byte[0]).andProperties(nullResult).build());
 
     MessageContext ctx = MessageContext.empty().with("correlationId", "cid-1");
     ArgumentCaptor<MessageProperties> propsCaptor =
