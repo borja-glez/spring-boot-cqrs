@@ -18,6 +18,8 @@ import com.borjaglez.cqrs.event.spring.SpringEventBus;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 class RabbitMqEventBusAutoConfigurationTest {
 
@@ -139,6 +141,47 @@ class RabbitMqEventBusAutoConfigurationTest {
                   .filteredOn(b -> b.getDestination().startsWith("cqrs.billing.events."))
                   .extracting(Binding::getRoutingKey)
                   .containsExactlyInAnyOrder("billing", "billing");
+            });
+  }
+
+  @Test
+  void shouldNotCreateEventBusBeansWhenEventsAreDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.events.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(RabbitMqEventBus.class);
+              assertThat(context).doesNotHaveBean("cqrsEventDeclarables");
+              assertThat(context).doesNotHaveBean("cqrsEventListenerContainer");
+              assertThat(context).hasSingleBean(RabbitMqPublisher.class);
+              assertThat(context).hasSingleBean(RabbitMqBusDeclarationBuilder.class);
+            });
+  }
+
+  @Test
+  void shouldCreateEventBusBeansWhenEventsAreExplicitlyEnabledAndOtherBusesAreDisabled() {
+    contextRunner
+        .withPropertyValues(
+            "cqrs.rabbitmq.events.enabled=true",
+            "cqrs.rabbitmq.commands.enabled=false",
+            "cqrs.rabbitmq.queries.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(RabbitMqEventBus.class);
+              assertThat(context).hasBean("cqrsEventDeclarables");
+              assertThat(context).hasBean("cqrsEventListenerContainer");
+            });
+  }
+
+  @Test
+  void shouldNotCreateEventBusBeansWhenRabbitMqIsDisabledEvenIfEventsAreEnabled() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.enabled=false", "cqrs.rabbitmq.events.enabled=true")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(RabbitMqEventBus.class);
+              assertThat(context).doesNotHaveBean("cqrsEventDeclarables");
+              assertThat(context).doesNotHaveBean("cqrsEventListenerContainer");
             });
   }
 }

@@ -2,7 +2,11 @@ package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 class RabbitMqCqrsPropertiesTest {
 
@@ -119,5 +123,33 @@ class RabbitMqCqrsPropertiesTest {
         new RabbitMqCqrsProperties.BusProperties("my-queries", 1, 2);
     properties.setQueries(queries);
     assertThat(properties.getQueries().getExchange()).isEqualTo("my-queries");
+  }
+
+  @Test
+  void shouldEnableEveryBusByDefault() {
+    RabbitMqCqrsProperties properties = new RabbitMqCqrsProperties();
+
+    assertThat(properties.getCommands().isEnabled()).isTrue();
+    assertThat(properties.getQueries().isEnabled()).isTrue();
+    assertThat(properties.getEvents().isEnabled()).isTrue();
+    assertThat(new RabbitMqCqrsProperties.BusProperties().isEnabled()).isTrue();
+  }
+
+  @Test
+  void shouldBindTheEnabledFlagOfEachBus() {
+    RabbitMqCqrsProperties properties =
+        new Binder(
+                new MapConfigurationPropertySource(
+                    Map.of(
+                        "cqrs.rabbitmq.commands.enabled", "false",
+                        "cqrs.rabbitmq.queries.enabled", "false",
+                        "cqrs.rabbitmq.events.enabled", "true")))
+            .bind("cqrs.rabbitmq", RabbitMqCqrsProperties.class)
+            .get();
+
+    assertThat(properties.getCommands().isEnabled()).isFalse();
+    assertThat(properties.getQueries().isEnabled()).isFalse();
+    assertThat(properties.getEvents().isEnabled()).isTrue();
+    assertThat(properties.getCommands().getExchange()).isEqualTo("commands");
   }
 }

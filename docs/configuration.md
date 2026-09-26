@@ -165,6 +165,7 @@ Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
 | `cqrs.rabbitmq.prefix` | `String` | `"cqrs"` | Prefix for RabbitMQ exchange and queue names. |
 | `cqrs.rabbitmq.retry.max-attempts` | `int` | `3` | Total number of deliveries of a failed asynchronous command or event, **including the first one**, before it is sent to the dead-letter queue. The default `3` means the first attempt plus two retries; `1` disables retries. Must be at least `1` (the application fails to start otherwise). |
 | `cqrs.rabbitmq.retry.ttl` | `long` | `1000` | Time-to-live (in milliseconds) for messages in the retry queue before they are re-delivered. |
+| `cqrs.rabbitmq.{commands,events,queries}.enabled` | `boolean` | `true` | Whether that bus uses RabbitMQ. When `false`, its bus bean, its main, retry and dead-letter queues and exchanges, and its listener container are not created; the application neither sends nor receives that kind of message over RabbitMQ. `cqrs.rabbitmq.enabled=false` still disables every bus. |
 | `cqrs.rabbitmq.commands.exchange` | `String` | `"commands"` | Logical name of the command exchange. Combined with prefix to form the full exchange name. |
 | `cqrs.rabbitmq.commands.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the command listener container. |
 | `cqrs.rabbitmq.commands.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the command listener container. |
@@ -174,6 +175,17 @@ Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
 | `cqrs.rabbitmq.queries.exchange` | `String` | `"queries"` | Logical name of the query exchange. |
 | `cqrs.rabbitmq.queries.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the query listener container. |
 | `cqrs.rabbitmq.queries.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the query listener container. |
+
+A service that handles commands over RabbitMQ and publishes events, but never serves or sends queries:
+
+```yaml
+cqrs:
+  rabbitmq:
+    queries:
+      enabled: false
+```
+
+Disabling a bus removes the sender as well as the receiver: keep `events.enabled=true` in a service that publishes events over RabbitMQ even if it does not handle any.
 
 ### Exchange and Queue Naming
 

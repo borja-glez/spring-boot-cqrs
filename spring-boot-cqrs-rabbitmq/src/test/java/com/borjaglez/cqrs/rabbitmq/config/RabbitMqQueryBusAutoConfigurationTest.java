@@ -12,6 +12,8 @@ import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 class RabbitMqQueryBusAutoConfigurationTest {
 
@@ -75,5 +77,46 @@ class RabbitMqQueryBusAutoConfigurationTest {
                         context.getBean(
                             "cqrsQueryListenerContainer", SimpleMessageListenerContainer.class))
                     .hasFieldOrPropertyWithValue("observationEnabled", true));
+  }
+
+  @Test
+  void shouldNotCreateQueryBusBeansWhenQueriesAreDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.queries.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(RabbitMqQueryBus.class);
+              assertThat(context).doesNotHaveBean("cqrsQueryDeclarables");
+              assertThat(context).doesNotHaveBean("cqrsQueryListenerContainer");
+              assertThat(context).hasSingleBean(RabbitMqPublisher.class);
+              assertThat(context).hasSingleBean(RabbitMqBusDeclarationBuilder.class);
+            });
+  }
+
+  @Test
+  void shouldCreateQueryBusBeansWhenQueriesAreExplicitlyEnabledAndOtherBusesAreDisabled() {
+    contextRunner
+        .withPropertyValues(
+            "cqrs.rabbitmq.queries.enabled=true",
+            "cqrs.rabbitmq.commands.enabled=false",
+            "cqrs.rabbitmq.events.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(RabbitMqQueryBus.class);
+              assertThat(context).hasBean("cqrsQueryDeclarables");
+              assertThat(context).hasBean("cqrsQueryListenerContainer");
+            });
+  }
+
+  @Test
+  void shouldNotCreateQueryBusBeansWhenRabbitMqIsDisabledEvenIfQueriesAreEnabled() {
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.enabled=false", "cqrs.rabbitmq.queries.enabled=true")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(RabbitMqQueryBus.class);
+              assertThat(context).doesNotHaveBean("cqrsQueryDeclarables");
+              assertThat(context).doesNotHaveBean("cqrsQueryListenerContainer");
+            });
   }
 }
