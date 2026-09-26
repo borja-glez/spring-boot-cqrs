@@ -376,6 +376,8 @@ RabbitMQ starts automatically via [Spring Boot Docker Compose](https://docs.spri
 
 The RabbitMQ event bus throws when the event cannot be sent; it does not fall back to the local event bus. `publish(List<Event>)` stops at the first failure. By default the bus does not wait for the broker to accept the event; set `cqrs.rabbitmq.events.confirms.enabled=true` (with `spring.rabbitmq.publisher-confirm-type=correlated`) to fail when the broker rejects it or does not confirm it within `cqrs.rabbitmq.events.confirms.timeout` (5s). For reliable publication, use an outbox (see [Transactional event publishing](#transactional-event-publishing)).
 
+Only messages annotated with `@CqrsMessage` are exposed over RabbitMQ by default (`cqrs.rabbitmq.expose=annotated`): other handled messages get no binding and are rejected if they reach the queue anyway, so in-process commands cannot be triggered by other producers on the broker. Mark a handler `remote = false` (`@HandleCommand(remote = false)`, or on the handler class) to keep an annotated message local too, or set `cqrs.rabbitmq.expose=all` to expose every handled message as before 0.4.0. See [Exposed and local messages](docs/rabbitmq-adapter.md#exposed-and-local-messages).
+
 ### Kafka
 
 Add the Kafka module to distribute commands, events, and queries across services (alongside your chosen starter):
@@ -533,6 +535,7 @@ The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `Comm
 | `cqrs.kafka.error-handling.dead-letter.replicas` | `1` | Dead-letter topic replication factor |
 | `cqrs.rabbitmq.enabled` | `true` | Enable RabbitMQ bus adapters |
 | `cqrs.rabbitmq.prefix` | `"cqrs"` | Prefix for RabbitMQ exchange and queue names |
+| `cqrs.rabbitmq.expose` | `annotated` | Messages exposed over RabbitMQ: `annotated` (only `@CqrsMessage` messages) or `all` |
 | `cqrs.rabbitmq.retry.max-attempts` | `3` | Max retry attempts before dead-lettering |
 | `cqrs.rabbitmq.retry.ttl` | `1000` | Retry queue TTL in milliseconds |
 | `cqrs.rabbitmq.commands.exchange` | `"commands"` | Command exchange name |

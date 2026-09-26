@@ -12,6 +12,25 @@ import com.borjaglez.cqrs.fixtures.TestEventHandler;
 class HandlerDescriptorTest {
 
   @Test
+  void isRemoteUnlessDescribedAsLocal() {
+    HandlerDescriptor remote =
+        new HandlerDescriptor(
+            TestCommand.class, HandlerType.COMMAND, "test.command", TestCommandHandler.class, true);
+    HandlerDescriptor local =
+        new HandlerDescriptor(
+            TestCommand.class,
+            HandlerType.COMMAND,
+            "test.command",
+            TestCommandHandler.class,
+            true,
+            false);
+
+    assertThat(remote.remote()).isTrue();
+    assertThat(local.remote()).isFalse();
+    assertThat(local).isNotEqualTo(remote);
+  }
+
+  @Test
   void accessors() {
     HandlerDescriptor descriptor =
         new HandlerDescriptor(

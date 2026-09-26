@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
+
 class RabbitMqCqrsPropertiesTest {
 
   @Test
@@ -20,6 +22,17 @@ class RabbitMqCqrsPropertiesTest {
     assertThat(properties.getRetry()).isNotNull();
     assertThat(properties.getRetry().getMaxAttempts()).isEqualTo(3);
     assertThat(properties.getRetry().getTtl()).isEqualTo(1000);
+    assertThat(properties.getExpose()).isEqualTo(RabbitMqExposure.ANNOTATED);
+  }
+
+  @Test
+  void shouldBindExpose() {
+    RabbitMqCqrsProperties properties =
+        new Binder(new MapConfigurationPropertySource(Map.of("cqrs.rabbitmq.expose", "all")))
+            .bind("cqrs.rabbitmq", RabbitMqCqrsProperties.class)
+            .get();
+
+    assertThat(properties.getExpose()).isEqualTo(RabbitMqExposure.ALL);
   }
 
   @Test

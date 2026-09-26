@@ -11,6 +11,7 @@ import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
@@ -19,6 +20,7 @@ public class RabbitMqQueryConsumer extends RabbitMqConsumer {
   private final QueryHandlerRegistry registry;
   private final List<BusMiddleware> middlewares;
   private final String contextHeaderPrefix;
+  private final RabbitMqExposure exposure;
 
   public RabbitMqQueryConsumer(
       QueryHandlerRegistry registry,
@@ -39,7 +41,28 @@ public class RabbitMqQueryConsumer extends RabbitMqConsumer {
       RabbitTemplate rabbitTemplate,
       RabbitMqNamingStrategy namingStrategy,
       String contextHeaderPrefix) {
+    this(
+        registry,
+        middlewares,
+        rabbitTemplate,
+        namingStrategy,
+        contextHeaderPrefix,
+        RabbitMqExposure.ANNOTATED);
+  }
+
+  /**
+   * Creates the consumer. A query that {@code exposure} does not expose is rejected and never
+   * handled; its requester receives an error reply.
+   */
+  public RabbitMqQueryConsumer(
+      QueryHandlerRegistry registry,
+      List<BusMiddleware> middlewares,
+      RabbitTemplate rabbitTemplate,
+      RabbitMqNamingStrategy namingStrategy,
+      String contextHeaderPrefix,
+      RabbitMqExposure exposure) {
     super(rabbitTemplate, namingStrategy);
+    this.exposure = exposure;
     this.registry = registry;
     this.middlewares = middlewares;
     this.contextHeaderPrefix =
@@ -48,6 +71,9 @@ public class RabbitMqQueryConsumer extends RabbitMqConsumer {
   }
 
   public Object consume(Message message, Query query) {
+    if (!exposure.exposesQuery(registry, query.getClass())) {
+      throw rejectNotExposed(message, query.getClass());
+    }
     MessageContext incoming = RabbitMqContextHeaders.extract(message, contextHeaderPrefix);
     MessageContext.Scope scope = MessageContext.scope(incoming);
     try {

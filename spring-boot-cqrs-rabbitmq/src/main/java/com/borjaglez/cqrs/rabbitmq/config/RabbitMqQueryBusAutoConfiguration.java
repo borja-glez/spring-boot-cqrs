@@ -51,7 +51,10 @@ public class RabbitMqQueryBusAutoConfiguration {
       @Value("${spring.application.name:cqrs-app}") String appName) {
     List<String> routingKeys =
         new ArrayList<>(
-            registry.getRegisteredQueries().stream().map(messageNaming::queryName).toList());
+            registry.getRegisteredQueries().stream()
+                .filter(type -> properties.getExpose().exposesQuery(registry, type))
+                .map(messageNaming::queryName)
+                .toList());
     return builder.buildSimple(appName, properties.getQueries().getExchange(), routingKeys);
   }
 
@@ -84,7 +87,8 @@ public class RabbitMqQueryBusAutoConfiguration {
             middlewaresProvider.getIfAvailable(Collections::emptyList),
             rabbitTemplate,
             rabbitNaming,
-            contextHeaderPrefix);
+            contextHeaderPrefix,
+            properties.getExpose());
 
     ExtendedMessageListenerAdapter adapter =
         new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");

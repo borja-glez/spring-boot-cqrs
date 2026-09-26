@@ -26,6 +26,23 @@ class QueryHandlerRegistryTest {
   }
 
   @Test
+  void handlersAreRemoteUnlessRegisteredAsLocal() throws Exception {
+    Method method = TestQueryHandler.class.getMethod("handle", TestQuery.class);
+    registry.register(TestQuery.class, new TestQueryHandler(), method, "test.query");
+    QueryHandlerRegistry localRegistry = new QueryHandlerRegistry();
+    localRegistry.register(TestQuery.class, new TestQueryHandler(), method, "test.query", false);
+
+    assertThat(registry.getHandlerInfo(TestQuery.class).orElseThrow().remote()).isTrue();
+    assertThat(localRegistry.getHandlerInfo(TestQuery.class).orElseThrow().remote()).isFalse();
+  }
+
+  @Test
+  void handlerInfoWithoutTheRemoteFlagIsRemote() {
+    assertThat(new QueryHandlerRegistry.HandlerInfo(new Object(), null, "test.query").remote())
+        .isTrue();
+  }
+
+  @Test
   void registerAndHandleReturnsResult() throws Exception {
     TestQueryHandler handler = new TestQueryHandler();
     Method method = TestQueryHandler.class.getMethod("handle", TestQuery.class);

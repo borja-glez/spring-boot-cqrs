@@ -159,7 +159,7 @@ class OrderNotifications {
 - The expression is parsed once, when the handler is registered. A malformed expression fails startup with an `IllegalStateException` naming the handler method, its bean and the expression.
 - On each dispatch the expression is evaluated with a `StandardEvaluationContext`: the root object is the event, the `#event` variable is the event too, and `@beanName` resolves beans of the application context.
 - `true` invokes the handler and `false` skips it silently. A `null` or non-boolean result, or an exception thrown while evaluating the expression, raises an `EventHandlerExecutionException` naming the handler and the expression.
-- Conditions apply wherever `EventHandlerRegistry.handle` dispatches: `SpringEventBus`, `TransactionalEventBus` and the RabbitMQ and Kafka event consumers. They are evaluated after the event has reached the application: there is no broker-side filtering, so the event is still delivered (and deserialized) before the condition discards it.
+- Conditions apply wherever `EventHandlerRegistry.handle` or `handleRemote` dispatches: `SpringEventBus`, `TransactionalEventBus` and the RabbitMQ and Kafka event consumers. They are evaluated after the event has reached the application: there is no broker-side filtering, so the event is still delivered (and deserialized) before the condition discards it.
 - Conditions are only available on event handlers; commands and queries have exactly one handler each.
 - In a native image, a bean referenced from a condition needs the methods the expression calls to be reachable by reflection (see [graalvm-native.md](graalvm-native.md#known-limitations)).
 
@@ -193,9 +193,10 @@ Stores the mapping from command class to handler. Each command class can have at
 
 ```java
 public class CommandHandlerRegistry {
-    record HandlerInfo(Object bean, MethodHandle handle, String messageName, boolean requiresValidation) {}
+    record HandlerInfo(Object bean, MethodHandle handle, String messageName, boolean requiresValidation, boolean remote) {}
 
     void register(Class<?> commandClass, Object bean, Method method, String messageName, boolean requiresValidation);
+    void register(Class<?> commandClass, Object bean, Method method, String messageName, boolean requiresValidation, boolean remote);
     Object handle(Command command);
     Optional<HandlerInfo> getHandlerInfo(Class<?> commandClass);
     Set<Class<?>> getRegisteredCommands();
@@ -208,12 +209,17 @@ Stores the mapping from event class to handler(s). An event can have **multiple*
 
 ```java
 public class EventHandlerRegistry {
-    record HandlerInfo(Object bean, MethodHandle handle, String messageName, EventHandlerCondition condition) {}
+    record HandlerInfo(Object bean, MethodHandle handle, String messageName,
+                       EventHandlerCondition condition, boolean remote) {}
 
     void register(Class<?> eventClass, Object bean, Method method, String messageName);
+    void register(Class<?> eventClass, Object bean, Method method, String messageName, boolean remote);
     void register(Class<?> eventClass, Object bean, Method method, String messageName,
                   Expression condition, BeanResolver beanResolver);
-    void handle(Event event);
+    void register(Class<?> eventClass, Object bean, Method method, String messageName,
+                  Expression condition, BeanResolver beanResolver, boolean remote);
+    void handle(Event event);       // every handler
+    void handleRemote(Event event); // only handlers not marked remote = false
     Set<Class<?>> getRegisteredEvents();
 }
 ```
@@ -226,9 +232,10 @@ Stores the mapping from query class to handler. Each query class can have at mos
 
 ```java
 public class QueryHandlerRegistry {
-    record HandlerInfo(Object bean, MethodHandle handle, String messageName) {}
+    record HandlerInfo(Object bean, MethodHandle handle, String messageName, boolean remote) {}
 
     void register(Class<?> queryClass, Object bean, Method method, String messageName);
+    void register(Class<?> queryClass, Object bean, Method method, String messageName, boolean remote);
     Object handle(Query query);
     Set<Class<?>> getRegisteredQueries();
 }
@@ -322,6 +329,8 @@ Each handler method is validated:
 For command handlers, if the parameter is annotated with `@Valid` (JSR-380), the `requiresValidation` flag is set to `true` in the registry.
 
 For event handlers, a non-empty `@HandleEvent(condition = ...)` is parsed with a shared `SpelExpressionParser` and registered with the handler; a malformed expression fails startup. The discoverer is `BeanFactoryAware`, so conditions can reference beans with `@beanName`.
+
+Every handler is registered with a `remote` flag, `true` by default. `remote = false` on the handler class (`@CommandHandler`, `@EventHandler`, `@QueryHandler`) or on the handler method (`@HandleCommand`, `@HandleEvent`, `@HandleQuery`) registers it as local only: the local buses still dispatch to it, but broker adapters neither bind nor consume its message (see [Exposed and local messages](rabbitmq-adapter.md#exposed-and-local-messages)). The registries' `register` overloads without the flag register remote handlers.
 
 The discoverer uses `AopUtils.getTargetClass()` to handle proxied beans correctly.
 

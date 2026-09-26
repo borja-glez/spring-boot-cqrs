@@ -23,14 +23,30 @@ public class EventHandlerRegistry {
   /**
    * A registered event handler.
    *
+   * @param bean the handler bean
+   * @param handle the handler method
+   * @param messageName the logical name of the event
    * @param condition the handler's {@code @HandleEvent} condition, or {@code null} when it always
    *     runs
+   * @param remote whether the handler may receive the event from a remote transport; {@code false}
+   *     when it is marked {@code remote = false}
    */
   public record HandlerInfo(
-      Object bean, MethodHandle handle, String messageName, EventHandlerCondition condition) {
+      Object bean,
+      MethodHandle handle,
+      String messageName,
+      EventHandlerCondition condition,
+      boolean remote) {
 
+    /** Creates the information of a remote handler without condition. */
     public HandlerInfo(Object bean, MethodHandle handle, String messageName) {
       this(bean, handle, messageName, null);
+    }
+
+    /** Creates the information of a remote handler. */
+    public HandlerInfo(
+        Object bean, MethodHandle handle, String messageName, EventHandlerCondition condition) {
+      this(bean, handle, messageName, condition, true);
     }
   }
 
@@ -40,7 +56,17 @@ public class EventHandlerRegistry {
   private final Set<Class<?>> warnedUnhandledSubclasses = ConcurrentHashMap.newKeySet();
 
   public void register(Class<?> eventClass, Object bean, Method method, String messageName) {
-    register(eventClass, bean, method, messageName, null, null);
+    register(eventClass, bean, method, messageName, null, null, true);
+  }
+
+  /**
+   * Registers an event handler without condition.
+   *
+   * @param remote whether the handler may receive the event from a remote transport
+   */
+  public void register(
+      Class<?> eventClass, Object bean, Method method, String messageName, boolean remote) {
+    register(eventClass, bean, method, messageName, null, null, remote);
   }
 
   /**
@@ -56,22 +82,56 @@ public class EventHandlerRegistry {
       String messageName,
       Expression condition,
       BeanResolver beanResolver) {
+    register(eventClass, bean, method, messageName, condition, beanResolver, true);
+  }
+
+  /**
+   * Registers an event handler that only runs when {@code condition} evaluates to {@code true}.
+   *
+   * @param condition the parsed condition, or {@code null} for a handler that always runs
+   * @param beanResolver resolves {@code @beanName} references in the condition; may be {@code null}
+   * @param remote whether the handler may receive the event from a remote transport
+   */
+  public void register(
+      Class<?> eventClass,
+      Object bean,
+      Method method,
+      String messageName,
+      Expression condition,
+      BeanResolver beanResolver,
+      boolean remote) {
     MethodHandle handle = MethodHandleUtil.unreflect(method);
     EventHandlerCondition handlerCondition =
         condition == null
             ? null
             : new EventHandlerCondition(condition, beanResolver, method.toGenericString());
-    HandlerInfo info = new HandlerInfo(bean, handle, messageName, handlerCondition);
+    HandlerInfo info = new HandlerInfo(bean, handle, messageName, handlerCondition, remote);
     handlers.computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>()).add(info);
   }
 
+  /** Runs every handler of the event, local and remote. */
   public void handle(Event event) {
+    handle(event, false);
+  }
+
+  /**
+   * Runs the handlers of an event received from a remote transport: handlers marked {@code remote =
+   * false} are skipped.
+   */
+  public void handleRemote(Event event) {
+    handle(event, true);
+  }
+
+  private void handle(Event event, boolean remoteOnly) {
     List<HandlerInfo> handlerList = handlers.get(event.getClass());
     if (handlerList == null) {
       warnIfOnlySuperclassIsHandled(event.getClass());
       return;
     }
     for (HandlerInfo info : handlerList) {
+      if (remoteOnly && !info.remote()) {
+        continue;
+      }
       if (info.condition() != null && !info.condition().matches(event)) {
         continue;
       }

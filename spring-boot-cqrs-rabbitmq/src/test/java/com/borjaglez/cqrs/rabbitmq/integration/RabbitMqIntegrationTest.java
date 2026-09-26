@@ -10,15 +10,22 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.testcontainers.DockerClientFactory;
 
+import com.borjaglez.cqrs.command.CommandBus;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
+import com.borjaglez.cqrs.query.QueryBus;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqCommandBus;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
@@ -27,9 +34,17 @@ import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 import com.borjaglez.cqrs.rabbitmq.config.RabbitMqCqrsProperties;
 import com.borjaglez.cqrs.rabbitmq.fixtures.FailingCommand;
+import com.borjaglez.cqrs.rabbitmq.fixtures.InternalCommand;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommand;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommandHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEvent;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEventHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQueryHandler;
 import com.borjaglez.cqrs.rabbitmq.fixtures.SlowCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrder;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQuery;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderResultCommand;
@@ -223,5 +238,88 @@ class RabbitMqIntegrationTest {
     TestOrder order = rabbitMqCommandBus.dispatchAndReceive(new TestOrderResultCommand("single"));
 
     assertThat(order).isEqualTo(new TestOrder("single"));
+  }
+
+  // Messages without @CqrsMessage, and handlers marked remote = false, stay local: they get no
+  // binding, and the consumer rejects them if they reach the queue anyway (issue #69).
+
+  @Autowired private RabbitTemplate rabbitTemplate;
+
+  @Autowired
+  @Qualifier("cqrsMessageConverter")
+  private MessageConverter messageConverter;
+
+  @Autowired private LocalCommandHandler localCommandHandler;
+
+  @Autowired private LocalQueryHandler localQueryHandler;
+
+  @Autowired private LocalEventHandler localEventHandler;
+
+  @Autowired private TestEventHandler testEventHandler;
+
+  @Autowired private CommandBus commandBus;
+
+  @Autowired private QueryBus queryBus;
+
+  private Message toMessage(Object payload) {
+    return messageConverter.toMessage(payload, new MessageProperties());
+  }
+
+  @Test
+  void shouldNotHandleLocalOnlyCommandsSentOverRabbitMq() {
+    String queue = "test-cqrs.integration-test.commands";
+
+    // Through the exchange, with the routing key of the command: nothing is bound to it.
+    rabbitMqCommandBus.dispatch(new LocalCommand("remote-exchange"));
+    rabbitMqCommandBus.dispatch(new InternalCommand("internal-exchange"));
+    // Straight to the queue through the default exchange, bypassing the bindings.
+    rabbitTemplate.send("", queue, toMessage(new LocalCommand("remote-queue")));
+    rabbitTemplate.send("", queue, toMessage(new InternalCommand("internal-queue")));
+
+    await()
+        .during(Duration.ofSeconds(2))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () ->
+                assertThat(localCommandHandler.getHandled())
+                    .doesNotContain(
+                        "remote-exchange", "internal-exchange", "remote-queue", "internal-queue"));
+
+    // The local bus still dispatches them.
+    commandBus.dispatch(new LocalCommand("local"));
+    commandBus.dispatch(new InternalCommand("internal-local"));
+    assertThat(localCommandHandler.getHandled()).contains("local", "internal-local");
+  }
+
+  @Test
+  void shouldAnswerALocalOnlyQuerySentStraightToTheQueueWithAnError() {
+    Message reply =
+        rabbitTemplate.sendAndReceive(
+            "", "test-cqrs.integration-test.queries", toMessage(new LocalQuery("remote")));
+
+    assertThat(reply).isNotNull();
+    assertThat((Boolean) reply.getMessageProperties().getHeader("cqrs.error")).isTrue();
+    assertThat(localQueryHandler.getHandled()).doesNotContain("remote");
+    assertThat((String) queryBus.ask(new LocalQuery("local"))).isEqualTo("local:local");
+  }
+
+  @Test
+  void shouldRunOnlyTheRemoteHandlersOfAnEventReceivedOverRabbitMq() {
+    // The exposed event goes through the exchange, the local one straight to the queue.
+    rabbitMqEventBus.publish(new TestEvent("remote-event"));
+    rabbitTemplate.send(
+        "", "test-cqrs.integration-test.events", toMessage(new LocalEvent("local-event")));
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () -> assertThat(testEventHandler.getLastHandledData()).isEqualTo("remote-event"));
+    await()
+        .during(Duration.ofSeconds(1))
+        .atMost(Duration.ofSeconds(3))
+        .untilAsserted(
+            () ->
+                assertThat(localEventHandler.getHandled())
+                    .doesNotContain("remote-event", "local-event"));
   }
 }

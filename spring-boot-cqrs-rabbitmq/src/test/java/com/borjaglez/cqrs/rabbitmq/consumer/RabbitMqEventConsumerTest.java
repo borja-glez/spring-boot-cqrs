@@ -2,9 +2,12 @@ package com.borjaglez.cqrs.rabbitmq.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -12,6 +15,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
@@ -20,7 +24,9 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEvent;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 
 class RabbitMqEventConsumerTest {
@@ -48,13 +54,13 @@ class RabbitMqEventConsumerTest {
 
     consumer.consume(message, event);
 
-    verify(registry).handle(event);
+    verify(registry).handleRemote(event);
   }
 
   @Test
   void consumeShouldHandleErrorWithRetry() {
     TestEvent event = new TestEvent("test-data");
-    doThrow(new RuntimeException("handler error")).when(registry).handle(event);
+    doThrow(new RuntimeException("handler error")).when(registry).handleRemote(event);
     when(namingStrategy.exchangeRetry("events")).thenReturn("cqrs.events.retry");
 
     Message message =
@@ -85,7 +91,7 @@ class RabbitMqEventConsumerTest {
 
     consumerWithMiddleware.consume(message, event);
 
-    verify(registry).handle(event);
+    verify(registry).handleRemote(event);
     assertThat(middlewareCalled).isTrue();
   }
 
@@ -123,7 +129,7 @@ class RabbitMqEventConsumerTest {
   @Test
   void consumeShouldSendStraightToDeadLetterWhenMaxAttemptsIsOne() {
     TestEvent event = new TestEvent("test-data");
-    doThrow(new RuntimeException("handler error")).when(registry).handle(event);
+    doThrow(new RuntimeException("handler error")).when(registry).handleRemote(event);
     when(namingStrategy.exchangeDeadLetter("events")).thenReturn("cqrs.events.dead_letter");
     RabbitMqEventConsumer singleAttemptConsumer =
         new RabbitMqEventConsumer(
@@ -164,5 +170,59 @@ class RabbitMqEventConsumerTest {
                     0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("max-attempts");
+  }
+
+  private RabbitMqEventConsumer consumerExposing(RabbitMqExposure exposure) {
+    return new RabbitMqEventConsumer(
+        registry,
+        Collections.emptyList(),
+        rabbitTemplate,
+        namingStrategy,
+        "events",
+        "app",
+        "cqrs.context.",
+        3,
+        exposure);
+  }
+
+  private static Message message() {
+    return MessageBuilder.withBody("{}".getBytes()).andProperties(new MessageProperties()).build();
+  }
+
+  @Test
+  void consumeShouldRejectUnannotatedEventsWithoutHandlingOrRetryingThem() {
+    LocalEvent event = new LocalEvent("local");
+
+    assertThatThrownBy(() -> consumer.consume(message(), event))
+        .isInstanceOf(AmqpRejectAndDontRequeueException.class)
+        .hasMessageContaining(LocalEvent.class.getName());
+
+    verify(registry, never()).handleRemote(any());
+    verify(registry, never()).handle(any());
+    verifyNoInteractions(rabbitTemplate);
+  }
+
+  @Test
+  void consumeShouldRejectEventsWhoseHandlersAreAllLocalEvenWhenExposingAll() {
+    TestEvent event = new TestEvent("internal");
+    when(registry.getHandlerInfos(TestEvent.class))
+        .thenReturn(
+            List.of(new EventHandlerRegistry.HandlerInfo(new Object(), null, "e", null, false)));
+
+    assertThatThrownBy(() -> consumerExposing(RabbitMqExposure.ALL).consume(message(), event))
+        .isInstanceOf(AmqpRejectAndDontRequeueException.class);
+
+    verify(registry, never()).handleRemote(any());
+    verifyNoInteractions(rabbitTemplate);
+  }
+
+  @Test
+  void consumeShouldRunOnlyRemoteHandlersOfExposedEvents() {
+    LocalEvent event = new LocalEvent("local");
+
+    consumerExposing(RabbitMqExposure.ALL).consume(message(), event);
+
+    verify(registry).handleRemote(event);
+    verify(registry, never()).handle(any());
   }
 }

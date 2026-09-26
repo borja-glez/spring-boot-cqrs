@@ -70,39 +70,60 @@ public class BeanPostProcessorHandlerDiscoverer
   public void discover(Object bean, String beanName) {
     Class<?> targetClass = AopUtils.getTargetClass(bean);
 
-    if (AnnotationUtils.findAnnotation(targetClass, CommandHandler.class) != null) {
+    // A handler is remote only when neither its class nor its method is marked remote = false.
+    CommandHandler commandHandler =
+        AnnotationUtils.findAnnotation(targetClass, CommandHandler.class);
+    if (commandHandler != null) {
       ReflectionUtils.doWithMethods(
           targetClass,
-          method -> registerCommandHandler(bean, beanName, method),
+          method ->
+              registerCommandHandler(
+                  bean,
+                  beanName,
+                  method,
+                  commandHandler.remote() && method.getAnnotation(HandleCommand.class).remote()),
           method -> method.isAnnotationPresent(HandleCommand.class));
     }
 
-    if (AnnotationUtils.findAnnotation(targetClass, EventHandler.class) != null) {
+    EventHandler eventHandler = AnnotationUtils.findAnnotation(targetClass, EventHandler.class);
+    if (eventHandler != null) {
       ReflectionUtils.doWithMethods(
           targetClass,
-          method -> registerEventHandler(bean, beanName, method),
+          method ->
+              registerEventHandler(
+                  bean,
+                  beanName,
+                  method,
+                  eventHandler.remote() && method.getAnnotation(HandleEvent.class).remote()),
           method -> method.isAnnotationPresent(HandleEvent.class));
     }
 
-    if (AnnotationUtils.findAnnotation(targetClass, QueryHandler.class) != null) {
+    QueryHandler queryHandler = AnnotationUtils.findAnnotation(targetClass, QueryHandler.class);
+    if (queryHandler != null) {
       ReflectionUtils.doWithMethods(
           targetClass,
-          method -> registerQueryHandler(bean, beanName, method),
+          method ->
+              registerQueryHandler(
+                  bean,
+                  beanName,
+                  method,
+                  queryHandler.remote() && method.getAnnotation(HandleQuery.class).remote()),
           method -> method.isAnnotationPresent(HandleQuery.class));
     }
   }
 
-  private void registerCommandHandler(Object bean, String beanName, Method method) {
+  private void registerCommandHandler(Object bean, String beanName, Method method, boolean remote) {
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(beanName, method, paramTypes, Command.class);
     Class<?> commandClass = paramTypes[0];
     String messageName = namingStrategy.commandName(commandClass);
     boolean requiresValidation = hasValidAnnotation(method);
     Method invocable = invocableMethod(bean, beanName, method);
-    commandHandlerRegistry.register(commandClass, bean, invocable, messageName, requiresValidation);
+    commandHandlerRegistry.register(
+        commandClass, bean, invocable, messageName, requiresValidation, remote);
   }
 
-  private void registerEventHandler(Object bean, String beanName, Method method) {
+  private void registerEventHandler(Object bean, String beanName, Method method, boolean remote) {
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(beanName, method, paramTypes, Event.class);
     Class<?> eventClass = paramTypes[0];
@@ -110,7 +131,7 @@ public class BeanPostProcessorHandlerDiscoverer
     Method invocable = invocableMethod(bean, beanName, method);
     Expression condition = parseCondition(beanName, method);
     eventHandlerRegistry.register(
-        eventClass, bean, invocable, messageName, condition, beanResolver);
+        eventClass, bean, invocable, messageName, condition, beanResolver, remote);
   }
 
   /** Parses the {@code @HandleEvent} condition once, failing startup when it is malformed. */
@@ -135,13 +156,13 @@ public class BeanPostProcessorHandlerDiscoverer
     }
   }
 
-  private void registerQueryHandler(Object bean, String beanName, Method method) {
+  private void registerQueryHandler(Object bean, String beanName, Method method, boolean remote) {
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(beanName, method, paramTypes, Query.class);
     Class<?> queryClass = paramTypes[0];
     String messageName = namingStrategy.queryName(queryClass);
     queryHandlerRegistry.register(
-        queryClass, bean, invocableMethod(bean, beanName, method), messageName);
+        queryClass, bean, invocableMethod(bean, beanName, method), messageName, remote);
   }
 
   /**

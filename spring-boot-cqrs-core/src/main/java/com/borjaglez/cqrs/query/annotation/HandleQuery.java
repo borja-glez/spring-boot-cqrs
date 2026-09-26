@@ -9,4 +9,15 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-public @interface HandleQuery {}
+public @interface HandleQuery {
+
+  /**
+   * Whether this handler may receive its query from a remote transport such as RabbitMQ. {@code
+   * false} keeps the handler local: the broker adapters neither bind nor consume the message for
+   * it, and the local buses still dispatch it. Use it to keep a message annotated with {@link
+   * com.borjaglez.cqrs.naming.CqrsMessage} out of the remote contract.
+   *
+   * @return {@code true} (the default) when the handler may be invoked remotely
+   */
+  boolean remote() default true;
+}

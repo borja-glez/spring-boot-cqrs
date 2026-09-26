@@ -16,8 +16,29 @@ import com.borjaglez.cqrs.command.CommandNotRegisteredException;
 
 public class CommandHandlerRegistry {
 
+  /**
+   * A registered command handler.
+   *
+   * @param bean the handler bean
+   * @param handle the handler method
+   * @param messageName the logical name of the command
+   * @param requiresValidation whether the command parameter is annotated with {@code @Valid}
+   * @param remote whether the handler may receive the command from a remote transport; {@code
+   *     false} when it is marked {@code remote = false}
+   */
   public record HandlerInfo(
-      Object bean, MethodHandle handle, String messageName, boolean requiresValidation) {}
+      Object bean,
+      MethodHandle handle,
+      String messageName,
+      boolean requiresValidation,
+      boolean remote) {
+
+    /** Creates the information of a remote handler. */
+    public HandlerInfo(
+        Object bean, MethodHandle handle, String messageName, boolean requiresValidation) {
+      this(bean, handle, messageName, requiresValidation, true);
+    }
+  }
 
   private final ConcurrentHashMap<Class<?>, HandlerInfo> handlers = new ConcurrentHashMap<>();
 
@@ -27,8 +48,23 @@ public class CommandHandlerRegistry {
       Method method,
       String messageName,
       boolean requiresValidation) {
+    register(commandClass, bean, method, messageName, requiresValidation, true);
+  }
+
+  /**
+   * Registers the handler of a command.
+   *
+   * @param remote whether the handler may receive the command from a remote transport
+   */
+  public void register(
+      Class<?> commandClass,
+      Object bean,
+      Method method,
+      String messageName,
+      boolean requiresValidation,
+      boolean remote) {
     MethodHandle handle = MethodHandleUtil.unreflect(method);
-    HandlerInfo info = new HandlerInfo(bean, handle, messageName, requiresValidation);
+    HandlerInfo info = new HandlerInfo(bean, handle, messageName, requiresValidation, remote);
     HandlerInfo existing = handlers.putIfAbsent(commandClass, info);
     if (existing != null) {
       throw new CommandAlreadyRegisteredException(commandClass);

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Binding;
@@ -19,7 +20,12 @@ import com.borjaglez.cqrs.event.spring.SpringEventBus;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEvent;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEventHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 class RabbitMqEventBusAutoConfigurationTest {
@@ -231,5 +237,88 @@ class RabbitMqEventBusAutoConfigurationTest {
                     .rootCause()
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("spring.rabbitmq.publisher-confirm-type=correlated"));
+  }
+
+  private static EventHandlerRegistry registryWithLocalMessages() {
+    try {
+      EventHandlerRegistry registry = new EventHandlerRegistry();
+      registry.register(
+          TestEvent.class,
+          new LocalEventHandler(),
+          LocalEventHandler.class.getMethod("on", TestEvent.class),
+          "created",
+          false);
+      registry.register(
+          TestEvent.class,
+          new TestEventHandler(),
+          TestEventHandler.class.getMethod("handle", TestEvent.class),
+          "created");
+      registry.register(
+          LocalEvent.class,
+          new LocalEventHandler(),
+          LocalEventHandler.class.getMethod("on", LocalEvent.class),
+          "local",
+          false);
+      return registry;
+    } catch (NoSuchMethodException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static List<String> messageBindings(Declarables declarables, String exchange) {
+    return declarables.getDeclarablesByType(Binding.class).stream()
+        .filter(b -> b.getExchange().equals(exchange))
+        .map(Binding::getRoutingKey)
+        .toList();
+  }
+
+  @Test
+  void shouldBindOnlyAnnotatedRemoteMessagesByDefault() {
+    contextRunner
+        .withAllowBeanDefinitionOverriding(true)
+        .withBean(
+            EventHandlerRegistry.class,
+            RabbitMqEventBusAutoConfigurationTest::registryWithLocalMessages)
+        .run(
+            context -> {
+              Declarables declarables = context.getBean("cqrsEventDeclarables", Declarables.class);
+              MessageNamingStrategy naming = context.getBean(MessageNamingStrategy.class);
+              assertThat(messageBindings(declarables, "cqrs.events"))
+                  .containsExactly(naming.eventName(TestEvent.class));
+              assertThat(
+                      context
+                          .getBean(
+                              "cqrsEventListenerContainer", SimpleMessageListenerContainer.class)
+                          .getMessageListener())
+                  .extracting("delegate")
+                  .extracting("exposure")
+                  .isEqualTo(RabbitMqExposure.ANNOTATED);
+            });
+  }
+
+  @Test
+  void shouldBindUnannotatedMessagesButNotLocalHandlersWhenExposingAll() {
+    contextRunner
+        .withAllowBeanDefinitionOverriding(true)
+        .withBean(
+            EventHandlerRegistry.class,
+            RabbitMqEventBusAutoConfigurationTest::registryWithLocalMessages)
+        .withPropertyValues("cqrs.rabbitmq.expose=all")
+        .run(
+            context -> {
+              Declarables declarables = context.getBean("cqrsEventDeclarables", Declarables.class);
+              MessageNamingStrategy naming = context.getBean(MessageNamingStrategy.class);
+              assertThat(messageBindings(declarables, "cqrs.events"))
+                  .containsExactlyInAnyOrder(naming.eventName(TestEvent.class))
+                  .doesNotContain(naming.eventName(LocalEvent.class));
+              assertThat(
+                      context
+                          .getBean(
+                              "cqrsEventListenerContainer", SimpleMessageListenerContainer.class)
+                          .getMessageListener())
+                  .extracting("delegate")
+                  .extracting("exposure")
+                  .isEqualTo(RabbitMqExposure.ALL);
+            });
   }
 }

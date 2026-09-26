@@ -2,7 +2,11 @@ package com.borjaglez.cqrs.rabbitmq.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
@@ -12,7 +16,14 @@ import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.LocalQueryHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQueryHandler;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestQueryHandler;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 class RabbitMqQueryBusAutoConfigurationTest {
@@ -117,6 +128,89 @@ class RabbitMqQueryBusAutoConfigurationTest {
               assertThat(context).doesNotHaveBean(RabbitMqQueryBus.class);
               assertThat(context).doesNotHaveBean("cqrsQueryDeclarables");
               assertThat(context).doesNotHaveBean("cqrsQueryListenerContainer");
+            });
+  }
+
+  private static QueryHandlerRegistry registryWithLocalMessages() {
+    try {
+      QueryHandlerRegistry registry = new QueryHandlerRegistry();
+      registry.register(
+          TestQuery.class,
+          new TestQueryHandler(),
+          TestQueryHandler.class.getMethod("handle", TestQuery.class),
+          "get");
+      registry.register(
+          LocalQuery.class,
+          new LocalQueryHandler(),
+          LocalQueryHandler.class.getMethod("handle", LocalQuery.class),
+          "local");
+      registry.register(
+          TestOrderListQuery.class,
+          new TestOrderListQueryHandler(),
+          TestOrderListQueryHandler.class.getMethod("handle", TestOrderListQuery.class),
+          "list",
+          false);
+      return registry;
+    } catch (NoSuchMethodException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static List<String> messageBindings(Declarables declarables, String exchange) {
+    return declarables.getDeclarablesByType(Binding.class).stream()
+        .filter(b -> b.getExchange().equals(exchange))
+        .map(Binding::getRoutingKey)
+        .toList();
+  }
+
+  @Test
+  void shouldBindOnlyAnnotatedRemoteMessagesByDefault() {
+    contextRunner
+        .withAllowBeanDefinitionOverriding(true)
+        .withBean(
+            QueryHandlerRegistry.class,
+            RabbitMqQueryBusAutoConfigurationTest::registryWithLocalMessages)
+        .run(
+            context -> {
+              Declarables declarables = context.getBean("cqrsQueryDeclarables", Declarables.class);
+              MessageNamingStrategy naming = context.getBean(MessageNamingStrategy.class);
+              assertThat(messageBindings(declarables, "cqrs.queries"))
+                  .containsExactly(naming.queryName(TestQuery.class));
+              assertThat(
+                      context
+                          .getBean(
+                              "cqrsQueryListenerContainer", SimpleMessageListenerContainer.class)
+                          .getMessageListener())
+                  .extracting("delegate")
+                  .extracting("exposure")
+                  .isEqualTo(RabbitMqExposure.ANNOTATED);
+            });
+  }
+
+  @Test
+  void shouldBindUnannotatedMessagesButNotLocalHandlersWhenExposingAll() {
+    contextRunner
+        .withAllowBeanDefinitionOverriding(true)
+        .withBean(
+            QueryHandlerRegistry.class,
+            RabbitMqQueryBusAutoConfigurationTest::registryWithLocalMessages)
+        .withPropertyValues("cqrs.rabbitmq.expose=all")
+        .run(
+            context -> {
+              Declarables declarables = context.getBean("cqrsQueryDeclarables", Declarables.class);
+              MessageNamingStrategy naming = context.getBean(MessageNamingStrategy.class);
+              assertThat(messageBindings(declarables, "cqrs.queries"))
+                  .containsExactlyInAnyOrder(
+                      naming.queryName(TestQuery.class), naming.queryName(LocalQuery.class))
+                  .doesNotContain(naming.queryName(TestOrderListQuery.class));
+              assertThat(
+                      context
+                          .getBean(
+                              "cqrsQueryListenerContainer", SimpleMessageListenerContainer.class)
+                          .getMessageListener())
+                  .extracting("delegate")
+                  .extracting("exposure")
+                  .isEqualTo(RabbitMqExposure.ALL);
             });
   }
 }
