@@ -1,10 +1,16 @@
 package com.borjaglez.cqrs.rabbitmq.infrastructure;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.amqp.support.converter.SmartMessageConverter;
@@ -12,6 +18,7 @@ import org.springframework.core.ParameterizedTypeReference;
 
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.rabbitmq.PublishNotConfirmedException;
 import com.borjaglez.cqrs.rabbitmq.RemoteHandlerException;
 import com.borjaglez.cqrs.rabbitmq.RemoteReplyTimeoutException;
 
@@ -36,15 +43,58 @@ public class RabbitMqPublisher {
   }
 
   public void publish(String exchange, String routingKey, Object message, String messageType) {
-    Map<String, String> contextHeaders = snapshotContextHeaders();
+    rabbitTemplate.convertAndSend(exchange, routingKey, message, cqrsHeaders(messageType));
+  }
+
+  /**
+   * Publishes the message and waits up to {@code timeout} for the broker to confirm it. Needs a
+   * connection factory with correlated publisher confirms ({@code
+   * spring.rabbitmq.publisher-confirm-type=correlated}).
+   *
+   * @throws PublishNotConfirmedException when the broker rejects the message or does not confirm it
+   *     in time
+   */
+  public void publishConfirmed(
+      String exchange, String routingKey, Object message, String messageType, Duration timeout) {
+    CorrelationData correlation = new CorrelationData();
     rabbitTemplate.convertAndSend(
-        exchange,
-        routingKey,
-        message,
-        m -> {
-          applyCqrsHeaders(m.getMessageProperties(), messageType, contextHeaders);
-          return m;
-        });
+        exchange, routingKey, message, cqrsHeaders(messageType), correlation);
+    CorrelationData.Confirm confirm = awaitConfirm(correlation, exchange, routingKey, timeout);
+    if (!confirm.isAck()) {
+      throw new PublishNotConfirmedException(
+          "Message "
+              + routingKey
+              + " sent to "
+              + exchange
+              + " was rejected by the broker: "
+              + confirm.getReason());
+    }
+  }
+
+  private static CorrelationData.Confirm awaitConfirm(
+      CorrelationData correlation, String exchange, String routingKey, Duration timeout) {
+    String description = "Message " + routingKey + " sent to " + exchange;
+    try {
+      return correlation.getFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      throw new PublishNotConfirmedException(
+          description + " was not confirmed by the broker within " + timeout, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new PublishNotConfirmedException(
+          description + " was not confirmed: interrupted while waiting for the broker", e);
+    } catch (ExecutionException e) {
+      throw new PublishNotConfirmedException(
+          description + " was not confirmed by the broker", e.getCause());
+    }
+  }
+
+  private MessagePostProcessor cqrsHeaders(String messageType) {
+    Map<String, String> contextHeaders = snapshotContextHeaders();
+    return m -> {
+      applyCqrsHeaders(m.getMessageProperties(), messageType, contextHeaders);
+      return m;
+    };
   }
 
   public Object publishAndReceive(

@@ -78,19 +78,30 @@ Implements `CommandBus`. Publishes commands to the command exchange.
 
 Implements `EventBus`. Publishes events to the event exchange.
 
-- Has a **fallback** to the local `SpringEventBus` if the RabbitMQ connection fails (catches `AmqpException`)
-- This ensures events are still processed locally when RabbitMQ is unavailable
+- `publish(event)` sends the event to the events exchange. If the send fails (for example, the broker is unreachable), the `AmqpException` thrown by `RabbitMqPublisher.publish` is rethrown unchanged and the event is **not** delivered in-process: there is no local fallback. Local handlers receive a published event through this application's own events queue
+- Without publisher confirms (the default), `publish(event)` returns once the message has been written to the channel, before the broker has accepted it: a message the broker drops afterwards is not detected. Enable [publisher confirms](#publisher-confirms) when the caller needs to know that the broker accepted the event
+- `publish(List<Event>)` publishes the events one by one, in order, and stops at the first failure, rethrowing it. The events before the failing one have been sent; the failing one and those after it have not. There is no batching or rollback
+- It is not wrapped by the transactional event bus: a caller inside a transaction publishes before the commit. For reliable publication consistent with the database, use the Outbox Pattern (see [Transactional event publishing](../README.md#transactional-event-publishing))
 
-```java
-public void publish(Event event) {
-    try {
-        publisher.publish(exchange, routingKey, event, "event");
-    } catch (AmqpException e) {
-        log.warn("Failed to publish via RabbitMQ, falling back to local bus");
-        fallbackEventBus.publish(event);
-    }
-}
+#### Publisher confirms
+
+With `cqrs.rabbitmq.events.confirms.enabled=true`, `publish(event)` waits for the broker to confirm each event and throws `PublishNotConfirmedException` (an `AmqpException`) when the broker rejects it (a negative acknowledgement, for example a queue with `x-overflow=reject-publish` that is full) or does not confirm it within `cqrs.rabbitmq.events.confirms.timeout` (5 seconds by default). Each publish then waits for a round trip to the broker.
+
+Confirms need correlated publisher confirms on the connection factory; the application fails to start when they are enabled without it:
+
+```yaml
+spring:
+  rabbitmq:
+    publisher-confirm-type: correlated
+cqrs:
+  rabbitmq:
+    events:
+      confirms:
+        enabled: true
+        timeout: 5s
 ```
+
+After a timeout the broker may still have accepted the event, so a caller that retries can publish it twice: event handlers should be idempotent. Commands and queries do not use confirms.
 
 ### RabbitMqQueryBus
 
@@ -184,6 +195,9 @@ cqrs:
     events:
       concurrent-consumers: 10
       max-concurrent-consumers: 20
+      confirms:
+        enabled: false  # see Publisher confirms
+        timeout: 5s
     queries:
       concurrent-consumers: 10
       max-concurrent-consumers: 20

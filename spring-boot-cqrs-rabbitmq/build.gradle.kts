@@ -20,4 +20,5 @@ dependencies {
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.spring.boot.starter.validation)
     testRuntimeOnly(libs.jackson.databind)
+    testRuntimeOnly(libs.jackson.datatype.jsr310)
 }
