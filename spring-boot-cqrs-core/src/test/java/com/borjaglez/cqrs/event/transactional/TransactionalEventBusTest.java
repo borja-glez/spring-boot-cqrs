@@ -1,7 +1,9 @@
 package com.borjaglez.cqrs.event.transactional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -15,6 +17,7 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.borjaglez.cqrs.event.Event;
 import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 
@@ -105,5 +108,120 @@ class TransactionalEventBusTest {
 
     @Override
     protected void doRollback(DefaultTransactionStatus status) {}
+  }
+
+  @Test
+  void eventsPublishedByHandlersAfterCommitAreNotLost() {
+    TestEvent first = new TestEvent("first");
+    TestEvent followUp = new TestEvent("follow-up");
+    List<Event> published = new java.util.ArrayList<>();
+    EventBus reacting =
+        new EventBus() {
+          @Override
+          public void publish(Event event) {
+            published.add(event);
+            if (event == first) {
+              // A handler that reacts to the event by publishing another one.
+              chained.publish(followUp);
+            }
+          }
+
+          @Override
+          public void publish(List<Event> events) {
+            events.forEach(this::publish);
+          }
+        };
+    chained = new TransactionalEventBus(reacting);
+
+    transactionTemplate.executeWithoutResult(status -> chained.publish(first));
+
+    assertThat(published).containsExactly(first, followUp);
+  }
+
+  private TransactionalEventBus chained;
+
+  /** Tracks nesting so that REQUIRES_NEW really suspends the outer transaction. */
+  private static final class NestingTransactionManager extends AbstractPlatformTransactionManager {
+    private final ThreadLocal<Integer> depth = ThreadLocal.withInitial(() -> 0);
+
+    @Override
+    protected Object doGetTransaction() {
+      return new Object();
+    }
+
+    @Override
+    protected boolean isExistingTransaction(Object transaction) {
+      return depth.get() > 0;
+    }
+
+    @Override
+    protected void doBegin(Object transaction, TransactionDefinition definition) {
+      depth.set(depth.get() + 1);
+    }
+
+    @Override
+    protected Object doSuspend(Object transaction) {
+      return transaction;
+    }
+
+    @Override
+    protected void doResume(Object transaction, Object suspendedResources) {}
+
+    @Override
+    protected void doCommit(DefaultTransactionStatus status) {}
+
+    @Override
+    protected void doRollback(DefaultTransactionStatus status) {}
+
+    @Override
+    protected void doCleanupAfterCompletion(Object transaction) {
+      depth.set(depth.get() - 1);
+    }
+  }
+
+  private final NestingTransactionManager nesting = new NestingTransactionManager();
+
+  private TransactionTemplate requiresNew() {
+    TransactionTemplate template = new TransactionTemplate(nesting);
+    template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    return template;
+  }
+
+  @Test
+  void eventsOfAnInnerTransactionThatRollsBackAreNotPublished() {
+    TestEvent outer = new TestEvent("outer");
+    TestEvent inner = new TestEvent("inner");
+
+    new TransactionTemplate(nesting)
+        .executeWithoutResult(
+            status -> {
+              eventBus.publish(outer);
+              requiresNew()
+                  .executeWithoutResult(
+                      innerStatus -> {
+                        eventBus.publish(inner);
+                        innerStatus.setRollbackOnly();
+                      });
+            });
+
+    verify(delegate).publish(outer);
+    verify(delegate, never()).publish(inner);
+  }
+
+  @Test
+  void eventsOfAnInnerTransactionThatCommitsSurviveAnOuterRollback() {
+    TestEvent outer = new TestEvent("outer");
+    TestEvent inner = new TestEvent("inner");
+
+    new TransactionTemplate(nesting)
+        .executeWithoutResult(
+            status -> {
+              eventBus.publish(outer);
+              requiresNew().executeWithoutResult(innerStatus -> eventBus.publish(inner));
+              status.setRollbackOnly();
+            });
+
+    verify(delegate).publish(inner);
+    verify(delegate, never()).publish(outer);
   }
 }
