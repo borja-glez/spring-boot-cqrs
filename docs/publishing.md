@@ -88,6 +88,8 @@ The workflow:
 6. Publishes via `./gradlew publish -Pversion={version}`
 7. Creates a GitHub Release
 
+Each module uploads 20 files: the jar, sources jar, javadoc jar, POM and Gradle module metadata, their `.asc` signatures, and md5/sha1 checksums of the five artifacts. The publish convention removes the optional sha256/sha512 checksums and the checksums of the signatures before the upload, because Maven Central counts every file against its monthly [publishing limits](https://central.sonatype.org/publish/maven-central-publishing-limits/).
+
 ### Snapshot (automatic)
 
 Triggers on every push to `main` or `release/*` branches. Publishes the current SNAPSHOT version from `gradle.properties`.
