@@ -8,7 +8,10 @@ import lombok.Getter;
 @Getter
 public abstract class Query {
 
-  private final String queryId;
+  // Not final so deserializers that only populate non-final fields (Jackson 3 by default) keep the
+  // identity the message was sent with. There are no setters: the value never changes after
+  // construction or deserialization.
+  private String queryId;
 
   protected Query() {
     this.queryId = UUID.randomUUID().toString();
