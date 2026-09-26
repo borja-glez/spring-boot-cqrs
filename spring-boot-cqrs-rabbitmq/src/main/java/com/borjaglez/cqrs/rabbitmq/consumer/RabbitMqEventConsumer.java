@@ -94,7 +94,7 @@ public class RabbitMqEventConsumer extends RabbitMqConsumer {
               });
       chain.proceed(event);
     } catch (Exception e) {
-      handleConsumptionError(message, exchangeName, appName);
+      handleConsumptionError(message, exchangeName, appName, e);
     } finally {
       scope.close();
     }

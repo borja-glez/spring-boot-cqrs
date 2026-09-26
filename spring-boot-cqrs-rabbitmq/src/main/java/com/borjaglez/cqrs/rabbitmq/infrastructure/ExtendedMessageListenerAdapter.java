@@ -11,7 +11,6 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
 import org.springframework.amqp.rabbit.support.DefaultMessagePropertiesConverter;
-import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
 import org.springframework.amqp.rabbit.support.MessagePropertiesConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 
@@ -21,8 +20,6 @@ public class ExtendedMessageListenerAdapter extends MessageListenerAdapter {
 
   private static final Log LOG = LogFactory.getLog(ExtendedMessageListenerAdapter.class);
 
-  static final String HEADER_ERROR = "cqrs.error";
-  static final String HEADER_ERROR_TYPE = "cqrs.error.type";
   static final String HEADER_NULL_RESULT = "cqrs.result.null";
 
   /** Stands for a {@code null} result, which Spring AMQP would otherwise not answer at all. */
@@ -88,13 +85,13 @@ public class ExtendedMessageListenerAdapter extends MessageListenerAdapter {
    */
   private void sendErrorResponse(Channel channel, Message originalMessage, Exception error) {
     try {
-      Throwable failure = handlerFailure(error);
+      Throwable failure = RabbitMqErrorHeaders.handlerFailure(error);
       String errorBody =
           failure.getMessage() != null ? failure.getMessage() : failure.getClass().getName();
 
       MessageProperties replyProperties = new MessageProperties();
-      replyProperties.setHeader(HEADER_ERROR, true);
-      replyProperties.setHeader(HEADER_ERROR_TYPE, failure.getClass().getName());
+      replyProperties.setHeader(RabbitMqErrorHeaders.ERROR, true);
+      replyProperties.setHeader(RabbitMqErrorHeaders.ERROR_TYPE, failure.getClass().getName());
       replyProperties.setContentType(MessageProperties.CONTENT_TYPE_TEXT_PLAIN);
       replyProperties.setContentEncoding(StandardCharsets.UTF_8.name());
 
@@ -112,14 +109,5 @@ public class ExtendedMessageListenerAdapter extends MessageListenerAdapter {
     } catch (Exception publishError) {
       LOG.warn("Could not send the error reply; the requester will time out", publishError);
     }
-  }
-
-  /** The exception thrown by the handler, without the wrapper added by the listener adapter. */
-  static Throwable handlerFailure(Throwable error) {
-    Throwable current = error;
-    while (current instanceof ListenerExecutionFailedException && current.getCause() != null) {
-      current = current.getCause();
-    }
-    return current;
   }
 }

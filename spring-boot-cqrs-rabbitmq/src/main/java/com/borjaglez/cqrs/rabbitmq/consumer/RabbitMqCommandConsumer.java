@@ -103,13 +103,13 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
       if ("command_reply".equals(messageType) || "command_wait".equals(messageType)) {
         throw e;
       }
-      handleConsumptionError(message, exchangeName, appName);
+      handleConsumptionError(message, exchangeName, appName, e);
       return null;
     } catch (Exception e) {
       if ("command_reply".equals(messageType) || "command_wait".equals(messageType)) {
         throw new RuntimeException(e);
       }
-      handleConsumptionError(message, exchangeName, appName);
+      handleConsumptionError(message, exchangeName, appName, e);
       return null;
     } finally {
       scope.close();

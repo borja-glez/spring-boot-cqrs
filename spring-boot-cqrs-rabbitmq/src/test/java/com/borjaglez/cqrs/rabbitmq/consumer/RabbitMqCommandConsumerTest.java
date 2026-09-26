@@ -266,6 +266,40 @@ class RabbitMqCommandConsumerTest {
     singleAttemptConsumer.consume(message, command);
 
     verify(rabbitTemplate).send("cqrs.commands.dead_letter", "app", message);
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.type"))
+        .isEqualTo(RuntimeException.class.getName());
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.message"))
+        .isEqualTo("handler error");
+    assertThat((Integer) message.getMessageProperties().getHeader("cqrs.error.attempts"))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void consumeShouldRecordTheCheckedExceptionOnDeadLetteredCommand() {
+    BusMiddleware middleware =
+        (msg, chain) -> {
+          throw new Exception("checked error");
+        };
+    when(namingStrategy.exchangeDeadLetter("commands")).thenReturn("cqrs.commands.dead_letter");
+    RabbitMqCommandConsumer singleAttemptConsumer =
+        new RabbitMqCommandConsumer(
+            registry,
+            List.of(middleware),
+            rabbitTemplate,
+            namingStrategy,
+            "commands",
+            "app",
+            "cqrs.context.",
+            1);
+
+    Message message = createMessage("command");
+    singleAttemptConsumer.consume(message, new TestCommand("test-data"));
+
+    verify(rabbitTemplate).send("cqrs.commands.dead_letter", "app", message);
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.type"))
+        .isEqualTo(Exception.class.getName());
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.message"))
+        .isEqualTo("checked error");
   }
 
   @Test

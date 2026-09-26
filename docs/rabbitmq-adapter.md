@@ -115,9 +115,21 @@ Commands and events use a three-tier queue strategy:
         after which the message returns to this application's Main Queue
         (dead-lettered through the default exchange)
    b. Otherwise:
+      - Record the failure cause in the cqrs.error.* headers (see below)
       - Send to Dead Letter Exchange with routing key = application name
       - Message stays in this application's Dead Letter Queue for manual inspection
 ```
+
+A dead-lettered message keeps its original body and headers (including `cqrs.redelivery.count`) and also records why it failed:
+
+| Header | Value |
+|--------|-------|
+| `cqrs.error.type` | Class name of the exception thrown by the handler (the handler's own exception, unwrapped from Spring AMQP's `ListenerExecutionFailedException`, as in error replies) |
+| `cqrs.error.message` | Exception message, truncated to 1000 characters; absent when the exception has no message |
+| `cqrs.error.attempts` | Number of deliveries made, including the first one |
+| `cqrs.error.timestamp` | ISO-8601 instant at which the message was dead-lettered |
+
+Retried messages do not get these headers. The header names are available as constants in `RabbitMqErrorHeaders`. A subclass of `RabbitMqConsumer` that calls the three-argument `handleConsumptionError(message, exchangeName, appName)` still dead-letters the message, but without `cqrs.error.type` and `cqrs.error.message`; use the overload that takes the exception to record them.
 
 Configuration:
 

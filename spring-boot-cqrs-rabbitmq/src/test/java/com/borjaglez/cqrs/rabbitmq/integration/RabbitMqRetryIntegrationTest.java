@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterAll;
@@ -126,6 +127,17 @@ class RabbitMqRetryIntegrationTest {
     assertThat(deadLetter).isNotNull();
     assertThat((Integer) deadLetter.getMessageProperties().getHeader("cqrs.redelivery.count"))
         .isEqualTo(2);
+    MessageProperties deadLetterProperties = deadLetter.getMessageProperties();
+    assertThat(deadLetterProperties.getHeader("cqrs.error.type").toString())
+        .isEqualTo(IllegalStateException.class.getName());
+    assertThat(deadLetterProperties.getHeader("cqrs.error.message").toString()).isEqualTo("boom");
+    assertThat(((Number) deadLetterProperties.getHeader("cqrs.error.attempts")).intValue())
+        .isEqualTo(3);
+    assertThat(Instant.parse(deadLetterProperties.getHeader("cqrs.error.timestamp").toString()))
+        .isBeforeOrEqualTo(Instant.now());
+    assertThat(deadLetterProperties.getHeader("custom").toString()).isEqualTo("kept");
+    assertThat(new String(deadLetter.getBody(), StandardCharsets.UTF_8))
+        .isEqualTo("{\"data\":\"payload\"}");
 
     assertThat(rabbitTemplate.receive(naming.queue("app-a", EXCHANGE), RETRY_TTL * 3)).isNull();
     assertThat(rabbitTemplate.receive(naming.queue("app-b", EXCHANGE))).isNull();

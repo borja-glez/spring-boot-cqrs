@@ -141,6 +141,12 @@ class RabbitMqEventConsumerTest {
     singleAttemptConsumer.consume(message, event);
 
     verify(rabbitTemplate).send("cqrs.events.dead_letter", "app", message);
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.type"))
+        .isEqualTo(RuntimeException.class.getName());
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.message"))
+        .isEqualTo("handler error");
+    assertThat((Integer) message.getMessageProperties().getHeader("cqrs.error.attempts"))
+        .isEqualTo(1);
   }
 
   @Test

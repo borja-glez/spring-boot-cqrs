@@ -12,6 +12,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -19,6 +21,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
 
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 
@@ -96,6 +99,91 @@ class RabbitMqConsumerTest {
     consumer.handleConsumptionError(message, "commands", "app");
 
     verify(rabbitTemplate).send("cqrs.commands.retry", "app", message);
+  }
+
+  @Test
+  void deadLetteredMessageShouldRecordTheFailureCause() {
+    Message message = message(2);
+    Instant before = Instant.now();
+
+    consumer.handleConsumptionError(
+        message, "commands", "app", new IllegalStateException("handler failed"));
+
+    verify(rabbitTemplate).send("cqrs.commands.dead_letter", "app", message);
+    MessageProperties props = message.getMessageProperties();
+    assertThat((String) props.getHeader("cqrs.error.type"))
+        .isEqualTo(IllegalStateException.class.getName());
+    assertThat((String) props.getHeader("cqrs.error.message")).isEqualTo("handler failed");
+    assertThat((Integer) props.getHeader("cqrs.error.attempts")).isEqualTo(3);
+    assertThat(Instant.parse(props.getHeader("cqrs.error.timestamp")))
+        .isBetween(before, Instant.now());
+    assertThat((String) props.getHeader("custom")).isEqualTo("kept");
+    assertThat((Integer) props.getHeader(REDELIVERY_COUNT)).isEqualTo(2);
+    assertThat(message.getBody()).isEqualTo("{\"a\":1}".getBytes());
+  }
+
+  @Test
+  void deadLetteredMessageShouldOmitTheErrorMessageWhenTheExceptionHasNone() {
+    Message message = message(2);
+
+    consumer.handleConsumptionError(message, "commands", "app", new IllegalStateException());
+
+    MessageProperties props = message.getMessageProperties();
+    assertThat((String) props.getHeader("cqrs.error.type"))
+        .isEqualTo(IllegalStateException.class.getName());
+    assertThat(props.getHeaders()).doesNotContainKey("cqrs.error.message");
+  }
+
+  @Test
+  void deadLetteredMessageShouldTruncateALongErrorMessage() {
+    Message message = message(2);
+
+    consumer.handleConsumptionError(
+        message, "commands", "app", new IllegalStateException("x".repeat(5000)));
+
+    assertThat((String) message.getMessageProperties().getHeader("cqrs.error.message"))
+        .isEqualTo("x".repeat(1000));
+  }
+
+  @Test
+  void deadLetteredMessageShouldRecordTheHandlerFailureInsideTheListenerException() {
+    Message message = message(2);
+
+    consumer.handleConsumptionError(
+        message,
+        "commands",
+        "app",
+        new ListenerExecutionFailedException("wrapped", new IllegalArgumentException("cause")));
+
+    MessageProperties props = message.getMessageProperties();
+    assertThat((String) props.getHeader("cqrs.error.type"))
+        .isEqualTo(IllegalArgumentException.class.getName());
+    assertThat((String) props.getHeader("cqrs.error.message")).isEqualTo("cause");
+  }
+
+  @Test
+  void retriedMessageShouldNotGetTheErrorHeaders() {
+    Message message = message(1);
+
+    consumer.handleConsumptionError(
+        message, "commands", "app", new IllegalStateException("handler failed"));
+
+    verify(rabbitTemplate).send("cqrs.commands.retry", "app", message);
+    assertThat(message.getMessageProperties().getHeaders())
+        .doesNotContainKeys(
+            "cqrs.error.type", "cqrs.error.message", "cqrs.error.attempts", "cqrs.error.timestamp");
+  }
+
+  @Test
+  void deadLetteringWithoutACauseShouldRecordOnlyTheAttemptsAndTimestamp() {
+    Message message = message(2);
+
+    consumer.handleConsumptionError(message, "commands", "app");
+
+    MessageProperties props = message.getMessageProperties();
+    assertThat((Integer) props.getHeader("cqrs.error.attempts")).isEqualTo(3);
+    assertThat((String) props.getHeader("cqrs.error.timestamp")).isNotNull();
+    assertThat(props.getHeaders()).doesNotContainKeys("cqrs.error.type", "cqrs.error.message");
   }
 
   @Test
