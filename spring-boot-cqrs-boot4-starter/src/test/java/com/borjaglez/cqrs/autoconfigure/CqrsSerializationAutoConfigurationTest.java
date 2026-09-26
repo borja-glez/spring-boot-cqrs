@@ -36,6 +36,19 @@ class CqrsSerializationAutoConfigurationTest {
   }
 
   @Test
+  void serializerIsCreatedWhenSpringBootProvidesTheMapperThroughItsAutoConfiguration() {
+    // Without an explicit ordering the CQRS configuration may be evaluated before Spring Boot's
+    // Jackson one, find no mapper yet and silently skip the serializer (finding C20).
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                CqrsAutoConfiguration.class,
+                CqrsSerializationAutoConfiguration.class,
+                org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration.class))
+        .run(context -> assertThat(context).hasSingleBean(MessageSerializer.class));
+  }
+
+  @Test
   void jacksonMessageSerializerIsNotCreatedWhenJsonMapperClassIsMissing() {
     contextRunner
         .withClassLoader(new FilteredClassLoader(JsonMapper.class))

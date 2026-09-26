@@ -23,4 +23,5 @@ dependencies {
     testImplementation(libs.micrometer.observation.versioned)
     testImplementation(libs.micrometer.observation.test.versioned)
     testImplementation(libs.jackson.databind.versioned)
+    testImplementation(libs.spring.boot4.jackson)
 }
