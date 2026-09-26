@@ -186,12 +186,16 @@ All registries use `MethodHandle` instead of `Method.invoke()` for improved perf
 ```java
 public interface CommandBus {
     void dispatch(Command command);
+    void dispatchAndWait(Command command);
     <R> R dispatchAndReceive(Command command);
+    <R> R dispatchAndReceive(Command command, ParameterizedTypeReference<R> responseType);
 }
 ```
 
 - `dispatch` -- fire-and-forget; the handler return value is discarded.
+- `dispatchAndWait` -- dispatches and waits for the handler to finish; the return value is discarded.
 - `dispatchAndReceive` -- dispatches and returns the handler's return value.
+- `dispatchAndReceive(command, responseType)` -- the same, for a generic result sent over a remote bus (see [Generic results on remote buses](#generic-results-on-remote-buses)).
 
 ### EventBus
 
@@ -209,10 +213,22 @@ Publishes one or more events. All registered handlers for each event type are in
 ```java
 public interface QueryBus {
     <R> R ask(Query query);
+    <R> R ask(Query query, ParameterizedTypeReference<R> responseType);
 }
 ```
 
-Dispatches a query and returns the handler's result.
+Dispatches a query and returns the handler's result. The `responseType` overload is for a generic result sent over a remote bus.
+
+### Generic results on remote buses
+
+The RabbitMQ and Kafka buses send a result back with its runtime class only, so the requester loses the type arguments of a generic result: without a type reference a `List<OrderDto>` comes back as a list of `LinkedHashMap`. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) are not affected. Pass a `ParameterizedTypeReference` to keep the element types:
+
+```java
+List<OrderDto> orders =
+    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+```
+
+The local buses (`SpringCommandBus`, `SpringQueryBus`) return the handler's object as it is; the default overloads ignore the type reference. See the [RabbitMQ](rabbitmq-adapter.md#generic-results) and [Kafka](kafka-adapter.md#generic-results) adapter guides.
 
 ## Spring Implementations
 

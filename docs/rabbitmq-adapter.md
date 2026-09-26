@@ -10,6 +10,7 @@ The RabbitMQ module provides distributed implementations of all three buses. Whe
 - [Architecture](#architecture)
 - [Exchanges, Queues, and Routing](#exchanges-queues-and-routing)
 - [Bus Implementations](#bus-implementations)
+  - [Generic results](#generic-results)
 - [Retry and Dead-Letter Queue Strategy](#retry-and-dead-letter-queue-strategy)
 - [Consumer Configuration](#consumer-configuration)
 - [Naming Strategy](#naming-strategy)
@@ -70,6 +71,7 @@ Implements `CommandBus`. Publishes commands to the command exchange.
 
 - `dispatch(command)` -- publishes fire-and-forget with message type `"command"`
 - `dispatchAndReceive(command)` -- uses `RabbitTemplate.sendAndReceive()` for RPC-style request/reply with message type `"command_reply"`
+- `dispatchAndReceive(command, responseType)` -- the same, converting the reply to the given `ParameterizedTypeReference` (see [Generic results](#generic-results))
 
 ### RabbitMqEventBus
 
@@ -91,7 +93,7 @@ public void publish(Event event) {
 
 ### RabbitMqQueryBus
 
-Implements `QueryBus`. Uses `sendAndReceive()` for synchronous request/reply with message type `"query"`.
+Implements `QueryBus`. Uses `sendAndReceive()` for synchronous request/reply with message type `"query"`. `ask(query, responseType)` converts the reply to the given `ParameterizedTypeReference` (see [Generic results](#generic-results)).
 
 ### RabbitMqPublisher
 
@@ -99,6 +101,27 @@ Shared publisher component that wraps `RabbitTemplate`:
 
 - `publish(exchange, routingKey, message, type)` -- one-way publish with a `cqrs.message.type` header
 - `publishAndReceive(exchange, routingKey, message, type)` -- RPC-style send/receive; checks for a `cqrs.error` header on the reply
+- `publishAndReceive(exchange, routingKey, message, type, responseType)` -- the same, converting the reply with the `ParameterizedTypeReference` through the `SmartMessageConverter`
+
+### Generic results
+
+The consumer's reply is converted by the Spring AMQP JSON converter from the runtime class of the handler's result: the `__TypeId__` / `__ContentTypeId__` headers name that erased class (`java.util.ArrayList`, `java.util.ImmutableCollections$ListN`, ...), never the handler's declared return type. Without a `responseType` the caller converts the reply from those headers, so:
+
+- A result whose class describes it fully (a record, a POJO, `String`, a boxed primitive) comes back as it was sent.
+- A generic result comes back with untyped content: a `List<OrderDto>` is a list of `LinkedHashMap`, a `Result<OrderDto>` wrapper holds a `LinkedHashMap`. This includes lists built with `List.of(...)` or `Stream.toList()`.
+
+Pass a `ParameterizedTypeReference` to get the element types back:
+
+```java
+List<OrderDto> orders =
+    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+
+Result<OrderDto> placed =
+    commandBus.dispatchAndReceive(
+        new PlaceOrder("o-1"), new ParameterizedTypeReference<Result<OrderDto>>() {});
+```
+
+The local buses do not need it; they return the handler's object as it is.
 
 ## Retry and Dead-Letter Queue Strategy
 

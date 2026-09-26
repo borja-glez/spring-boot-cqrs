@@ -5,12 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.ParameterizedTypeReference;
 import org.testcontainers.DockerClientFactory;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
@@ -27,7 +30,11 @@ import com.borjaglez.cqrs.rabbitmq.fixtures.FailingCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.SlowCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrder;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderResultCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
+import com.borjaglez.cqrs.rabbitmq.fixtures.TestResult;
 
 @SpringBootTest(
     classes = TestApplication.class,
@@ -161,5 +168,60 @@ class RabbitMqIntegrationTest {
 
     assertThatThrownBy(() -> rabbitMqCommandBus.dispatchAndWait(new SlowCommand(4000)))
         .isInstanceOf(RemoteReplyTimeoutException.class);
+  }
+
+  // A reply carries only the runtime class of the result, so a generic result keeps its element
+  // types only when the caller passes a ParameterizedTypeReference (finding C16).
+
+  @Test
+  void shouldAskAGenericResultWithTypedElementsGivenATypeReference() {
+    List<TestOrder> orders =
+        rabbitMqQueryBus.ask(
+            new TestOrderListQuery(false), new ParameterizedTypeReference<List<TestOrder>>() {});
+
+    assertThat(orders).containsExactly(new TestOrder("o-1"), new TestOrder("o-2"));
+  }
+
+  @Test
+  void shouldAskAGenericResultWithMapElementsWithoutATypeReference() {
+    List<Object> orders = rabbitMqQueryBus.ask(new TestOrderListQuery(false));
+
+    assertThat(orders).containsExactly(Map.of("id", "o-1"), Map.of("id", "o-2"));
+  }
+
+  @Test
+  void shouldAskAStreamToListResult() {
+    // Stream.toList() answers a JDK-internal list class, which the reply names as its type.
+    List<TestOrder> typed =
+        rabbitMqQueryBus.ask(
+            new TestOrderListQuery(true), new ParameterizedTypeReference<List<TestOrder>>() {});
+    List<Object> untyped = rabbitMqQueryBus.ask(new TestOrderListQuery(true));
+
+    assertThat(typed).containsExactly(new TestOrder("o-1"), new TestOrder("o-2"));
+    assertThat(untyped).containsExactly(Map.of("id", "o-1"), Map.of("id", "o-2"));
+  }
+
+  @Test
+  void shouldReceiveAGenericWrapperWithTypedContentGivenATypeReference() {
+    TestResult<TestOrder> result =
+        rabbitMqCommandBus.dispatchAndReceive(
+            new TestOrderResultCommand("o-7"),
+            new ParameterizedTypeReference<TestResult<TestOrder>>() {});
+
+    assertThat(result.value()).isEqualTo(new TestOrder("o-7"));
+  }
+
+  @Test
+  void shouldReceiveAGenericWrapperWithMapContentWithoutATypeReference() {
+    TestResult<?> result = rabbitMqCommandBus.dispatchAndReceive(new TestOrderResultCommand("o-7"));
+
+    assertThat(result.value()).isEqualTo(Map.of("id", "o-7"));
+  }
+
+  @Test
+  void shouldReceiveAResultDescribedByItsRuntimeClassWithoutATypeReference() {
+    TestOrder order = rabbitMqCommandBus.dispatchAndReceive(new TestOrderResultCommand("single"));
+
+    assertThat(order).isEqualTo(new TestOrder("single"));
   }
 }
