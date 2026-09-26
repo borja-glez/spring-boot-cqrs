@@ -413,7 +413,7 @@ cqrs:
       concurrency: 1
 ```
 
-Kafka request/reply supports `ParameterizedTypeReference`, so generic responses such as `List<OrderDto>` or nested wrapper types are preserved during deserialization.
+Generic results such as `List<OrderDto>` need a `ParameterizedTypeReference`; see [Generic results over RabbitMQ and Kafka](#generic-results-over-rabbitmq-and-kafka).
 
 Replies are read from the per-application reply topic (`<prefix>.<spring.application.name>.replies`). Each instance consumes it with its own consumer group (`<appName>.cqrs.replies.<random>`), so every instance sees every reply and keeps the ones it is waiting for. On startup the reply consumer starts at the instance start time instead of the beginning of the topic, so replies from previous runs are not read again; `spring.kafka.consumer.auto-offset-reset` keeps applying to the command, event and query consumers. Groups left by previous starts have no members and expire in the broker after `offsets.retention.minutes` (seven days by default). No configuration is needed.
 
@@ -422,6 +422,34 @@ Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
 - `MESSAGE_NAME` -- route by CQRS message name (default)
 - `PAYLOAD_TYPE` -- route by Java payload type
 - `NONE` -- send records without a key
+
+### Generic results over RabbitMQ and Kafka
+
+A remote reply carries only the runtime class of the handler's result, and the requester rebuilds the result from that erased class. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) come back as they were sent. A generic result (a collection, a map, a generic wrapper such as `Page<OrderDto>`) comes back with untyped content, `LinkedHashMap` instead of `OrderDto`, unless the caller passes a `ParameterizedTypeReference`:
+
+```java
+@QueryHandler
+class OrderQueries {
+    @HandleQuery
+    List<OrderDto> on(ListOrders query) {
+        return orders.stream().map(OrderDto::from).toList();
+    }
+}
+
+// Requester, over RabbitMQ or Kafka
+List<OrderDto> orders =
+    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+
+Result<OrderDto> placed =
+    commandBus.dispatchAndReceive(
+        new PlaceOrder("o-1"), new ParameterizedTypeReference<Result<OrderDto>>() {});
+
+// Without the type reference the elements are maps: untyped.get(0) is a LinkedHashMap,
+// and using it as an OrderDto fails with a ClassCastException.
+List<OrderDto> untyped = queryBus.ask(new ListOrders());
+```
+
+The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `CommandBus.dispatchAndReceive(Command, ParameterizedTypeReference<R>)`. The local buses return the handler's object as it is and do not need them, so passing the type reference keeps the same call working when a bus moves from local to remote.
 
 ### Configuration Reference
 

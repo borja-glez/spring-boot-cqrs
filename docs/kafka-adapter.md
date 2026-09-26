@@ -12,6 +12,7 @@ The Kafka module provides distributed implementations of all three buses. When a
 - [Topics and Naming](#topics-and-naming)
 - [Bus Implementations](#bus-implementations)
 - [Request/Reply](#requestreply)
+  - [Generic results](#generic-results)
 - [Partition Keys](#partition-keys)
 - [Consumers and Consumer Groups](#consumers-and-consumer-groups)
 - [Record Headers](#record-headers)
@@ -134,7 +135,25 @@ On the receiving side the consumer publishes the reply to the topic named in `cq
 | Handler throws | Error reply (`cqrs.error=true`) | `RuntimeException("Remote handler error: <message>")` |
 | No reply in time | -- | `RuntimeException("Timed out waiting for Kafka reply for <message name>")` |
 
-Generic results such as `List<OrderDto>` need the `ParameterizedTypeReference` overloads; without a `responseType` the reply is deserialized as the class named in its payload type header.
+### Generic results
+
+The reply's `cqrs.payload.type` header names the runtime class of the result (`payload.getClass()`), which says nothing about its type arguments. Without a `responseType` the caller deserializes the reply as that class, so:
+
+- A result whose class describes it fully (a record, a POJO, `String`, a boxed primitive) comes back as it was sent.
+- A generic result comes back with untyped content: a `List<OrderDto>` is a list of `LinkedHashMap`, a `Result<OrderDto>` wrapper holds a `LinkedHashMap`. A list built with `List.of(...)` or `Stream.toList()` is named by its JDK-internal class (`java.util.ImmutableCollections$ListN`) and is read back as a list of maps as well.
+
+Pass a `ParameterizedTypeReference` to get the element types back; it is used instead of the payload type header:
+
+```java
+List<OrderDto> orders =
+    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+
+Result<OrderDto> placed =
+    commandBus.dispatchAndReceive(
+        new PlaceOrder("o-1"), new ParameterizedTypeReference<Result<OrderDto>>() {});
+```
+
+The local buses do not need it; they return the handler's object as it is.
 
 ### Reply topic and reply container
 
