@@ -33,7 +33,7 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 **Gradle**
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.1")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.4.0")
 ```
 
 **Maven**
@@ -42,7 +42,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.1")
 <dependency>
     <groupId>com.borjaglez.cqrs</groupId>
     <artifactId>spring-boot-cqrs-boot3-starter</artifactId>
-    <version>0.3.1</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
@@ -51,7 +51,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter:0.3.1")
 **Gradle**
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.3.1")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.4.0")
 ```
 
 **Maven**
@@ -60,7 +60,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter:0.3.1")
 <dependency>
     <groupId>com.borjaglez.cqrs</groupId>
     <artifactId>spring-boot-cqrs-boot4-starter</artifactId>
-    <version>0.3.1</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
@@ -350,7 +350,7 @@ See [docs/middleware.md](docs/middleware.md#message-context--correlation-id) for
 Add the RabbitMQ module to distribute commands, events, and queries across services (alongside your chosen starter):
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq:0.3.1")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq:0.4.0")
 ```
 
 Configure in `application.yml`:
@@ -391,7 +391,7 @@ Only messages annotated with `@CqrsMessage` are exposed over RabbitMQ by default
 Add the Kafka module to distribute commands, events, and queries across services (alongside your chosen starter):
 
 ```kotlin
-implementation("com.borjaglez.cqrs:spring-boot-cqrs-kafka:0.3.1")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-kafka:0.4.0")
 ```
 
 Configure in `application.yml`:
