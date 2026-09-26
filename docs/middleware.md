@@ -1,6 +1,6 @@
 # Middleware Documentation
 
-The middleware pipeline intercepts every message dispatched through any of the three buses (Command, Event, Query). Middleware can inspect, modify, or short-circuit messages before they reach handlers.
+The middleware pipeline intercepts every message dispatched through any of the three buses (Command, Event, Query). Middleware can inspect, modify, or short-circuit messages before they reach handlers. It runs where the handler runs: with the RabbitMQ and Kafka buses, on the receiving side only (see [Middleware on Remote Buses](#middleware-on-remote-buses)).
 
 ## Table of Contents
 
@@ -8,6 +8,7 @@ The middleware pipeline intercepts every message dispatched through any of the t
 - [MiddlewareChain](#middlewarechain)
 - [Creating Custom Middleware](#creating-custom-middleware)
 - [Ordering with @Order](#ordering-with-order)
+- [Middleware on Remote Buses](#middleware-on-remote-buses)
 - [Built-in Middleware](#built-in-middleware)
 - [Message Context & Correlation ID](#message-context--correlation-id)
 - [Examples](#examples)
@@ -110,6 +111,19 @@ Middleware beans are collected by Spring and ordered using `@Order`. Lower value
 Middleware without `@Order` receives the default order value (`Ordered.LOWEST_PRECEDENCE`), meaning it runs after all explicitly ordered middleware.
 
 The built-in `CommandValidationInterceptor` and `MicrometerBusObservability` are also ordered as middleware beans and participate in the same pipeline.
+
+## Middleware on Remote Buses
+
+The middleware chain runs **where the handler runs**. With the in-process buses (`SpringCommandBus`, `SpringQueryBus`, `SpringEventBus`) that is the dispatching application. With the remote buses of the RabbitMQ and Kafka modules (`RabbitMqCommandBus`, `RabbitMqQueryBus`, `RabbitMqEventBus`, `KafkaCommandBus`, `KafkaQueryBus`, `KafkaEventBus`) it is the **receiving side only**: the bus hands the message straight to the transport publisher, and the consumer of the receiving service rehydrates the `MessageContext` from the headers and runs the whole chain (built-in and user middleware) before the handler.
+
+No `BusMiddleware` runs on the sending side. Consequences:
+
+- **Validation:** `CommandValidationInterceptor` runs in the receiving service. An invalid command is published, travels to the receiver and fails there; with request/reply the caller gets a remote error (`RemoteHandlerException` with RabbitMQ, a `RuntimeException("Remote handler error: ...")` with Kafka) instead of a local `ConstraintViolationException`. With a fire-and-forget `dispatch` the sender is not told at all. Validate before sending if you need to fail fast.
+- **Context:** `ContextPropagationMiddleware` does not run on the sender, so a remote dispatch made without an open `MessageContext` sends no `correlationId` header, and the receiver generates one that the sender's logs do not have. Open a `MessageContext.Scope` with a correlation id at the boundary (see [Seeding the context](#seeding-the-context-at-a-system-boundary)) to share it.
+- **Metrics and spans:** `MicrometerBusObservability` and `TracingMiddleware` record the dispatch on the receiver. On the sender the only observation is the transport's own (`spring.rabbitmq.template.observation-enabled`, `spring.kafka.template.observation-enabled`); see [Distributed Tracing](#distributed-tracing).
+- **User middleware** (logging, authorization, transactions, idempotency) sees remote messages only in the receiving service.
+
+Whether middleware should also run on the sending side is tracked in [#59](https://github.com/borja-glez/spring-boot-cqrs/issues/59).
 
 ## Built-in Middleware
 

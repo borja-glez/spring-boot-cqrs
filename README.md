@@ -441,18 +441,24 @@ Partition keys are configurable through `cqrs.kafka.partition-key.strategy`:
 | `cqrs.kafka.replies.partitions` | `1` | Reply topic partition count |
 | `cqrs.kafka.replies.replicas` | `1` | Reply topic replication factor |
 | `cqrs.kafka.replies.timeout` | `30s` | Timeout for distributed command/query replies |
+| `cqrs.kafka.commands.enabled` | `true` | Whether commands use Kafka |
 | `cqrs.kafka.commands.topic` | `"commands"` | Command topic name |
 | `cqrs.kafka.commands.partitions` | `3` | Command topic partition count |
 | `cqrs.kafka.commands.replicas` | `1` | Command topic replication factor |
 | `cqrs.kafka.commands.concurrency` | `1` | Command listener concurrency |
+| `cqrs.kafka.commands.group-id` | `""` | Command consumer group; blank means `{spring.application.name}.cqrs.commands` |
+| `cqrs.kafka.events.enabled` | `true` | Whether events use Kafka |
 | `cqrs.kafka.events.topic` | `"events"` | Event topic name |
 | `cqrs.kafka.events.partitions` | `3` | Event topic partition count |
 | `cqrs.kafka.events.replicas` | `1` | Event topic replication factor |
 | `cqrs.kafka.events.concurrency` | `1` | Event listener concurrency |
+| `cqrs.kafka.events.group-id` | `""` | Event consumer group; blank means `{spring.application.name}.cqrs.events` |
+| `cqrs.kafka.queries.enabled` | `true` | Whether queries use Kafka |
 | `cqrs.kafka.queries.topic` | `"queries"` | Query topic name |
 | `cqrs.kafka.queries.partitions` | `3` | Query topic partition count |
 | `cqrs.kafka.queries.replicas` | `1` | Query topic replication factor |
 | `cqrs.kafka.queries.concurrency` | `1` | Query listener concurrency |
+| `cqrs.kafka.queries.group-id` | `""` | Query consumer group; blank means `{spring.application.name}.cqrs.queries` |
 | `cqrs.rabbitmq.enabled` | `true` | Enable RabbitMQ bus adapters |
 | `cqrs.rabbitmq.prefix` | `"cqrs"` | Prefix for RabbitMQ exchange and queue names |
 | `cqrs.rabbitmq.retry.max-attempts` | `3` | Max retry attempts before dead-lettering |
