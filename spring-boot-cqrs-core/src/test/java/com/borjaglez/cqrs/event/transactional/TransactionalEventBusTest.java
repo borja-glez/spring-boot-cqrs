@@ -1,5 +1,6 @@
 package com.borjaglez.cqrs.event.transactional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.borjaglez.cqrs.event.Event;
 import com.borjaglez.cqrs.event.EventBus;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 
@@ -106,4 +108,34 @@ class TransactionalEventBusTest {
     @Override
     protected void doRollback(DefaultTransactionStatus status) {}
   }
+
+  @Test
+  void eventsPublishedByHandlersAfterCommitAreNotLost() {
+    TestEvent first = new TestEvent("first");
+    TestEvent followUp = new TestEvent("follow-up");
+    List<Event> published = new java.util.ArrayList<>();
+    EventBus reacting =
+        new EventBus() {
+          @Override
+          public void publish(Event event) {
+            published.add(event);
+            if (event == first) {
+              // A handler that reacts to the event by publishing another one.
+              chained.publish(followUp);
+            }
+          }
+
+          @Override
+          public void publish(List<Event> events) {
+            events.forEach(this::publish);
+          }
+        };
+    chained = new TransactionalEventBus(reacting);
+
+    transactionTemplate.executeWithoutResult(status -> chained.publish(first));
+
+    assertThat(published).containsExactly(first, followUp);
+  }
+
+  private TransactionalEventBus chained;
 }

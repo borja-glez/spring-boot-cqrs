@@ -50,7 +50,13 @@ public class TransactionalEventBus implements EventBus {
         new TransactionSynchronization() {
           @Override
           public void afterCommit() {
-            newContext.snapshot().forEach(delegate::publish);
+            // A handler of these events may publish more while the transaction is still bound:
+            // they land in this same context, so keep draining until it is empty.
+            for (List<Event> events = newContext.drain();
+                !events.isEmpty();
+                events = newContext.drain()) {
+              events.forEach(delegate::publish);
+            }
           }
 
           @Override

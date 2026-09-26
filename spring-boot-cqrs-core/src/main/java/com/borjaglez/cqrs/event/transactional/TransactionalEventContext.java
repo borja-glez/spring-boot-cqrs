@@ -13,7 +13,10 @@ final class TransactionalEventContext {
     events.add(event);
   }
 
-  List<Event> snapshot() {
-    return List.copyOf(events);
+  /** The queued events, removed from the context. */
+  List<Event> drain() {
+    List<Event> drained = List.copyOf(events);
+    events.clear();
+    return drained;
   }
 }
