@@ -21,6 +21,59 @@ public class KafkaCqrsProperties {
   private BusProperties events = new BusProperties("events", 3, (short) 1, 1, "");
   private BusProperties queries = new BusProperties("queries", 3, (short) 1, 1, "");
 
+  /**
+   * Retry and dead-letter handling of the commands, events and queries listener containers. Ignored
+   * when the application defines its own {@code CommonErrorHandler} bean.
+   */
+  private ErrorHandlingProperties errorHandling = new ErrorHandlingProperties();
+
+  @Getter
+  @Setter
+  public static class ErrorHandlingProperties {
+
+    /**
+     * Total number of deliveries of a failed record, including the first one. The default {@code 3}
+     * means the first attempt plus two retries; {@code 1} sends a failed record straight to the
+     * dead-letter topic. Must be at least 1.
+     */
+    private int maxAttempts = 3;
+
+    private BackOffProperties backOff = new BackOffProperties();
+    private DeadLetterProperties deadLetter = new DeadLetterProperties();
+  }
+
+  @Getter
+  @Setter
+  public static class BackOffProperties {
+
+    /** Delay before the first retry. */
+    private Duration initialInterval = Duration.ofSeconds(1);
+
+    /** Factor applied to the delay after every retry. Must be at least 1. */
+    private double multiplier = 2.0;
+
+    /** Upper bound of the delay between two attempts. */
+    private Duration maxInterval = Duration.ofSeconds(10);
+  }
+
+  @Getter
+  @Setter
+  public static class DeadLetterProperties {
+
+    /**
+     * Whether a record that exhausts its attempts, or cannot be processed at all, is published to
+     * the dead-letter topic of this application ({@code <prefix>.<application>.<bus>.dlt}). When
+     * disabled it is logged and skipped.
+     */
+    private boolean enabled = true;
+
+    /** Partitions of the dead-letter topics created when {@code auto-create-topics} is on. */
+    private int partitions = 1;
+
+    /** Replicas of the dead-letter topics created when {@code auto-create-topics} is on. */
+    private short replicas = 1;
+  }
+
   @Getter
   @Setter
   public static class PartitionKeyProperties {

@@ -90,6 +90,30 @@ class KafkaEventConsumerTest {
   }
 
   @Test
+  void shouldReportAPayloadThatCannotBeDeserializedAsUnprocessable() {
+    ConsumerRecord<String, byte[]> record = recordFor();
+    IllegalArgumentException cause = new IllegalArgumentException("bad json");
+    when(serializer.deserialize(record.value(), TestEvent.class)).thenThrow(cause);
+
+    assertThatThrownBy(() -> consumer.consume(record))
+        .isInstanceOf(UnprocessableRecordException.class)
+        .hasMessage("Cannot deserialize Kafka CQRS payload of type " + TestEvent.class.getName())
+        .hasCause(cause);
+    verifyNoInteractions(registry);
+  }
+
+  @Test
+  void shouldReportARecordWithoutPayloadTypeAsUnprocessable() {
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>("cqrs.events", 0, 0L, "key", "payload".getBytes(UTF_8));
+
+    assertThatThrownBy(() -> consumer.consume(record))
+        .isInstanceOf(UnprocessableRecordException.class)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Missing Kafka CQRS payload type header");
+  }
+
+  @Test
   void shouldExposeContextFromHeaders() {
     java.util.concurrent.atomic.AtomicReference<String> observed =
         new java.util.concurrent.atomic.AtomicReference<>();

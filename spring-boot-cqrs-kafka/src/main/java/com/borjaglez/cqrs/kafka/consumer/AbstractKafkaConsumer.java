@@ -36,7 +36,7 @@ abstract class AbstractKafkaConsumer {
   protected Optional<Class<?>> localPayloadClass(ConsumerRecord<String, byte[]> record) {
     String payloadType = header(record, KafkaMessageHeaders.PAYLOAD_TYPE);
     if (payloadType == null) {
-      throw new IllegalStateException("Missing Kafka CQRS payload type header");
+      throw new UnprocessableRecordException("Missing Kafka CQRS payload type header");
     }
     try {
       return Optional.of(Class.forName(payloadType));
@@ -45,8 +45,18 @@ abstract class AbstractKafkaConsumer {
     }
   }
 
+  /**
+   * Deserializes the payload. A payload that cannot be read as {@code payloadClass} will not become
+   * readable on a later attempt, so the failure is reported as an {@link
+   * UnprocessableRecordException}, which is not retried.
+   */
   protected <T> T deserialize(ConsumerRecord<String, byte[]> record, Class<T> payloadClass) {
-    return serializer.deserialize(record.value(), payloadClass);
+    try {
+      return serializer.deserialize(record.value(), payloadClass);
+    } catch (RuntimeException e) {
+      throw new UnprocessableRecordException(
+          "Cannot deserialize Kafka CQRS payload of type " + payloadClass.getName(), e);
+    }
   }
 
   protected String header(ConsumerRecord<String, byte[]> record, String name) {

@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -15,6 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.MessageListener;
@@ -54,6 +56,23 @@ public class KafkaCommandBusAutoConfiguration {
         properties.getCommands().getReplicas());
   }
 
+  @Bean(name = "cqrsCommandsDeadLetterTopic")
+  @ConditionalOnProperty(
+      prefix = "cqrs.kafka",
+      name = "auto-create-topics",
+      havingValue = "true",
+      matchIfMissing = true)
+  @ConditionalOnBooleanProperty(
+      name = "cqrs.kafka.error-handling.dead-letter.enabled",
+      matchIfMissing = true)
+  public NewTopic cqrsCommandsDeadLetterTopic(
+      KafkaCqrsProperties properties,
+      KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
+      @Value("${spring.application.name:cqrs-app}") String applicationName) {
+    return KafkaErrorHandling.deadLetterTopic(
+        properties, kafkaTopicNamingStrategy, applicationName, properties.getCommands().getTopic());
+  }
+
   @Bean
   public KafkaCommandBus kafkaCommandBus(
       KafkaMessagePublisher kafkaMessagePublisher,
@@ -89,7 +108,11 @@ public class KafkaCommandBusAutoConfiguration {
       KafkaCqrsProperties properties,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
       @Value("${spring.application.name:cqrs-app}") String applicationName,
-      @Value("${spring.kafka.listener.observation-enabled:false}") boolean observationEnabled) {
+      @Value("${spring.kafka.listener.observation-enabled:false}") boolean observationEnabled,
+      KafkaTemplate<String, byte[]> cqrsKafkaTemplate,
+      @Qualifier(KafkaErrorHandling.ERROR_HANDLER_BEAN_NAME)
+          ObjectProvider<CommonErrorHandler> qualifiedErrorHandler,
+      ObjectProvider<CommonErrorHandler> errorHandlers) {
     ContainerProperties containerProperties =
         new ContainerProperties(
             kafkaTopicNamingStrategy.topic(properties.getCommands().getTopic()));
@@ -103,6 +126,14 @@ public class KafkaCommandBusAutoConfiguration {
         new ConcurrentMessageListenerContainer<>(cqrsKafkaConsumerFactory, containerProperties);
     container.setConcurrency(properties.getCommands().getConcurrency());
     container.getContainerProperties().setMissingTopicsFatal(false);
+    KafkaErrorHandling.configure(
+        container,
+        qualifiedErrorHandler,
+        errorHandlers,
+        properties.getErrorHandling(),
+        cqrsKafkaTemplate,
+        kafkaTopicNamingStrategy.deadLetterTopic(
+            applicationName, properties.getCommands().getTopic()));
     return container;
   }
 

@@ -7,7 +7,10 @@ import static org.mockito.Mockito.when;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.CommonErrorHandler;
 
 import com.borjaglez.cqrs.kafka.consumer.KafkaCommandConsumer;
 import com.borjaglez.cqrs.kafka.consumer.KafkaEventConsumer;
@@ -44,7 +47,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(container.getContainerProperties().getGroupId())
         .isEqualTo("orders-service.cqrs.commands");
@@ -65,7 +71,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(container.getContainerProperties().getGroupId()).isEqualTo("custom-commands");
   }
@@ -85,7 +94,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(container.getContainerProperties().getGroupId())
         .isEqualTo("orders-service.cqrs.queries");
@@ -106,7 +118,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(container.getContainerProperties().getGroupId()).isEqualTo("custom-queries");
   }
@@ -126,7 +141,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(container.getContainerProperties().getGroupId())
         .isEqualTo("orders-service.cqrs.events");
@@ -147,7 +165,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(container.getContainerProperties().getGroupId()).isEqualTo("custom-events");
   }
@@ -190,7 +211,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
     var events =
         new KafkaEventBusAutoConfiguration()
             .cqrsEventListenerContainer(
@@ -199,7 +223,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
     var queries =
         new KafkaQueryBusAutoConfiguration()
             .cqrsQueryListenerContainer(
@@ -208,7 +235,10 @@ class KafkaConfigurationCoverageTest {
                 properties,
                 namingStrategy,
                 "orders-service",
-                false);
+                false,
+                mock(KafkaTemplate.class),
+                noErrorHandler(),
+                noErrorHandler());
 
     assertThat(commands.getContainerProperties().getKafkaConsumerProperties())
         .doesNotContainKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
@@ -216,5 +246,10 @@ class KafkaConfigurationCoverageTest {
         .doesNotContainKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
     assertThat(queries.getContainerProperties().getKafkaConsumerProperties())
         .doesNotContainKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ObjectProvider<CommonErrorHandler> noErrorHandler() {
+    return mock(ObjectProvider.class);
   }
 }
