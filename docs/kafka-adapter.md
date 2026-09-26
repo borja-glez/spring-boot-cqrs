@@ -122,7 +122,7 @@ Shared publisher that wraps the module's `KafkaTemplate<String, byte[]>`:
 Request/reply is used by `dispatchAndWait`, `dispatchAndReceive` and `ask`. It is handled by `KafkaRequestReplyClient`:
 
 1. A random UUID is generated as correlation id.
-2. The request is sent with the headers `cqrs.correlation.id`, `cqrs.reply.topic` (the reply topic of this application) and `cqrs.request.mode` (`WAIT` or `REPLY`).
+2. The request is sent with the headers `cqrs.correlation.id`, `cqrs.reply.topic` (the reply topic of this application) and `cqrs.request.mode` (`WAIT` or `REPLY`), plus the current `MessageContext` as context headers, like a one-way record, so the handler sees the caller's correlation id and context entries.
 3. The caller blocks until a reply with the same correlation id arrives, or until `cqrs.kafka.replies.timeout` (default `30s`) expires.
 
 On the receiving side the consumer publishes the reply to the topic named in `cqrs.reply.topic`, keyed by the correlation id:
@@ -229,7 +229,7 @@ A record without the `cqrs.payload.type` header is rejected with an `IllegalStat
 | `cqrs.request.mode` | Requests | `WAIT` or `REPLY` |
 | `cqrs.error` | Error replies | `true` |
 | `cqrs.error.type` | Error replies | Class name of the handler's exception |
-| `{cqrs.context.header-prefix}{key}` | One-way records sent with `dispatch` / `publish` | One header per `MessageContext` entry (for example `cqrs.context.correlationId`) |
+| `{cqrs.context.header-prefix}{key}` | Requests and one-way records, when there is a current `MessageContext` (not on replies) | One header per `MessageContext` entry (for example `cqrs.context.correlationId`) |
 
 The constants are in `KafkaMessageHeaders`.
 

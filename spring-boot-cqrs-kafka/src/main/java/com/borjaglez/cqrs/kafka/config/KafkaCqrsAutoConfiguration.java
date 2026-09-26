@@ -140,14 +140,16 @@ public class KafkaCqrsAutoConfiguration {
       MessageNamingStrategy messageNamingStrategy,
       KafkaTopicNamingStrategy kafkaTopicNamingStrategy,
       KafkaCqrsProperties properties,
-      @Value("${spring.application.name:cqrs-app}") String applicationName) {
+      @Value("${spring.application.name:cqrs-app}") String applicationName,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
     return new KafkaRequestReplyClient(
         cqrsKafkaTemplate,
         messageSerializer,
         kafkaPartitionKeyStrategy,
         messageNamingStrategy,
         kafkaTopicNamingStrategy.replyTopic(applicationName, properties.getReplies().getTopic()),
-        properties.getReplies().getTimeout());
+        properties.getReplies().getTimeout(),
+        contextHeaderPrefix);
   }
 
   @Conditional(RequestReplyBusEnabled.class)

@@ -21,12 +21,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
 import com.borjaglez.cqrs.kafka.fixtures.TestEvent;
 import com.borjaglez.cqrs.kafka.fixtures.TestQuery;
@@ -546,6 +548,96 @@ class KafkaRequestReplyClientTest {
                     KafkaRequestMode.REPLY))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Unsupported CQRS message type");
+  }
+
+  @Test
+  void shouldSendCurrentMessageContextAsHeadersWithDefaultPrefix() throws Exception {
+    MessageContext context =
+        MessageContext.empty().with("correlationId", "cid-81").with("tenantId", "acme");
+
+    ProducerRecord<String, byte[]> record;
+    try (MessageContext.Scope ignored = MessageContext.scope(context)) {
+      record = sendAndReplyImmediately(client);
+    }
+
+    assertThat(header(record, "cqrs.context.correlationId")).isEqualTo("cid-81");
+    assertThat(header(record, "cqrs.context.tenantId")).isEqualTo("acme");
+  }
+
+  @Test
+  void shouldSendCurrentMessageContextAsHeadersWithConfiguredPrefix() throws Exception {
+    KafkaRequestReplyClient prefixedClient =
+        new KafkaRequestReplyClient(
+            kafkaTemplate,
+            serializer,
+            partitionKeyStrategy,
+            messageNamingStrategy,
+            "cqrs.orders.replies",
+            Duration.ofSeconds(5),
+            "x-ctx-");
+
+    ProducerRecord<String, byte[]> record;
+    try (MessageContext.Scope ignored =
+        MessageContext.scope(MessageContext.empty().with("correlationId", "cid-custom"))) {
+      record = sendAndReplyImmediately(prefixedClient);
+    }
+
+    assertThat(header(record, "x-ctx-correlationId")).isEqualTo("cid-custom");
+    assertThat(record.headers().lastHeader("cqrs.context.correlationId")).isNull();
+  }
+
+  @Test
+  void shouldFallBackToDefaultPrefixWhenConfiguredPrefixIsNull() throws Exception {
+    KafkaRequestReplyClient nullPrefixClient =
+        new KafkaRequestReplyClient(
+            kafkaTemplate,
+            serializer,
+            partitionKeyStrategy,
+            messageNamingStrategy,
+            "cqrs.orders.replies",
+            Duration.ofSeconds(5),
+            null);
+
+    ProducerRecord<String, byte[]> record;
+    try (MessageContext.Scope ignored =
+        MessageContext.scope(MessageContext.empty().with("correlationId", "cid-null"))) {
+      record = sendAndReplyImmediately(nullPrefixClient);
+    }
+
+    assertThat(header(record, "cqrs.context.correlationId")).isEqualTo("cid-null");
+  }
+
+  @Test
+  void shouldNotSendContextHeadersWithoutCurrentMessageContext() throws Exception {
+    MessageContext.clear();
+
+    ProducerRecord<String, byte[]> record = sendAndReplyImmediately(client);
+
+    for (Header header : record.headers()) {
+      assertThat(header.key()).doesNotStartWith("cqrs.context.");
+    }
+  }
+
+  /** Sends a command whose reply arrives while the record is being sent, on the same thread. */
+  private ProducerRecord<String, byte[]> sendAndReplyImmediately(
+      KafkaRequestReplyClient requestReplyClient) throws Exception {
+    TestCommand command = new TestCommand("abc");
+    when(partitionKeyStrategy.partitionKey(KafkaMessageKind.COMMAND, command))
+        .thenReturn("sales.order.create");
+    when(messageNamingStrategy.commandName(TestCommand.class)).thenReturn("sales.order.create");
+    when(serializer.serialize(command)).thenReturn("request".getBytes(UTF_8));
+    when(kafkaTemplate.send(any(ProducerRecord.class)))
+        .thenAnswer(
+            invocation -> {
+              ProducerRecord<String, byte[]> request = invocation.getArgument(0);
+              sentRecord.set(request);
+              requestReplyClient.handleReply(
+                  replyWithPayloadType(request, String.class.getName(), new byte[0]));
+              return CompletableFuture.completedFuture(null);
+            });
+
+    requestReplyClient.sendAndReceive(null, "cqrs.commands", command, null, KafkaRequestMode.WAIT);
+    return sentRecord.get();
   }
 
   private CompletableFuture<Object> startRequest(ThrowingSupplier supplier) {

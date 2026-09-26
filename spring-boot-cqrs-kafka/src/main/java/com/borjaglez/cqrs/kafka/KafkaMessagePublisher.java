@@ -2,7 +2,6 @@ package com.borjaglez.cqrs.kafka;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import java.util.Map;
 import java.util.concurrent.CompletionException;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -10,9 +9,8 @@ import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import com.borjaglez.cqrs.command.Command;
-import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
-import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.event.Event;
+import com.borjaglez.cqrs.kafka.infrastructure.KafkaContextHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageKind;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaPartitionKeyStrategy;
@@ -22,7 +20,7 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 public class KafkaMessagePublisher {
 
-  public static final String DEFAULT_CONTEXT_HEADER_PREFIX = "cqrs.context.";
+  public static final String DEFAULT_CONTEXT_HEADER_PREFIX = KafkaContextHeaders.DEFAULT_PREFIX;
 
   private final KafkaTemplate<String, byte[]> kafkaTemplate;
   private final MessageSerializer serializer;
@@ -79,7 +77,7 @@ public class KafkaMessagePublisher {
         .add(
             new RecordHeader(
                 KafkaMessageHeaders.PAYLOAD_TYPE, message.getClass().getName().getBytes(UTF_8)));
-    addContextHeaders(record);
+    KafkaContextHeaders.write(record.headers(), contextHeaderPrefix);
     try {
       kafkaTemplate.send(record).join();
     } catch (CompletionException e) {
@@ -134,14 +132,6 @@ public class KafkaMessagePublisher {
             new RecordHeader(
                 KafkaMessageHeaders.PAYLOAD_TYPE, String.class.getName().getBytes(UTF_8)));
     kafkaTemplate.send(record).join();
-  }
-
-  private void addContextHeaders(ProducerRecord<String, byte[]> record) {
-    Map<String, String> headers =
-        ContextPropagationMiddleware.headerMap(MessageContext.current(), contextHeaderPrefix);
-    for (Map.Entry<String, String> entry : headers.entrySet()) {
-      record.headers().add(new RecordHeader(entry.getKey(), entry.getValue().getBytes(UTF_8)));
-    }
   }
 
   private KafkaMessageKind inferKind(Object message) {
