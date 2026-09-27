@@ -18,7 +18,8 @@ This document describes the complete CI/CD pipeline for this project.
 **Trigger:** `pull_request` (any branch, any PR)
 
 **What it does:**
-- Runs `./gradlew quality` (all tests + coverage)
+- Runs `./gradlew quality` (all tests + coverage), `verifyBoot3Compatibility` and `verifyBoot4Compatibility`
+- Each job is a matrix over `test-java: [21, 25]`: the code is always compiled with the Java 21 toolchain (`release = 21`), and `-PtestJavaVersion=<n>` runs the tests on a JDK `<n>` launcher. `setup-java` installs both JDKs (21 stays `JAVA_HOME`) and `-Porg.gradle.java.installations.fromEnv=JAVA_HOME_21_X64,JAVA_HOME_25_X64` lets Gradle find them as toolchains
 
 **Purpose:** Gate that blocks merging until all tests pass and coverage meets the 100% threshold.
 
