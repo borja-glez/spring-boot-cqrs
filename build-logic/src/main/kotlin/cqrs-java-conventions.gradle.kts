@@ -40,8 +40,20 @@ dependencies {
     "testRuntimeOnly"(libs.findLibrary("junit-platform-launcher").get())
 }
 
+// -PtestJavaVersion=<n> runs the tests on a JDK <n> launcher while compilation stays on the Java 21
+// toolchain with release 21, proving the Java 21 bytecode also works on newer runtimes.
+val testJavaVersion = providers.gradleProperty("testJavaVersion")
+val javaToolchains = extensions.getByType<JavaToolchainService>()
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    if (testJavaVersion.isPresent) {
+        javaLauncher.set(
+            javaToolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(testJavaVersion.get()))
+            }
+        )
+    }
 }
 
 tasks.withType<JacocoCoverageVerification>().configureEach {

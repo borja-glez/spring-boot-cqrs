@@ -28,6 +28,11 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 
 ## Quick Start
 
+### Requirements
+
+- Java 21+ (tested on 21 and 25)
+- Spring Boot 3.5.x or 4.0.x
+
 ### Spring Boot 3
 
 **Gradle**
@@ -604,6 +609,13 @@ Run a single test class:
 
 ```bash
 ./gradlew :spring-boot-cqrs-core:test --tests "com.borjaglez.cqrs.command.CommandTest"
+```
+
+The library is compiled for Java 21. To run the tests on a newer JDK (compilation stays on
+Java 21), pass `testJavaVersion`; CI runs every suite on JDK 21 and 25:
+
+```bash
+./gradlew quality -PtestJavaVersion=25
 ```
 
 Apply code formatting before committing:

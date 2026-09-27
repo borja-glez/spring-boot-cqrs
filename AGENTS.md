@@ -181,7 +181,7 @@ class ClassNameTest {
 
 ## CI/CD
 
-- GitHub Actions: CI runs on PR + push to `main` against Java 21 and 22
+- GitHub Actions: CI runs on PRs; code is compiled for Java 21 and the tests run on JDK 21 and 25 (`-PtestJavaVersion=25` locally)
 - `./gradlew quality` is the gate — must pass with 100% coverage
 - JaCoCo reports and test results uploaded as artifacts (14-day retention)
 
