@@ -81,7 +81,6 @@ changes of each release with before/after code and migration steps, and
 
 ```java
 @Getter
-@CqrsMessage(service = "task-service", module = "task", name = "create-task")
 public class CreateTaskCommand extends Command {
     private final String title;
 
@@ -128,7 +127,7 @@ public class TaskController {
 }
 ```
 
-That is all you need. The starter auto-configures the bus, discovers your handler at startup, and routes the command.
+That is all you need. The starter auto-configures the bus, discovers your handler at startup, and routes the command. The in-process buses route by Java type, so messages need no annotation; annotate with `@CqrsMessage` the messages that other services send or receive (see [Message names and `@CqrsMessage`](#message-names-and-cqrsmessage)).
 
 ## Modules
 
@@ -153,7 +152,6 @@ Commands represent intentions to change state. Each command has exactly one hand
 ```java
 // Define
 @Getter
-@CqrsMessage(service = "my-app", module = "order", name = "create-order")
 public class CreateOrderCommand extends Command {
     private final String product;
     public CreateOrderCommand(String product) {
@@ -183,7 +181,6 @@ Events represent facts that have occurred. An event can have zero or many handle
 ```java
 // Define
 @Getter
-@CqrsMessage(service = "my-app", module = "order", name = "order-created")
 public class OrderCreatedEvent extends Event {
     private final String orderId;
     public OrderCreatedEvent(String orderId) {
@@ -245,7 +242,6 @@ Queries represent read requests. Each query has exactly one handler.
 
 ```java
 // Define
-@CqrsMessage(service = "my-app", module = "order", name = "get-order")
 public class GetOrderQuery extends Query {
     @Getter private final String orderId;
     public GetOrderQuery(String orderId) {
@@ -266,6 +262,39 @@ public class OrderQueryHandler {
 // Ask
 Order order = queryBus.ask(new GetOrderQuery("order-123"));
 ```
+
+### Message names and `@CqrsMessage`
+
+`@CqrsMessage` gives a message a stable, service-qualified name. It is optional: the in-process buses dispatch by Java type and never read it, so commands, events and queries handled inside one application need no annotation.
+
+Annotate the messages that cross a service boundary, the public contract of a service:
+
+- a command or query that another service sends to this one;
+- an event that other services consume.
+
+```java
+@Getter
+@CqrsMessage(service = "orders", module = "order", name = "order-placed")
+public class OrderPlaced extends Event {
+    private final String orderId;
+    public OrderPlaced(String orderId) {
+        super();
+        this.orderId = orderId;
+    }
+}
+```
+
+`MessageNamingStrategy` turns it into `{prefix}.{service}.{version}.{type}.{module}.{name}`, for example `orders.1.event.order.order-placed`. A message without the annotation is named after its class in kebab-case (`order-placed`), a name that can collide between services and changes when the class is renamed.
+
+What the name is used for:
+
+| Transport | Use of the message name | Without `@CqrsMessage` |
+|---|---|---|
+| In-process buses | None (dispatch by Java type) | Works the same |
+| RabbitMQ | Routing key; only annotated messages are exposed by default (`cqrs.rabbitmq.expose=annotated`) | The message stays local: it is not bound and is rejected if it reaches the queue |
+| Kafka | `cqrs.message.name` header and default partition key (`MESSAGE_NAME`) | Still delivered (consumers match the payload type), with the kebab-case class name as header and key |
+
+Keep contract messages in a module shared by the services that exchange them, and keep in-process messages next to their handlers. See [docs/core.md](docs/core.md#cqrsmessage) for the attributes.
 
 ### Middleware
 
