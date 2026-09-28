@@ -192,6 +192,8 @@ public interface KafkaPartitionKeyStrategy {
 | `PAYLOAD_TYPE` | The fully qualified class name of the message |
 | `NONE` | No key (`null`) |
 
+Consumers match records by payload type, so a message without `@CqrsMessage` is still delivered; its name, and therefore its `MESSAGE_NAME` key, is then the kebab-case simple class name (`order-placed`), which can collide between services and changes when the class is renamed. Annotate the messages that other services consume so they get a stable, service-qualified name (see [@CqrsMessage](core.md#cqrsmessage)).
+
 Kafka only keeps order within a partition. With `MESSAGE_NAME` or `PAYLOAD_TYPE` all records of one message type share a key, so they keep their order among themselves, but two messages of different types about the same order (an `OrderPlaced` and an `OrderCancelled`, say) usually land on different partitions and can be consumed in any order.
 
 ### Keying by entity with `KeyedMessage`

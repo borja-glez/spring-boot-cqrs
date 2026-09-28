@@ -185,6 +185,8 @@ For example, with prefix `"app"`: `app.order-service.1.command.order.create-orde
 
 If `@CqrsMessage` is not present, the class simple name is converted to kebab-case (e.g., `CreateOrderCommand` becomes `create-order-command`).
 
+The annotation is optional. The in-process buses dispatch by Java type and never read the name, so messages handled inside one application need no annotation. Annotate the messages that cross a service boundary (commands and queries that other services send, events that other services consume): the name is the RabbitMQ routing key, and RabbitMQ exposes only annotated messages by default ([Exposed and local messages](rabbitmq-adapter.md#exposed-and-local-messages)); on Kafka it is the `cqrs.message.name` header and the default partition key ([Partition Keys](kafka-adapter.md#partition-keys)). A service-qualified name does not collide with a message of another service and survives renaming or moving the class.
+
 ## Registries
 
 ### CommandHandlerRegistry
