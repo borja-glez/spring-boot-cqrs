@@ -2,6 +2,8 @@ package com.borjaglez.cqrs.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Set;
+
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
@@ -100,5 +102,40 @@ class CqrsValidationAutoConfigurationTest {
                 assertThat(context.getBean(CommandValidationInterceptor.class).phases())
                     .containsExactlyInAnyOrder(
                         DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND));
+  }
+
+  @Test
+  void userCommandValidationInterceptorReplacesTheBuiltIn() {
+    contextRunner
+        .withUserConfiguration(
+            ValidatorConfiguration.class, CustomValidationInterceptorConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(CommandValidationInterceptor.class);
+              assertThat(context.getBean(CommandValidationInterceptor.class))
+                  .isSameAs(context.getBean("customCommandValidationInterceptor"))
+                  .isInstanceOf(LocalAndInboundCommandValidationInterceptor.class);
+              assertThat(context.getBean(CommandValidationInterceptor.class).phases())
+                  .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+            });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class CustomValidationInterceptorConfiguration {
+    @Bean
+    CommandValidationInterceptor customCommandValidationInterceptor(Validator validator) {
+      return new LocalAndInboundCommandValidationInterceptor(validator);
+    }
+  }
+
+  static class LocalAndInboundCommandValidationInterceptor extends CommandValidationInterceptor {
+    LocalAndInboundCommandValidationInterceptor(Validator validator) {
+      super(validator);
+    }
+
+    @Override
+    public Set<DispatchPhase> phases() {
+      return Set.of(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+    }
   }
 }

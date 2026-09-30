@@ -3,12 +3,15 @@ package com.borjaglez.cqrs.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -128,5 +131,39 @@ class CqrsContextAutoConfigurationTest {
             assertThat(context.getBean(ContextPropagationMiddleware.class).phases())
                 .containsExactlyInAnyOrder(
                     DispatchPhase.LOCAL, DispatchPhase.OUTBOUND, DispatchPhase.INBOUND));
+  }
+
+  @Test
+  void userContextMiddlewareReplacesTheBuiltIn() {
+    contextRunner
+        .withUserConfiguration(CustomContextMiddlewareConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(ContextPropagationMiddleware.class);
+              assertThat(context.getBean(ContextPropagationMiddleware.class))
+                  .isSameAs(context.getBean("customContextPropagationMiddleware"))
+                  .isInstanceOf(LocalAndInboundContextPropagationMiddleware.class);
+              assertThat(context.getBean(ContextPropagationMiddleware.class).phases())
+                  .containsExactlyInAnyOrder(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+            });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class CustomContextMiddlewareConfiguration {
+    @Bean
+    ContextPropagationMiddleware customContextPropagationMiddleware() {
+      return new LocalAndInboundContextPropagationMiddleware();
+    }
+  }
+
+  static class LocalAndInboundContextPropagationMiddleware extends ContextPropagationMiddleware {
+    LocalAndInboundContextPropagationMiddleware() {
+      super(true, List.of());
+    }
+
+    @Override
+    public Set<DispatchPhase> phases() {
+      return Set.of(DispatchPhase.LOCAL, DispatchPhase.INBOUND);
+    }
   }
 }
