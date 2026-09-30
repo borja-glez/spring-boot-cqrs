@@ -4,6 +4,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -13,6 +14,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.expression.BeanResolver;
 import org.springframework.expression.Expression;
 
+import com.borjaglez.cqrs.MessageNameIndex;
 import com.borjaglez.cqrs.MessageTypeHierarchy;
 import com.borjaglez.cqrs.MethodHandleUtil;
 import com.borjaglez.cqrs.event.Event;
@@ -53,6 +55,7 @@ public class EventHandlerRegistry {
   private static final Log LOG = LogFactory.getLog(EventHandlerRegistry.class);
 
   private final ConcurrentHashMap<Class<?>, List<HandlerInfo>> handlers = new ConcurrentHashMap<>();
+  private final MessageNameIndex messageNames = new MessageNameIndex();
   private final Set<Class<?>> warnedUnhandledSubclasses = ConcurrentHashMap.newKeySet();
 
   public void register(Class<?> eventClass, Object bean, Method method, String messageName) {
@@ -107,6 +110,7 @@ public class EventHandlerRegistry {
             : new EventHandlerCondition(condition, beanResolver, method.toGenericString());
     HandlerInfo info = new HandlerInfo(bean, handle, messageName, handlerCondition, remote);
     handlers.computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>()).add(info);
+    messageNames.add(messageName, eventClass);
   }
 
   /** Runs every handler of the event, local and remote. */
@@ -172,5 +176,15 @@ public class EventHandlerRegistry {
 
   public Set<Class<?>> getRegisteredEvents() {
     return Collections.unmodifiableSet(handlers.keySet());
+  }
+
+  /**
+   * The class of the handled event registered under {@code messageName}, the name the naming
+   * strategy gives it. Empty when no handled event has that name or when two of them share it.
+   * Transports use it to read an incoming message as the local class whatever class the producer
+   * used.
+   */
+  public Optional<Class<?>> findMessageClass(String messageName) {
+    return messageNames.find(messageName);
   }
 }

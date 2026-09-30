@@ -360,4 +360,13 @@ class EventHandlerRegistryTest {
       super(data);
     }
   }
+
+  @Test
+  void findsTheHandledEventByItsMessageName() throws Exception {
+    Method method = TestEventHandler.class.getMethod("handle", TestEvent.class);
+    registry.register(TestEvent.class, new TestEventHandler(), method, "test.event");
+
+    assertThat(registry.findMessageClass("test.event")).contains(TestEvent.class);
+    assertThat(registry.findMessageClass("other.event")).isEmpty();
+  }
 }
