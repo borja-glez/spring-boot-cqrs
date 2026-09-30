@@ -9,6 +9,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
@@ -29,6 +31,7 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.ExtendedMessageListenerAdapter
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitTemplateFactory;
 
 @AutoConfiguration
 @AutoConfigureAfter(RabbitMqCqrsAutoConfiguration.class)
@@ -41,6 +44,15 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
     matchIfMissing = true)
 @ConditionalOnBooleanProperty(name = "cqrs.rabbitmq.queries.enabled", matchIfMissing = true)
 public class RabbitMqQueryBusAutoConfiguration {
+
+  /** Name of the query bus's own {@code RabbitTemplate}, used when a reply timeout is set. */
+  public static final String QUERY_RABBIT_TEMPLATE = "cqrsQueryRabbitTemplate";
+
+  /**
+   * Name of the query bus's own {@code RabbitMqPublisher}. When a bean with this name exists, the
+   * query bus sends through it instead of the shared publisher.
+   */
+  public static final String QUERY_PUBLISHER = "cqrsQueryRabbitMqPublisher";
 
   @Bean
   public Declarables cqrsQueryDeclarables(
@@ -58,16 +70,43 @@ public class RabbitMqQueryBusAutoConfiguration {
     return builder.buildSimple(appName, properties.getQueries().getExchange(), routingKeys);
   }
 
+  /**
+   * The query bus's own template when {@code cqrs.rabbitmq.queries.reply-timeout} is set. It is not
+   * a default candidate, so it never replaces the application's {@code RabbitTemplate} where one is
+   * injected by type.
+   */
+  @Bean(name = QUERY_RABBIT_TEMPLATE, defaultCandidate = false)
+  @ConditionalOnProperty(prefix = "cqrs.rabbitmq.queries", name = "reply-timeout")
+  @ConditionalOnMissingBean(name = QUERY_RABBIT_TEMPLATE)
+  public RabbitTemplate cqrsQueryRabbitTemplate(
+      BeanFactory beanFactory,
+      ConnectionFactory connectionFactory,
+      RabbitMqCqrsProperties properties) {
+    return RabbitTemplateFactory.create(
+        beanFactory, connectionFactory, properties.getQueries().getReplyTimeout());
+  }
+
+  /** The query bus's own publisher, over {@link #cqrsQueryRabbitTemplate}. */
+  @Bean(name = QUERY_PUBLISHER, defaultCandidate = false)
+  @ConditionalOnProperty(prefix = "cqrs.rabbitmq.queries", name = "reply-timeout")
+  @ConditionalOnMissingBean(name = QUERY_PUBLISHER)
+  public RabbitMqPublisher cqrsQueryRabbitMqPublisher(
+      @Qualifier(QUERY_RABBIT_TEMPLATE) RabbitTemplate rabbitTemplate,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
+    return new RabbitMqPublisher(rabbitTemplate, contextHeaderPrefix);
+  }
+
   @Bean
   public RabbitMqQueryBus rabbitMqQueryBus(
       RabbitMqPublisher publisher,
+      @Qualifier(QUERY_PUBLISHER) ObjectProvider<RabbitMqPublisher> queryPublisher,
       RabbitMqNamingStrategy rabbitNaming,
       MessageNamingStrategy messageNaming,
       RabbitMqCqrsProperties properties,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
     // The bus keeps the middlewares that declare DispatchPhase.OUTBOUND.
     return new RabbitMqQueryBus(
-        publisher,
+        queryPublisher.getIfAvailable(() -> publisher),
         rabbitNaming,
         messageNaming,
         properties.getQueries().getExchange(),

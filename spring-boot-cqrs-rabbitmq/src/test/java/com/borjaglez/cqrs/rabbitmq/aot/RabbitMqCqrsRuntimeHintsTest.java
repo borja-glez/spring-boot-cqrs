@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeHint;
+import org.springframework.aot.hint.TypeReference;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 
 import com.borjaglez.cqrs.rabbitmq.consumer.RabbitMqCommandConsumer;
@@ -40,6 +41,36 @@ class RabbitMqCqrsRuntimeHintsTest {
                 .onType(JsonMessageConverterFactory.class)
                 .test(hints))
         .isTrue();
+  }
+
+  @Test
+  void shouldRegisterTheBootTemplateTypesCalledReflectively() {
+    RuntimeHints hints = new RuntimeHints();
+
+    new RabbitMqCqrsRuntimeHints().registerHints(hints, getClass().getClassLoader());
+
+    assertThat(
+            RuntimeHintsPredicates.reflection()
+                .onType(
+                    TypeReference.of(
+                        "org.springframework.boot.autoconfigure.amqp.RabbitTemplateConfigurer"))
+                .test(hints))
+        .isTrue();
+    assertThat(
+            RuntimeHintsPredicates.reflection()
+                .onType(
+                    TypeReference.of(
+                        "org.springframework.boot.autoconfigure.amqp.RabbitTemplateCustomizer"))
+                .test(hints))
+        .isTrue();
+    // Spring Boot 4 is not on this module's classpath.
+    assertThat(
+            hints
+                .reflection()
+                .getTypeHint(
+                    TypeReference.of(
+                        "org.springframework.boot.amqp.autoconfigure.RabbitTemplateConfigurer")))
+        .isNull();
   }
 
   @Test

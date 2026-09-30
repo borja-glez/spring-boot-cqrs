@@ -47,6 +47,15 @@ public class RabbitMqCqrsRuntimeHints implements RuntimeHintsRegistrar {
         hints,
         classLoader,
         "org.springframework.amqp.support.converter.Jackson2JsonMessageConverter");
+    // Called reflectively by RabbitTemplateFactory for the reply timeout per bus.
+    registerIfPresent(
+        hints, classLoader, "org.springframework.boot.amqp.autoconfigure.RabbitTemplateConfigurer");
+    registerIfPresent(
+        hints, classLoader, "org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer");
+    registerIfPresent(
+        hints, classLoader, "org.springframework.boot.autoconfigure.amqp.RabbitTemplateConfigurer");
+    registerIfPresent(
+        hints, classLoader, "org.springframework.boot.autoconfigure.amqp.RabbitTemplateCustomizer");
   }
 
   private void registerIfPresent(RuntimeHints hints, ClassLoader classLoader, String className) {

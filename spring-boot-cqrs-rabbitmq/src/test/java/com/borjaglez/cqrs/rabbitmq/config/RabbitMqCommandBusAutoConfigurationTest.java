@@ -8,10 +8,15 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.Declarables;
+import org.springframework.amqp.rabbit.core.RabbitMessagingTemplate;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
+import org.springframework.boot.autoconfigure.amqp.RabbitTemplateCustomizer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
@@ -289,5 +294,82 @@ class RabbitMqCommandBusAutoConfigurationTest {
                                 .dispatch(new TestCommand("data")))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage(OutboundBlocker.MESSAGE));
+  }
+
+  @Test
+  void withoutAReplyTimeoutTheBusUsesTheSharedPublisher() {
+    contextRunner.run(
+        context -> {
+          assertThat(context)
+              .doesNotHaveBean(RabbitMqCommandBusAutoConfiguration.COMMAND_RABBIT_TEMPLATE)
+              .doesNotHaveBean(RabbitMqCommandBusAutoConfiguration.COMMAND_PUBLISHER);
+          assertThat(context.getBean(RabbitMqCommandBus.class))
+              .extracting("publisher")
+              .isSameAs(context.getBean(RabbitMqPublisher.class));
+        });
+  }
+
+  @Test
+  void withAReplyTimeoutTheBusSendsThroughItsOwnTemplateConfiguredLikeBoots() {
+    contextRunner
+        .withPropertyValues(
+            "cqrs.rabbitmq.commands.reply-timeout=7s",
+            "spring.rabbitmq.template.reply-timeout=1s",
+            "spring.rabbitmq.template.mandatory=true",
+            "spring.rabbitmq.template.observation-enabled=true",
+            "spring.rabbitmq.template.exchange=configured-exchange")
+        .withBean(
+            "routingKeyCustomizer",
+            RabbitTemplateCustomizer.class,
+            () -> template -> template.setRoutingKey("customized"))
+        .run(
+            context -> {
+              RabbitTemplate shared = context.getBean("rabbitTemplate", RabbitTemplate.class);
+              RabbitTemplate own =
+                  context.getBean(
+                      RabbitMqCommandBusAutoConfiguration.COMMAND_RABBIT_TEMPLATE,
+                      RabbitTemplate.class);
+              RabbitMqPublisher ownPublisher =
+                  context.getBean(
+                      RabbitMqCommandBusAutoConfiguration.COMMAND_PUBLISHER,
+                      RabbitMqPublisher.class);
+
+              assertThat(own).isNotSameAs(shared);
+              assertThat(ReflectionTestUtils.getField(own, "replyTimeout")).isEqualTo(7000L);
+              assertThat(ReflectionTestUtils.getField(shared, "replyTimeout")).isEqualTo(1000L);
+              assertThat(own.isMandatoryFor(null)).isTrue();
+              assertThat(ReflectionTestUtils.getField(own, "observationEnabled")).isEqualTo(true);
+              assertThat(own.getExchange()).isEqualTo("configured-exchange");
+              assertThat(own.getRoutingKey()).isEqualTo("customized");
+              assertThat(own.getMessageConverter()).isSameAs(shared.getMessageConverter());
+              assertThat(own.getConnectionFactory()).isSameAs(shared.getConnectionFactory());
+              assertThat(ownPublisher).extracting("rabbitTemplate").isSameAs(own);
+              assertThat(context.getBean(RabbitMqCommandBus.class))
+                  .extracting("publisher")
+                  .isSameAs(ownPublisher);
+              // The bus's own beans never replace the shared ones where they are injected by type.
+              assertThat(context.getBeanProvider(RabbitTemplate.class).getIfUnique())
+                  .isSameAs(shared);
+              assertThat(context.getBeanProvider(RabbitMqPublisher.class).getIfUnique())
+                  .isSameAs(context.getBean("cqrsRabbitMqPublisher"));
+              assertThat(context).hasSingleBean(RabbitMessagingTemplate.class);
+            });
+  }
+
+  @Test
+  void theBusUsesAPublisherTheApplicationDefinesUnderItsName() {
+    RabbitMqPublisher custom = new RabbitMqPublisher(new RabbitTemplate());
+    contextRunner
+        .withPropertyValues("cqrs.rabbitmq.commands.reply-timeout=7s")
+        .withBean(
+            RabbitMqCommandBusAutoConfiguration.COMMAND_PUBLISHER,
+            RabbitMqPublisher.class,
+            () -> custom,
+            definition -> ((AbstractBeanDefinition) definition).setDefaultCandidate(false))
+        .run(
+            context ->
+                assertThat(context.getBean(RabbitMqCommandBus.class))
+                    .extracting("publisher")
+                    .isSameAs(custom));
   }
 }

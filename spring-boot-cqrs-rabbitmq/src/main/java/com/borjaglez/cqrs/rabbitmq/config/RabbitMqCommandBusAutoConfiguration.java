@@ -9,6 +9,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
@@ -29,6 +31,7 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.ExtendedMessageListenerAdapter
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitTemplateFactory;
 
 @AutoConfiguration
 @AutoConfigureAfter(RabbitMqCqrsAutoConfiguration.class)
@@ -41,6 +44,15 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
     matchIfMissing = true)
 @ConditionalOnBooleanProperty(name = "cqrs.rabbitmq.commands.enabled", matchIfMissing = true)
 public class RabbitMqCommandBusAutoConfiguration {
+
+  /** Name of the command bus's own {@code RabbitTemplate}, used when a reply timeout is set. */
+  public static final String COMMAND_RABBIT_TEMPLATE = "cqrsCommandRabbitTemplate";
+
+  /**
+   * Name of the command bus's own {@code RabbitMqPublisher}. When a bean with this name exists, the
+   * command bus sends through it instead of the shared publisher.
+   */
+  public static final String COMMAND_PUBLISHER = "cqrsCommandRabbitMqPublisher";
 
   @Bean
   public Declarables cqrsCommandDeclarables(
@@ -62,16 +74,43 @@ public class RabbitMqCommandBusAutoConfiguration {
         properties.getRetry().getTtl());
   }
 
+  /**
+   * The command bus's own template when {@code cqrs.rabbitmq.commands.reply-timeout} is set. It is
+   * not a default candidate, so it never replaces the application's {@code RabbitTemplate} where
+   * one is injected by type.
+   */
+  @Bean(name = COMMAND_RABBIT_TEMPLATE, defaultCandidate = false)
+  @ConditionalOnProperty(prefix = "cqrs.rabbitmq.commands", name = "reply-timeout")
+  @ConditionalOnMissingBean(name = COMMAND_RABBIT_TEMPLATE)
+  public RabbitTemplate cqrsCommandRabbitTemplate(
+      BeanFactory beanFactory,
+      ConnectionFactory connectionFactory,
+      RabbitMqCqrsProperties properties) {
+    return RabbitTemplateFactory.create(
+        beanFactory, connectionFactory, properties.getCommands().getReplyTimeout());
+  }
+
+  /** The command bus's own publisher, over {@link #cqrsCommandRabbitTemplate}. */
+  @Bean(name = COMMAND_PUBLISHER, defaultCandidate = false)
+  @ConditionalOnProperty(prefix = "cqrs.rabbitmq.commands", name = "reply-timeout")
+  @ConditionalOnMissingBean(name = COMMAND_PUBLISHER)
+  public RabbitMqPublisher cqrsCommandRabbitMqPublisher(
+      @Qualifier(COMMAND_RABBIT_TEMPLATE) RabbitTemplate rabbitTemplate,
+      @Value("${cqrs.context.header-prefix:cqrs.context.}") String contextHeaderPrefix) {
+    return new RabbitMqPublisher(rabbitTemplate, contextHeaderPrefix);
+  }
+
   @Bean
   public RabbitMqCommandBus rabbitMqCommandBus(
       RabbitMqPublisher publisher,
+      @Qualifier(COMMAND_PUBLISHER) ObjectProvider<RabbitMqPublisher> commandPublisher,
       RabbitMqNamingStrategy rabbitNaming,
       MessageNamingStrategy messageNaming,
       RabbitMqCqrsProperties properties,
       ObjectProvider<List<BusMiddleware>> middlewaresProvider) {
     // The bus keeps the middlewares that declare DispatchPhase.OUTBOUND.
     return new RabbitMqCommandBus(
-        publisher,
+        commandPublisher.getIfAvailable(() -> publisher),
         rabbitNaming,
         messageNaming,
         properties.getCommands().getExchange(),

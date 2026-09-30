@@ -224,6 +224,7 @@ Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
 | `cqrs.rabbitmq.commands.exchange` | `String` | `"commands"` | Logical name of the command exchange. Combined with prefix to form the full exchange name. |
 | `cqrs.rabbitmq.commands.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the command listener container. |
 | `cqrs.rabbitmq.commands.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the command listener container. |
+| `cqrs.rabbitmq.commands.reply-timeout` | `Duration` | unset | How long `dispatchAndReceive` and `dispatchAndWait` wait for the reply before throwing `RemoteReplyTimeoutException`. When set, the command bus sends through its own `RabbitTemplate`, configured like Spring Boot's with the other `spring.rabbitmq.template.*` settings and the `RabbitTemplateCustomizer` beans. Unset, it uses `spring.rabbitmq.template.reply-timeout`. See [Reply timeout per bus](rabbitmq-adapter.md#reply-timeout-per-bus). |
 | `cqrs.rabbitmq.events.exchange` | `String` | `"events"` | Logical name of the event exchange. |
 | `cqrs.rabbitmq.events.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the event listener container. |
 | `cqrs.rabbitmq.events.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the event listener container. |
@@ -232,6 +233,7 @@ Defined in `RabbitMqCqrsProperties` (`cqrs.rabbitmq.*`):
 | `cqrs.rabbitmq.queries.exchange` | `String` | `"queries"` | Logical name of the query exchange. |
 | `cqrs.rabbitmq.queries.concurrent-consumers` | `int` | `10` | Minimum number of concurrent consumers for the query listener container. |
 | `cqrs.rabbitmq.queries.max-concurrent-consumers` | `int` | `20` | Maximum number of concurrent consumers for the query listener container. |
+| `cqrs.rabbitmq.queries.reply-timeout` | `Duration` | unset | How long `ask` waits for the reply before throwing `RemoteReplyTimeoutException`. When set, the query bus sends through its own `RabbitTemplate`, configured like Spring Boot's. Unset, it uses `spring.rabbitmq.template.reply-timeout`. See [Reply timeout per bus](rabbitmq-adapter.md#reply-timeout-per-bus). |
 
 A service that handles commands over RabbitMQ and publishes events, but never serves or sends queries:
 

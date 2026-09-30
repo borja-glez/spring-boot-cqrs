@@ -156,6 +156,30 @@ class RabbitMqCqrsPropertiesTest {
   }
 
   @Test
+  void replyTimeoutIsUnsetByDefault() {
+    RabbitMqCqrsProperties properties = new RabbitMqCqrsProperties();
+
+    assertThat(properties.getCommands().getReplyTimeout()).isNull();
+    assertThat(properties.getQueries().getReplyTimeout()).isNull();
+  }
+
+  @Test
+  void shouldBindTheReplyTimeoutOfEachBusAsADuration() {
+    RabbitMqCqrsProperties properties =
+        new Binder(
+                new MapConfigurationPropertySource(
+                    Map.of(
+                        "cqrs.rabbitmq.commands.reply-timeout", "5s",
+                        "cqrs.rabbitmq.queries.reply-timeout", "1500ms")))
+            .bind("cqrs.rabbitmq", RabbitMqCqrsProperties.class)
+            .get();
+
+    assertThat(properties.getCommands().getReplyTimeout()).isEqualTo(Duration.ofSeconds(5));
+    assertThat(properties.getQueries().getReplyTimeout()).isEqualTo(Duration.ofMillis(1500));
+    assertThat(properties.getQueries().getExchange()).isEqualTo("queries");
+  }
+
+  @Test
   void shouldSetQueries() {
     RabbitMqCqrsProperties properties = new RabbitMqCqrsProperties();
     RabbitMqCqrsProperties.BusProperties queries =
