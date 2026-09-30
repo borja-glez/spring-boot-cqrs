@@ -3,12 +3,17 @@ package com.borjaglez.cqrs.rabbitmq.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
@@ -41,6 +46,63 @@ class RabbitMqCqrsAutoConfigurationTest {
           assertThat(namingStrategy).isInstanceOf(DefaultRabbitMqNamingStrategy.class);
           assertThat(converter).isNotNull();
         });
+  }
+
+  @Test
+  void shouldWriteDatesAsIsoTextWithTheApplicationObjectMapper() {
+    contextRunner
+        .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration.class))
+        .run(
+            context -> {
+              MessageConverter converter =
+                  context.getBean("cqrsMessageConverter", MessageConverter.class);
+
+              assertThat(body(converter, new TimedReply(SENT_AT)))
+                  .contains("\"sentAt\":\"2026-09-30T10:15:30.123456Z\"");
+            });
+  }
+
+  @Test
+  void shouldApplyTheApplicationJacksonCustomizations() {
+    contextRunner
+        .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration.class))
+        .withPropertyValues("spring.jackson.property-naming-strategy=SNAKE_CASE")
+        .run(
+            context -> {
+              MessageConverter converter =
+                  context.getBean("cqrsMessageConverter", MessageConverter.class);
+
+              assertThat(body(converter, new TimedReply(SENT_AT))).contains("\"sent_at\"");
+            });
+  }
+
+  @Test
+  void shouldTrustTheConfiguredPackagesWithTheApplicationObjectMapper() {
+    contextRunner
+        .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration.class))
+        .withPropertyValues("cqrs.rabbitmq.trusted-packages=com.example.contracts")
+        .run(
+            context -> {
+              MessageConverter converter =
+                  context.getBean("cqrsMessageConverter", MessageConverter.class);
+              Message message =
+                  JsonMessageConverterFactory.create()
+                      .toMessage(new TestCommand("data"), new MessageProperties());
+              assertThatThrownBy(() -> converter.fromMessage(message))
+                  .hasMessageContaining("not in the trusted packages");
+            });
+  }
+
+  @Test
+  void shouldBackOffWhenCustomMessageConverterProvided() {
+    MessageConverter custom = JsonMessageConverterFactory.create();
+    contextRunner
+        .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration.class))
+        .withBean("cqrsMessageConverter", MessageConverter.class, () -> custom)
+        .run(
+            context ->
+                assertThat(context.getBean("cqrsMessageConverter", MessageConverter.class))
+                    .isSameAs(custom));
   }
 
   @Test
@@ -121,4 +183,14 @@ class RabbitMqCqrsAutoConfigurationTest {
               assertThat(props.getQueries().getExchange()).isEqualTo("my-queries");
             });
   }
+
+  private static final OffsetDateTime SENT_AT =
+      OffsetDateTime.of(2026, 9, 30, 10, 15, 30, 123_456_000, ZoneOffset.UTC);
+
+  private static String body(MessageConverter converter, Object payload) {
+    return new String(
+        converter.toMessage(payload, new MessageProperties()).getBody(), StandardCharsets.UTF_8);
+  }
+
+  record TimedReply(OffsetDateTime sentAt) {}
 }

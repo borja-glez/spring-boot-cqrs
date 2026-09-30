@@ -10,6 +10,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 
@@ -95,6 +96,56 @@ class JsonMessageConverterFactoryTest {
   }
 
   @Test
+  void createShouldUseTheMapperFoundForTheSelectedConverter() {
+    TestObjectMapper mapper = new TestObjectMapper();
+
+    MessageConverter converter =
+        JsonMessageConverterFactory.create(
+            JsonMessageConverterFactory.class.getClassLoader(),
+            List.of(
+                new JsonMessageConverterFactory.ConverterCandidate(
+                    TestMessageConverter.class.getName(), TestObjectMapper.class.getName())),
+            mapperType -> mapperType == TestObjectMapper.class ? mapper : null,
+            "com.example.contracts");
+
+    assertThat(((TestMessageConverter) converter).mapper).isSameAs(mapper);
+    assertThat(((TestMessageConverter) converter).trustedPackages)
+        .containsExactly("com.example.contracts");
+  }
+
+  @Test
+  void createShouldUseSpringAmqpMapperWhenNoMapperIsFound() {
+    MessageConverter converter =
+        JsonMessageConverterFactory.create(
+            JsonMessageConverterFactory.class.getClassLoader(),
+            List.of(
+                new JsonMessageConverterFactory.ConverterCandidate(
+                    TestMessageConverter.class.getName(), TestObjectMapper.class.getName())),
+            mapperType -> null,
+            "com.example.contracts");
+
+    assertThat(((TestMessageConverter) converter).mapper).isNull();
+    assertThat(((TestMessageConverter) converter).trustedPackages)
+        .containsExactly("com.example.contracts");
+  }
+
+  @Test
+  void createWithBeanFactoryShouldKeepTheDefaultConverterWithoutMapperBean() {
+    MessageConverter converter =
+        JsonMessageConverterFactory.create(
+            new StaticListableBeanFactory(), "com.example.contracts");
+    Message message =
+        JsonMessageConverterFactory.create()
+            .toMessage(new TestCommand("data"), new MessageProperties());
+
+    assertThat(converter)
+        .extracting(created -> created.getClass().getName())
+        .isEqualTo("org.springframework.amqp.support.converter.Jackson2JsonMessageConverter");
+    assertThatThrownBy(() -> converter.fromMessage(message))
+        .hasMessageContaining("not in the trusted packages");
+  }
+
+  @Test
   void createShouldFailWhenNoCompatibleConverterExists() {
     assertThatThrownBy(
             () ->
@@ -125,9 +176,15 @@ class JsonMessageConverterFactoryTest {
 
   static class TestMessageConverter implements MessageConverter {
 
+    final TestObjectMapper mapper;
     final String[] trustedPackages;
 
     TestMessageConverter(String... trustedPackages) {
+      this(null, trustedPackages);
+    }
+
+    TestMessageConverter(TestObjectMapper mapper, String... trustedPackages) {
+      this.mapper = mapper;
       this.trustedPackages = trustedPackages;
     }
 
