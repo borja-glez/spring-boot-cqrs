@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestQuery;
+import com.borjaglez.cqrs.fixtures.UnannotatedCommand;
 
 class MessageNameIndexTest {
 
@@ -47,5 +48,14 @@ class MessageNameIndexTest {
     index.add("shared", TestQuery.class);
 
     assertThat(index.find("shared")).isEmpty();
+  }
+
+  @Test
+  void classWithoutCqrsMessageIsNotIndexed() {
+    // Its kebab-case simple name is not qualified by service, so the same name may belong to
+    // another service's class on a shared topic.
+    index.add("unannotated-command", UnannotatedCommand.class);
+
+    assertThat(index.find("unannotated-command")).isEmpty();
   }
 }
