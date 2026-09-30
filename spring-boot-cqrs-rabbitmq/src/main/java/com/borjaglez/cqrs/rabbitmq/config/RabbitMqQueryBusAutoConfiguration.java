@@ -28,6 +28,7 @@ import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 import com.borjaglez.cqrs.rabbitmq.RabbitMqQueryBus;
 import com.borjaglez.cqrs.rabbitmq.consumer.RabbitMqQueryConsumer;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.ExtendedMessageListenerAdapter;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.MessageNameResolvingConverter;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -136,7 +137,10 @@ public class RabbitMqQueryBusAutoConfiguration {
             properties.getExpose());
 
     ExtendedMessageListenerAdapter adapter =
-        new ExtendedMessageListenerAdapter(consumer, messageConverter, "consume");
+        new ExtendedMessageListenerAdapter(
+            consumer,
+            new MessageNameResolvingConverter(messageConverter, registry::findMessageClass),
+            "consume");
 
     SimpleMessageListenerContainer container =
         new SimpleMessageListenerContainer(connectionFactory);

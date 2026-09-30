@@ -27,6 +27,7 @@ import com.borjaglez.cqrs.rabbitmq.fixtures.LocalEventHandler;
 import com.borjaglez.cqrs.rabbitmq.fixtures.OutboundBlocker;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEvent;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestEventHandler;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.MessageNameResolvingConverter;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -336,5 +337,17 @@ class RabbitMqEventBusAutoConfigurationTest {
                             context.getBean(RabbitMqEventBus.class).publish(new TestEvent("data")))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage(OutboundBlocker.MESSAGE));
+  }
+
+  @Test
+  void eventListenerReadsMessagesByTheirLogicalName() {
+    contextRunner.run(
+        context ->
+            assertThat(
+                    context
+                        .getBean("cqrsEventListenerContainer", SimpleMessageListenerContainer.class)
+                        .getMessageListener())
+                .extracting("messageConverter")
+                .isInstanceOf(MessageNameResolvingConverter.class));
   }
 }

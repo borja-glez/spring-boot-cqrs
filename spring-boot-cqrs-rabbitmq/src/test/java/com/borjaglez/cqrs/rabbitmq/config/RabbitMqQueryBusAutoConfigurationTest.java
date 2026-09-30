@@ -31,6 +31,7 @@ import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQuery;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestOrderListQueryHandler;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQuery;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestQueryHandler;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.MessageNameResolvingConverter;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -306,5 +307,17 @@ class RabbitMqQueryBusAutoConfigurationTest {
                     .extracting("publisher")
                     .extracting("rabbitTemplate")
                     .isSameAs(custom));
+  }
+
+  @Test
+  void queryListenerReadsMessagesByTheirLogicalName() {
+    contextRunner.run(
+        context ->
+            assertThat(
+                    context
+                        .getBean("cqrsQueryListenerContainer", SimpleMessageListenerContainer.class)
+                        .getMessageListener())
+                .extracting("messageConverter")
+                .isInstanceOf(MessageNameResolvingConverter.class));
   }
 }

@@ -29,6 +29,7 @@ import com.borjaglez.cqrs.rabbitmq.fixtures.LocalCommandHandler;
 import com.borjaglez.cqrs.rabbitmq.fixtures.OutboundBlocker;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommand;
 import com.borjaglez.cqrs.rabbitmq.fixtures.TestCommandHandler;
+import com.borjaglez.cqrs.rabbitmq.infrastructure.MessageNameResolvingConverter;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqBusDeclarationBuilder;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqExposure;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
@@ -371,5 +372,18 @@ class RabbitMqCommandBusAutoConfigurationTest {
                 assertThat(context.getBean(RabbitMqCommandBus.class))
                     .extracting("publisher")
                     .isSameAs(custom));
+  }
+
+  @Test
+  void commandListenerReadsMessagesByTheirLogicalName() {
+    contextRunner.run(
+        context ->
+            assertThat(
+                    context
+                        .getBean(
+                            "cqrsCommandListenerContainer", SimpleMessageListenerContainer.class)
+                        .getMessageListener())
+                .extracting("messageConverter")
+                .isInstanceOf(MessageNameResolvingConverter.class));
   }
 }
