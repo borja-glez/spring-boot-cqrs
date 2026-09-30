@@ -63,6 +63,8 @@ class RabbitMqPublisherTest {
     Message processedMessage = postProcessor.postProcessMessage(testMessage);
     Object headerValue = processedMessage.getMessageProperties().getHeader("cqrs.message.type");
     assertThat(headerValue).isEqualTo("command");
+    assertThat((Object) processedMessage.getMessageProperties().getHeader("cqrs.message.name"))
+        .isEqualTo("routing.key");
   }
 
   @Test
@@ -522,5 +524,38 @@ class RabbitMqPublisherTest {
 
   private static CorrelationData.Confirm confirm(boolean ack, String reason) {
     return new CorrelationData.Confirm(ack, reason);
+  }
+
+  @Test
+  void publishAndReceiveSendsTheMessageName() {
+    MessageConverter converter = JsonMessageConverterFactory.create();
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+    ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("svc.1.query.mod.get"), sent.capture()))
+        .thenReturn(converter.toMessage("result", new MessageProperties()));
+
+    publisher.publishAndReceive("exchange", "svc.1.query.mod.get", "payload", "query");
+
+    assertThat((Object) sent.getValue().getMessageProperties().getHeader("cqrs.message.name"))
+        .isEqualTo("svc.1.query.mod.get");
+  }
+
+  @Test
+  void publishAndReceiveWithResponseTypeSendsTheMessageName() {
+    MessageConverter converter = JsonMessageConverterFactory.create();
+    when(rabbitTemplate.getMessageConverter()).thenReturn(converter);
+    ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
+    when(rabbitTemplate.sendAndReceive(eq("exchange"), eq("svc.1.query.mod.get"), sent.capture()))
+        .thenReturn(converter.toMessage("result", new MessageProperties()));
+
+    publisher.publishAndReceive(
+        "exchange",
+        "svc.1.query.mod.get",
+        "payload",
+        "query",
+        new ParameterizedTypeReference<String>() {});
+
+    assertThat((Object) sent.getValue().getMessageProperties().getHeader("cqrs.message.name"))
+        .isEqualTo("svc.1.query.mod.get");
   }
 }

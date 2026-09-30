@@ -26,6 +26,12 @@ public class RabbitMqPublisher {
 
   public static final String DEFAULT_CONTEXT_HEADER_PREFIX = "cqrs.context.";
 
+  /**
+   * Logical name of the message (its routing key), which the consumer uses to read it as its own
+   * class whatever class the producer used.
+   */
+  public static final String HEADER_MESSAGE_NAME = "cqrs.message.name";
+
   private static final String HEADER_MESSAGE_TYPE = "cqrs.message.type";
   private static final String HEADER_NULL_RESULT = "cqrs.result.null";
 
@@ -43,7 +49,8 @@ public class RabbitMqPublisher {
   }
 
   public void publish(String exchange, String routingKey, Object message, String messageType) {
-    rabbitTemplate.convertAndSend(exchange, routingKey, message, cqrsHeaders(messageType));
+    rabbitTemplate.convertAndSend(
+        exchange, routingKey, message, cqrsHeaders(routingKey, messageType));
   }
 
   /**
@@ -58,7 +65,7 @@ public class RabbitMqPublisher {
       String exchange, String routingKey, Object message, String messageType, Duration timeout) {
     CorrelationData correlation = new CorrelationData();
     rabbitTemplate.convertAndSend(
-        exchange, routingKey, message, cqrsHeaders(messageType), correlation);
+        exchange, routingKey, message, cqrsHeaders(routingKey, messageType), correlation);
     CorrelationData.Confirm confirm = awaitConfirm(correlation, exchange, routingKey, timeout);
     if (!confirm.isAck()) {
       throw new PublishNotConfirmedException(
@@ -89,10 +96,10 @@ public class RabbitMqPublisher {
     }
   }
 
-  private MessagePostProcessor cqrsHeaders(String messageType) {
+  private MessagePostProcessor cqrsHeaders(String routingKey, String messageType) {
     Map<String, String> contextHeaders = snapshotContextHeaders();
     return m -> {
-      applyCqrsHeaders(m.getMessageProperties(), messageType, contextHeaders);
+      applyCqrsHeaders(m.getMessageProperties(), routingKey, messageType, contextHeaders);
       return m;
     };
   }
@@ -101,7 +108,7 @@ public class RabbitMqPublisher {
       String exchange, String routingKey, Object payload, String messageType) {
     MessageConverter converter = rabbitTemplate.getMessageConverter();
     MessageProperties properties = new MessageProperties();
-    applyCqrsHeaders(properties, messageType, snapshotContextHeaders());
+    applyCqrsHeaders(properties, routingKey, messageType, snapshotContextHeaders());
 
     Message requestMessage = converter.toMessage(payload, properties);
     Message reply = receive(exchange, routingKey, requestMessage);
@@ -119,7 +126,7 @@ public class RabbitMqPublisher {
       ParameterizedTypeReference<?> responseType) {
     MessageConverter converter = rabbitTemplate.getMessageConverter();
     MessageProperties properties = new MessageProperties();
-    applyCqrsHeaders(properties, messageType, snapshotContextHeaders());
+    applyCqrsHeaders(properties, routingKey, messageType, snapshotContextHeaders());
 
     Message requestMessage = converter.toMessage(payload, properties);
     Message reply = receive(exchange, routingKey, requestMessage);
@@ -164,8 +171,12 @@ public class RabbitMqPublisher {
   }
 
   private void applyCqrsHeaders(
-      MessageProperties properties, String messageType, Map<String, String> contextHeaders) {
+      MessageProperties properties,
+      String routingKey,
+      String messageType,
+      Map<String, String> contextHeaders) {
     properties.setHeader(HEADER_MESSAGE_TYPE, messageType);
+    properties.setHeader(HEADER_MESSAGE_NAME, routingKey);
     for (Map.Entry<String, String> entry : contextHeaders.entrySet()) {
       properties.setHeader(entry.getKey(), entry.getValue());
     }
