@@ -309,12 +309,16 @@ The module provides four auto-configuration classes:
 
 | Class | Condition | Creates |
 |---|---|---|
-| `RabbitMqCqrsAutoConfiguration` | `RabbitTemplate` on classpath + `cqrs.rabbitmq.enabled=true` | `RabbitMqNamingStrategy`, `RabbitMqPublisher`, `RabbitMqBusDeclarationBuilder` |
+| `RabbitMqCqrsAutoConfiguration` | `RabbitTemplate` on classpath + `cqrs.rabbitmq.enabled=true` | `cqrsMessageConverter`, `RabbitMqNamingStrategy`, `RabbitMqPublisher`, `RabbitMqBusDeclarationBuilder` |
 | `RabbitMqCommandBusAutoConfiguration` | Above + `CommandHandlerRegistry` bean + `cqrs.rabbitmq.commands.enabled` not `false` | `RabbitMqCommandBus`, command `Declarables`, command listener container |
 | `RabbitMqEventBusAutoConfiguration` | Above + `EventHandlerRegistry` bean + `cqrs.rabbitmq.events.enabled` not `false` | `RabbitMqEventBus`, event `Declarables`, event listener container |
 | `RabbitMqQueryBusAutoConfiguration` | Above + `QueryHandlerRegistry` bean + `cqrs.rabbitmq.queries.enabled` not `false` | `RabbitMqQueryBus`, query `Declarables`, query listener container |
 
 The bus auto-configurations use `@Value("${spring.application.name:cqrs-app}")` for the application name used in queue naming.
+
+### Message format
+
+`cqrsMessageConverter` is Spring AMQP's JSON converter for the Jackson generation on the classpath (`JacksonJsonMessageConverter` for Jackson 3, `Jackson2JsonMessageConverter` for Jackson 2), restricted to `cqrs.rabbitmq.trusted-packages`. When the application context has a Jackson mapper of that generation (the `JsonMapper` Spring Boot 4 configures, or the `ObjectMapper` of Spring Boot 3), the converter uses it, so RabbitMQ messages share the JSON format of the rest of the application and its `spring.jackson.*` settings and Jackson modules apply. Dates are written as ISO-8601 text on both generations. Without such a mapper, Spring AMQP's own is used. Declare a `MessageConverter` bean named `cqrsMessageConverter` to replace it.
 
 ### Enabling each bus
 

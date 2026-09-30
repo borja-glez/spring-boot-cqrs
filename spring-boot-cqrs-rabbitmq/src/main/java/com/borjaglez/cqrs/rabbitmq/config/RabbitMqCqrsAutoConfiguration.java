@@ -2,6 +2,7 @@ package com.borjaglez.cqrs.rabbitmq.config;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -33,9 +34,10 @@ public class RabbitMqCqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(name = "cqrsMessageConverter")
-  public MessageConverter cqrsMessageConverter(RabbitMqCqrsProperties properties) {
+  public MessageConverter cqrsMessageConverter(
+      RabbitMqCqrsProperties properties, BeanFactory beanFactory) {
     return JsonMessageConverterFactory.create(
-        properties.getTrustedPackages().toArray(String[]::new));
+        beanFactory, properties.getTrustedPackages().toArray(String[]::new));
   }
 
   @Bean
