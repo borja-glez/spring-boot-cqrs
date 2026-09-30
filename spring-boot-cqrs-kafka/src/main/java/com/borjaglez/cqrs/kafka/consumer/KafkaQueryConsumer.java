@@ -48,7 +48,7 @@ public class KafkaQueryConsumer extends AbstractKafkaConsumer {
 
   public void consume(ConsumerRecord<String, byte[]> record) {
     // Queries of other services arrive here too; only the owner answers them.
-    Optional<Class<?>> type = localPayloadClass(record);
+    Optional<Class<?>> type = localPayloadClass(record, registry::findMessageClass);
     if (type.isEmpty() || registry.getHandlerInfo(type.get()).isEmpty()) {
       return;
     }

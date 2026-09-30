@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -29,11 +30,23 @@ abstract class AbstractKafkaConsumer {
   }
 
   /**
-   * The class of the payload, when this application has it. Every service reads the shared
-   * commands, queries and events topics, so a record may well carry a type that only another
-   * service knows: that is not an error, the record is simply not for this application.
+   * The class of the payload, when this application has it. The {@code cqrs.message.name} header is
+   * looked up first with {@code classByName}, so a message is read as the local class registered
+   * under its logical name even when the producer's class has another name or package; the {@code
+   * cqrs.payload.type} class name is the fallback for messages without a known name. Every service
+   * reads the shared commands, queries and events topics, so a record may well carry a type that
+   * only another service knows: that is not an error, the record is simply not for this
+   * application.
    */
-  protected Optional<Class<?>> localPayloadClass(ConsumerRecord<String, byte[]> record) {
+  protected Optional<Class<?>> localPayloadClass(
+      ConsumerRecord<String, byte[]> record, Function<String, Optional<Class<?>>> classByName) {
+    String messageName = header(record, KafkaMessageHeaders.MESSAGE_NAME);
+    if (messageName != null) {
+      Optional<Class<?>> named = classByName.apply(messageName);
+      if (named.isPresent()) {
+        return named;
+      }
+    }
     String payloadType = header(record, KafkaMessageHeaders.PAYLOAD_TYPE);
     if (payloadType == null) {
       throw new UnprocessableRecordException("Missing Kafka CQRS payload type header");

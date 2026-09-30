@@ -50,7 +50,7 @@ public class KafkaCommandConsumer extends AbstractKafkaConsumer {
   public void consume(ConsumerRecord<String, byte[]> record) {
     // Commands of other services arrive here too. Answering them (with "no handler") would race
     // the reply of the service that owns them, so they are left alone.
-    Optional<Class<?>> type = localPayloadClass(record);
+    Optional<Class<?>> type = localPayloadClass(record, registry::findMessageClass);
     if (type.isEmpty() || registry.getHandlerInfo(type.get()).isEmpty()) {
       return;
     }

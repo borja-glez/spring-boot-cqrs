@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -168,5 +169,58 @@ class KafkaEventConsumerTest {
         new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND),
         new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
         new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
+  }
+
+  @Test
+  void handlesAnEventWhoseProducerClassIsUnknownHereByItsMessageName() {
+    TestEvent event = new TestEvent("value");
+    ConsumerRecord<String, byte[]> record =
+        record("com.example.producer.RenamedEvent", "svc.1.event.mod.renamed");
+    when(registry.findMessageClass("svc.1.event.mod.renamed"))
+        .thenReturn(Optional.<Class<?>>of(TestEvent.class));
+    when(serializer.deserialize(record.value(), TestEvent.class)).thenReturn(event);
+
+    consumer.consume(record);
+
+    verify(registry).handle(event);
+  }
+
+  @Test
+  void fallsBackToThePayloadTypeWhenTheNameIsUnknown() {
+    TestEvent event = new TestEvent("value");
+    ConsumerRecord<String, byte[]> record =
+        record(TestEvent.class.getName(), "svc.1.event.mod.unknown");
+    when(serializer.deserialize(record.value(), TestEvent.class)).thenReturn(event);
+
+    consumer.consume(record);
+
+    verify(registry).handle(event);
+  }
+
+  @Test
+  void resolvesByNameWithoutPayloadTypeHeader() {
+    TestEvent event = new TestEvent("value");
+    ConsumerRecord<String, byte[]> record = record(null, "svc.1.event.mod.renamed");
+    when(registry.findMessageClass("svc.1.event.mod.renamed"))
+        .thenReturn(Optional.<Class<?>>of(TestEvent.class));
+    when(serializer.deserialize(record.value(), TestEvent.class)).thenReturn(event);
+
+    consumer.consume(record);
+
+    verify(registry).handle(event);
+  }
+
+  private ConsumerRecord<String, byte[]> record(String payloadType, String messageName) {
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>("cqrs.events", 0, 0L, "key", "payload".getBytes(UTF_8));
+    if (payloadType != null) {
+      record
+          .headers()
+          .add(new RecordHeader(KafkaMessageHeaders.PAYLOAD_TYPE, payloadType.getBytes(UTF_8)));
+    }
+    record
+        .headers()
+        .add(new RecordHeader(KafkaMessageHeaders.MESSAGE_NAME, messageName.getBytes(UTF_8)));
+    return record;
   }
 }
