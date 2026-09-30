@@ -70,6 +70,17 @@ public class RabbitMqCqrsProperties {
     private int concurrentConsumers;
     private int maxConcurrentConsumers;
 
+    /**
+     * How long this bus waits for the reply of a request ({@code dispatchAndReceive} on the command
+     * bus, {@code ask} on the query bus) before it throws {@code RemoteReplyTimeoutException}. When
+     * set, the bus sends through its own {@code RabbitTemplate}, configured like Spring Boot's with
+     * the {@code spring.rabbitmq.template.*} settings and every {@code RabbitTemplateCustomizer},
+     * and only the reply timeout changed. When unset, the bus uses the application's {@code
+     * RabbitTemplate} and so {@code spring.rabbitmq.template.reply-timeout}. Ignored for events,
+     * which have no reply.
+     */
+    private Duration replyTimeout;
+
     public BusProperties() {
       this("", 10, 20);
     }

@@ -583,12 +583,14 @@ The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `Comm
 | `cqrs.rabbitmq.commands.exchange` | `"commands"` | Command exchange name |
 | `cqrs.rabbitmq.commands.concurrent-consumers` | `10` | Min concurrent command consumers |
 | `cqrs.rabbitmq.commands.max-concurrent-consumers` | `20` | Max concurrent command consumers |
+| `cqrs.rabbitmq.commands.reply-timeout` | unset | How long `dispatchAndReceive` waits for the reply; unset uses `spring.rabbitmq.template.reply-timeout` |
 | `cqrs.rabbitmq.events.exchange` | `"events"` | Event exchange name |
 | `cqrs.rabbitmq.events.concurrent-consumers` | `10` | Min concurrent event consumers |
 | `cqrs.rabbitmq.events.max-concurrent-consumers` | `20` | Max concurrent event consumers |
 | `cqrs.rabbitmq.queries.exchange` | `"queries"` | Query exchange name |
 | `cqrs.rabbitmq.queries.concurrent-consumers` | `10` | Min concurrent query consumers |
 | `cqrs.rabbitmq.queries.max-concurrent-consumers` | `20` | Max concurrent query consumers |
+| `cqrs.rabbitmq.queries.reply-timeout` | unset | How long `ask` waits for the reply; unset uses `spring.rabbitmq.template.reply-timeout` ([details](docs/rabbitmq-adapter.md#reply-timeout-per-bus)) |
 
 See [docs/configuration.md](docs/configuration.md) for full details with YAML examples.
 

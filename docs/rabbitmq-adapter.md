@@ -11,6 +11,7 @@ The RabbitMQ module provides distributed implementations of all three buses. Whe
 - [Exchanges, Queues, and Routing](#exchanges-queues-and-routing)
 - [Exposed and local messages](#exposed-and-local-messages)
 - [Bus Implementations](#bus-implementations)
+  - [Reply timeout per bus](#reply-timeout-per-bus)
   - [Generic results](#generic-results)
 - [Retry and Dead-Letter Queue Strategy](#retry-and-dead-letter-queue-strategy)
 - [Consumer Configuration](#consumer-configuration)
@@ -163,6 +164,23 @@ Shared publisher component that wraps `RabbitTemplate`:
 - `publishAndReceive(exchange, routingKey, message, type)` -- RPC-style send/receive; checks for a `cqrs.error` header on the reply
 - `publishAndReceive(exchange, routingKey, message, type, responseType)` -- the same, converting the reply with the `ParameterizedTypeReference` through the `SmartMessageConverter`
 
+### Reply timeout per bus
+
+`dispatchAndReceive`, `dispatchAndWait` and `ask` wait for the reply as long as the template's reply timeout, and throw `RemoteReplyTimeoutException` when it runs out. By default every bus uses the application's `RabbitTemplate`, so the wait is `spring.rabbitmq.template.reply-timeout` (5 seconds by default) for commands and queries alike. Set a timeout per bus when they need different budgets, for example a checkout that waits for a command and a page that gives up quickly on a query:
+
+```yaml
+cqrs:
+  rabbitmq:
+    commands:
+      reply-timeout: 5s
+    queries:
+      reply-timeout: 1s
+```
+
+A bus with a `reply-timeout` sends through its own `RabbitTemplate` (bean `cqrsCommandRabbitTemplate` or `cqrsQueryRabbitTemplate`) and its own `RabbitMqPublisher` (`cqrsCommandRabbitMqPublisher` or `cqrsQueryRabbitMqPublisher`). The template is built like Spring Boot's `rabbitTemplate`: Boot's `RabbitTemplateConfigurer` applies every other `spring.rabbitmq.template.*` setting (message converter, mandatory, retry, observation) and every `RabbitTemplateCustomizer` bean runs on it; only the reply timeout differs. A bus without it keeps the shared template and publisher. The event bus has no replies and ignores the property.
+
+These beans are not default candidates: injecting `RabbitTemplate` or `RabbitMqPublisher` by type still gets the application's one. Define a bean with one of those names to replace it (the bus then uses it even without the property). A reply timeout per bus needs Boot's `RabbitAutoConfiguration`, which defines the `RabbitTemplateConfigurer`; the application fails to start without it. A timeout per message type is not supported yet.
+
 ### Generic results
 
 The consumer's reply is converted by the Spring AMQP JSON converter from the runtime class of the handler's result: the `__TypeId__` / `__ContentTypeId__` headers name that erased class (`java.util.ArrayList`, `java.util.ImmutableCollections$ListN`, ...), never the handler's declared return type. Without a `responseType` the caller converts the reply from those headers, so:
@@ -240,6 +258,7 @@ cqrs:
     commands:
       concurrent-consumers: 10    # min threads
       max-concurrent-consumers: 20  # max threads
+      # reply-timeout: 5s  # see Reply timeout per bus; unset uses spring.rabbitmq.template.reply-timeout
     events:
       concurrent-consumers: 10
       max-concurrent-consumers: 20
@@ -249,6 +268,7 @@ cqrs:
     queries:
       concurrent-consumers: 10
       max-concurrent-consumers: 20
+      # reply-timeout: 1s
 ```
 
 ### Consumer Classes
@@ -310,9 +330,9 @@ The module provides four auto-configuration classes:
 | Class | Condition | Creates |
 |---|---|---|
 | `RabbitMqCqrsAutoConfiguration` | `RabbitTemplate` on classpath + `cqrs.rabbitmq.enabled=true` | `cqrsMessageConverter`, `RabbitMqNamingStrategy`, `RabbitMqPublisher`, `RabbitMqBusDeclarationBuilder` |
-| `RabbitMqCommandBusAutoConfiguration` | Above + `CommandHandlerRegistry` bean + `cqrs.rabbitmq.commands.enabled` not `false` | `RabbitMqCommandBus`, command `Declarables`, command listener container |
+| `RabbitMqCommandBusAutoConfiguration` | Above + `CommandHandlerRegistry` bean + `cqrs.rabbitmq.commands.enabled` not `false` | `RabbitMqCommandBus`, command `Declarables`, command listener container; with `cqrs.rabbitmq.commands.reply-timeout`, `cqrsCommandRabbitTemplate` and `cqrsCommandRabbitMqPublisher` |
 | `RabbitMqEventBusAutoConfiguration` | Above + `EventHandlerRegistry` bean + `cqrs.rabbitmq.events.enabled` not `false` | `RabbitMqEventBus`, event `Declarables`, event listener container |
-| `RabbitMqQueryBusAutoConfiguration` | Above + `QueryHandlerRegistry` bean + `cqrs.rabbitmq.queries.enabled` not `false` | `RabbitMqQueryBus`, query `Declarables`, query listener container |
+| `RabbitMqQueryBusAutoConfiguration` | Above + `QueryHandlerRegistry` bean + `cqrs.rabbitmq.queries.enabled` not `false` | `RabbitMqQueryBus`, query `Declarables`, query listener container; with `cqrs.rabbitmq.queries.reply-timeout`, `cqrsQueryRabbitTemplate` and `cqrsQueryRabbitMqPublisher` |
 
 The bus auto-configurations use `@Value("${spring.application.name:cqrs-app}")` for the application name used in queue naming.
 
