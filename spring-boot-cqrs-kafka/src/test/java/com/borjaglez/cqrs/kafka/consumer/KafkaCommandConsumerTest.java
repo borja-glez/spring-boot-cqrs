@@ -380,4 +380,27 @@ class KafkaCommandConsumerTest {
         new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
         new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
+
+  @Test
+  void handlesACommandWhoseProducerClassIsUnknownHereByItsMessageName() {
+    TestCommand command = new TestCommand("value");
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>("cqrs.commands", 0, 0L, "key", "payload".getBytes(UTF_8));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE,
+                "com.example.producer.RenamedCommand".getBytes(UTF_8)))
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.MESSAGE_NAME, "svc.1.command.mod.renamed".getBytes(UTF_8)));
+    when(registry.findMessageClass("svc.1.command.mod.renamed"))
+        .thenReturn(Optional.<Class<?>>of(TestCommand.class));
+    when(serializer.deserialize(record.value(), TestCommand.class)).thenReturn(command);
+
+    consumer.consume(record);
+
+    verify(registry).handle(command);
+  }
 }

@@ -160,7 +160,7 @@ Implements `QueryBus`. Uses `sendAndReceive()` for synchronous request/reply wit
 
 Shared publisher component that wraps `RabbitTemplate`:
 
-- `publish(exchange, routingKey, message, type)` -- one-way publish with a `cqrs.message.type` header
+- `publish(exchange, routingKey, message, type)` -- one-way publish with a `cqrs.message.type` header and a `cqrs.message.name` header holding the routing key (the logical message name); every method below sets both
 - `publishAndReceive(exchange, routingKey, message, type)` -- RPC-style send/receive; checks for a `cqrs.error` header on the reply
 - `publishAndReceive(exchange, routingKey, message, type, responseType)` -- the same, converting the reply with the `ParameterizedTypeReference` through the `SmartMessageConverter`
 
@@ -339,6 +339,8 @@ The bus auto-configurations use `@Value("${spring.application.name:cqrs-app}")` 
 ### Message format
 
 `cqrsMessageConverter` is Spring AMQP's JSON converter for the Jackson generation on the classpath (`JacksonJsonMessageConverter` for Jackson 3, `Jackson2JsonMessageConverter` for Jackson 2), restricted to `cqrs.rabbitmq.trusted-packages`. When the application context has a Jackson mapper of that generation (the `JsonMapper` Spring Boot 4 configures, or the `ObjectMapper` of Spring Boot 3), the converter uses it, so RabbitMQ messages share the JSON format of the rest of the application and its `spring.jackson.*` settings and Jackson modules apply. Dates are written as ISO-8601 text on both generations. Without such a mapper, Spring AMQP's own is used. Declare a `MessageConverter` bean named `cqrsMessageConverter` to replace it.
+
+The listener containers read an incoming command, event or query as the local class registered under its `cqrs.message.name` header, not as the class named in Spring AMQP's `__TypeId__` header, so the producer can rename or move the class (see [Evolving a message](core.md#evolving-a-message)). Messages without that header, with a name this application does not handle, or read by a custom `cqrsMessageConverter` that is not a `SmartMessageConverter` are converted through `__TypeId__` and the trusted packages as before. Replies are always converted through `__TypeId__`.
 
 ### Enabling each bus
 

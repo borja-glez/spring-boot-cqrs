@@ -187,6 +187,12 @@ If `@CqrsMessage` is not present, the class simple name is converted to kebab-ca
 
 The annotation is optional. The in-process buses dispatch by Java type and never read the name, so messages handled inside one application need no annotation. Annotate the messages that cross a service boundary (commands and queries that other services send, events that other services consume): the name is the RabbitMQ routing key, and RabbitMQ exposes only annotated messages by default ([Exposed and local messages](rabbitmq-adapter.md#exposed-and-local-messages)); on Kafka it is the `cqrs.message.name` header and the default partition key ([Partition Keys](kafka-adapter.md#partition-keys)). A service-qualified name does not collide with a message of another service and survives renaming or moving the class.
 
+#### Evolving a message
+
+Remote consumers read an incoming message annotated with `@CqrsMessage` as the local class registered under its name: each handler registry indexes the annotated classes it handles by the name the naming strategy gives them (`findMessageClass`), and the Kafka and RabbitMQ consumers look the name up before the class name the producer sent. The producer may therefore rename a class or move it to another package without breaking consumers, as long as its `@CqrsMessage` coordinates stay the same and both sides use the same naming prefix. Upgrade every consumer to a version that resolves names before renaming the class on the producer: an older consumer still reads the class name and skips (Kafka) or rejects (RabbitMQ) the message. Messages without `@CqrsMessage`, whose kebab-case name is not qualified by service and may collide with another service's message, and messages whose name is unknown locally or shared by two handled classes, are resolved by class name as before.
+
+The version is part of the name, so `version = 2` is a different message: publish it next to version 1 until every consumer handles it, and drain version 1 before removing it. Compatible changes (adding a field that consumers can ignore) keep the version. There is no upcasting from one version to another.
+
 ## Registries
 
 ### CommandHandlerRegistry

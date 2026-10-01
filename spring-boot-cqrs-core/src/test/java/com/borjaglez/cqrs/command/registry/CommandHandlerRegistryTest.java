@@ -168,4 +168,22 @@ class CommandHandlerRegistryTest {
       super(data);
     }
   }
+
+  @Test
+  void findsTheHandledCommandByItsMessageName() throws Exception {
+    Method method = TestCommandHandler.class.getMethod("handle", TestCommand.class);
+    registry.register(TestCommand.class, new TestCommandHandler(), method, "test.command", false);
+
+    assertThat(registry.findMessageClass("test.command")).contains(TestCommand.class);
+    assertThat(registry.findMessageClass("other.command")).isEmpty();
+  }
+
+  @Test
+  void commandWithoutCqrsMessageIsNotFoundByItsMessageName() throws Exception {
+    Method method = TestCommandHandler.class.getMethod("handle", TestCommand.class);
+    registry.register(
+        UnannotatedCommand.class, new TestCommandHandler(), method, "unannotated-command", false);
+
+    assertThat(registry.findMessageClass("unannotated-command")).isEmpty();
+  }
 }

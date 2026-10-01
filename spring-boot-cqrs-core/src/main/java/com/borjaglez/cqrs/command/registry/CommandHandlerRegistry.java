@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.borjaglez.cqrs.MessageNameIndex;
 import com.borjaglez.cqrs.MessageTypeHierarchy;
 import com.borjaglez.cqrs.MethodHandleUtil;
 import com.borjaglez.cqrs.command.Command;
@@ -41,6 +42,7 @@ public class CommandHandlerRegistry {
   }
 
   private final ConcurrentHashMap<Class<?>, HandlerInfo> handlers = new ConcurrentHashMap<>();
+  private final MessageNameIndex messageNames = new MessageNameIndex();
 
   public void register(
       Class<?> commandClass,
@@ -69,6 +71,7 @@ public class CommandHandlerRegistry {
     if (existing != null) {
       throw new CommandAlreadyRegisteredException(commandClass);
     }
+    messageNames.add(messageName, commandClass);
   }
 
   public Object handle(Command command) {
@@ -99,5 +102,15 @@ public class CommandHandlerRegistry {
 
   public Set<Class<?>> getRegisteredCommands() {
     return Collections.unmodifiableSet(handlers.keySet());
+  }
+
+  /**
+   * The class of the handled command registered under {@code messageName}, the name the naming
+   * strategy gives it. Empty when no handled command has that name or when two of them share it.
+   * Transports use it to read an incoming message as the local class whatever class the producer
+   * used.
+   */
+  public Optional<Class<?>> findMessageClass(String messageName) {
+    return messageNames.find(messageName);
   }
 }

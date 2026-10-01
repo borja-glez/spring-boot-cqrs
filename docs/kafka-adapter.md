@@ -192,7 +192,7 @@ public interface KafkaPartitionKeyStrategy {
 | `PAYLOAD_TYPE` | The fully qualified class name of the message |
 | `NONE` | No key (`null`) |
 
-Consumers match records by payload type, so a message without `@CqrsMessage` is still delivered; its name, and therefore its `MESSAGE_NAME` key, is then the kebab-case simple class name (`order-placed`), which can collide between services and changes when the class is renamed. Annotate the messages that other services consume so they get a stable, service-qualified name (see [@CqrsMessage](core.md#cqrsmessage)).
+Consumers match records by name and fall back to the payload type, so a message without `@CqrsMessage` is still delivered; its name, and therefore its `MESSAGE_NAME` key, is then the kebab-case simple class name (`order-placed`), which can collide between services and changes when the class is renamed. Annotate the messages that other services consume so they get a stable, service-qualified name (see [@CqrsMessage](core.md#cqrsmessage)).
 
 Kafka only keeps order within a partition. With `MESSAGE_NAME` or `PAYLOAD_TYPE` all records of one message type share a key, so they keep their order among themselves, but two messages of different types about the same order (an `OrderPlaced` and an `OrderCancelled`, say) usually land on different partitions and can be consumed in any order.
 
@@ -252,15 +252,15 @@ Each enabled bus has its own `ConcurrentMessageListenerContainer`:
 
 | Consumer | Handles | Behavior |
 |---|---|---|
-| `KafkaCommandConsumer` | Commands | Skips records whose payload type is not on the classpath or has no local handler (they belong to another service). Replies in `REPLY` and `WAIT` mode, including failures. |
-| `KafkaEventConsumer` | Events | Skips records whose payload type is not on the classpath; otherwise dispatches to every local event handler. |
-| `KafkaQueryConsumer` | Queries | Skips records whose payload type is not on the classpath or has no local handler. Always replies, including failures. |
+| `KafkaCommandConsumer` | Commands | Skips records whose name and payload type are both unknown locally, or that have no local handler (they belong to another service). Replies in `REPLY` and `WAIT` mode, including failures. |
+| `KafkaEventConsumer` | Events | Skips records whose name and payload type are both unknown locally; otherwise dispatches to every local event handler. |
+| `KafkaQueryConsumer` | Queries | Skips records whose name and payload type are both unknown locally, or that have no local handler. Always replies, including failures. |
 
 Before invoking the handler every consumer rehydrates the `MessageContext` from the context headers and runs the `BusMiddleware` beans that declare `DispatchPhase.INBOUND` (by default, every middleware). See [Middleware on remote buses](middleware.md#middleware-on-remote-buses).
 
 A command dispatched with `dispatch` whose handler fails, or a failing event handler, is not answered: the exception is rethrown to the listener container, which retries the record and then publishes it to the application's dead-letter topic (see [Retry and Dead-Letter Topics](#retry-and-dead-letter-topics)).
 
-A record without the `cqrs.payload.type` header, or whose payload cannot be deserialized into that type, is rejected with an `UnprocessableRecordException` (an `IllegalStateException`), which is never retried.
+A record whose name is unknown locally and that has no `cqrs.payload.type` header, or whose payload cannot be deserialized into that type, is rejected with an `UnprocessableRecordException` (an `IllegalStateException`), which is never retried.
 
 ## Retry and Dead-Letter Topics
 
@@ -284,7 +284,7 @@ The command, event and query listener containers share one error-handling policy
 
 The dead-letter record is published with no explicit partition, so the dead-letter topic does not need as many partitions as the source topic. The containers set `deliveryAttemptHeader`, so records also carry Spring Kafka's `kafka_deliveryAttempt` header.
 
-**What is not dead-lettered.** Request/reply commands and queries whose handler fails are answered with an error reply (see [Request/Reply](#requestreply)) and are neither retried nor dead-lettered. The reply container has no retry or dead-letter topic: a reply nobody waits for is dropped. Records whose payload type is unknown locally are skipped, as before: they belong to other services.
+**What is not dead-lettered.** Request/reply commands and queries whose handler fails are answered with an error reply (see [Request/Reply](#requestreply)) and are neither retried nor dead-lettered. The reply container has no retry or dead-letter topic: a reply nobody waits for is dropped. Records whose name and payload type are both unknown locally are skipped, as before: they belong to other services.
 
 **Using your own error handler.** Declare a `CommonErrorHandler` bean (for example a `DefaultErrorHandler` with another recoverer) and it is applied to the three containers instead; `cqrs.kafka.error-handling.*` is then ignored, but the dead-letter `NewTopic` beans are still declared while `dead-letter.enabled=true`. If the application has several `CommonErrorHandler` beans, the one named `cqrsKafkaErrorHandler` wins, then a `@Primary` one; without either, the module's own handler is used. The module's handler is deliberately not a bean: Spring Boot applies a unique `CommonErrorHandler` bean to its `@KafkaListener` container factory, and the CQRS dead-letter publishing is not meant for the application's own listeners.
 
@@ -295,9 +295,9 @@ The dead-letter record is published with no explicit partition, so the dead-lett
 | Header | Set on | Value |
 |---|---|---|
 | `cqrs.message.kind` | Requests and one-way records | `COMMAND`, `EVENT` or `QUERY` |
-| `cqrs.message.name` | Requests and one-way records | Message name from `MessageNamingStrategy` |
+| `cqrs.message.name` | Requests and one-way records | Message name from `MessageNamingStrategy`. Consumers resolve the payload class by this name first (see [Evolving a message](core.md#evolving-a-message)) |
 | `cqrs.message.key` | Requests and one-way commands and events whose payload implements `KeyedMessage` with a non-blank key | The declared key |
-| `cqrs.payload.type` | Requests, one-way records, replies with a result, error replies | Fully qualified class name of the payload |
+| `cqrs.payload.type` | Requests, one-way records, replies with a result, error replies | Fully qualified class name of the payload. Consumers fall back to it when the name is unknown locally |
 | `cqrs.correlation.id` | Requests and replies | Correlation id of the request |
 | `cqrs.reply.topic` | Requests | Reply topic of the sending application |
 | `cqrs.request.mode` | Requests | `WAIT` or `REPLY` |

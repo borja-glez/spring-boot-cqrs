@@ -38,7 +38,7 @@ public class KafkaEventConsumer extends AbstractKafkaConsumer {
 
   public void consume(ConsumerRecord<String, byte[]> record) {
     // An event type this application does not have cannot have a handler here either.
-    Optional<Class<?>> type = localPayloadClass(record);
+    Optional<Class<?>> type = localPayloadClass(record, registry::findMessageClass);
     if (type.isEmpty()) {
       return;
     }

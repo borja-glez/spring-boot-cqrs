@@ -192,4 +192,29 @@ class KafkaQueryConsumerTest {
         new RecordingMiddleware(calls, "outbound", DispatchPhase.OUTBOUND),
         new RecordingMiddleware(calls, "local", DispatchPhase.LOCAL));
   }
+
+  @Test
+  void handlesAQueryWhoseProducerClassIsUnknownHereByItsMessageName() {
+    TestQuery query = new TestQuery("value");
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>("cqrs.queries", 0, 0L, "key", "payload".getBytes(UTF_8));
+    record
+        .headers()
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.PAYLOAD_TYPE,
+                "com.example.producer.RenamedQuery".getBytes(UTF_8)))
+        .add(
+            new RecordHeader(
+                KafkaMessageHeaders.MESSAGE_NAME, "svc.1.query.mod.renamed".getBytes(UTF_8)))
+        .add(new RecordHeader(KafkaMessageHeaders.REPLY_TOPIC, "reply-topic".getBytes(UTF_8)))
+        .add(new RecordHeader(KafkaMessageHeaders.CORRELATION_ID, "corr-1".getBytes(UTF_8)));
+    when(registry.findMessageClass("svc.1.query.mod.renamed"))
+        .thenReturn(Optional.<Class<?>>of(TestQuery.class));
+    when(serializer.deserialize(record.value(), TestQuery.class)).thenReturn(query);
+
+    consumer.consume(record);
+
+    verify(registry).handle(query);
+  }
 }

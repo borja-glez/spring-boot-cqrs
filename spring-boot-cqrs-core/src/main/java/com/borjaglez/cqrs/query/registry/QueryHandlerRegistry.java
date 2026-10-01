@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.borjaglez.cqrs.MessageNameIndex;
 import com.borjaglez.cqrs.MessageTypeHierarchy;
 import com.borjaglez.cqrs.MethodHandleUtil;
 import com.borjaglez.cqrs.query.Query;
@@ -34,6 +35,7 @@ public class QueryHandlerRegistry {
   }
 
   private final ConcurrentHashMap<Class<?>, HandlerInfo> handlers = new ConcurrentHashMap<>();
+  private final MessageNameIndex messageNames = new MessageNameIndex();
 
   public void register(Class<?> queryClass, Object bean, Method method, String messageName) {
     register(queryClass, bean, method, messageName, true);
@@ -52,6 +54,7 @@ public class QueryHandlerRegistry {
     if (existing != null) {
       throw new QueryAlreadyRegisteredException(queryClass);
     }
+    messageNames.add(messageName, queryClass);
   }
 
   public Object handle(Query query) {
@@ -82,5 +85,15 @@ public class QueryHandlerRegistry {
 
   public Set<Class<?>> getRegisteredQueries() {
     return Collections.unmodifiableSet(handlers.keySet());
+  }
+
+  /**
+   * The class of the handled query registered under {@code messageName}, the name the naming
+   * strategy gives it. Empty when no handled query has that name or when two of them share it.
+   * Transports use it to read an incoming message as the local class whatever class the producer
+   * used.
+   */
+  public Optional<Class<?>> findMessageClass(String messageName) {
+    return messageNames.find(messageName);
   }
 }

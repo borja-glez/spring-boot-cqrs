@@ -147,4 +147,13 @@ class QueryHandlerRegistryTest {
       super(data);
     }
   }
+
+  @Test
+  void findsTheHandledQueryByItsMessageName() throws Exception {
+    Method method = TestQueryHandler.class.getMethod("handle", TestQuery.class);
+    registry.register(TestQuery.class, new TestQueryHandler(), method, "test.query");
+
+    assertThat(registry.findMessageClass("test.query")).contains(TestQuery.class);
+    assertThat(registry.findMessageClass("other.query")).isEmpty();
+  }
 }

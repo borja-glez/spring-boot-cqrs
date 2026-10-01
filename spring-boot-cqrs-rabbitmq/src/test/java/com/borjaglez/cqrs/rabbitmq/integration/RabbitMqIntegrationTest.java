@@ -322,4 +322,22 @@ class RabbitMqIntegrationTest {
                 assertThat(localEventHandler.getHandled())
                     .doesNotContain("remote-event", "local-event"));
   }
+
+  @Test
+  void shouldHandleAnEventWhoseProducerClassHasAnotherNameAndPackage() {
+    Message message = toMessage(new TestEvent("renamed-producer"));
+    message
+        .getMessageProperties()
+        .setHeader("__TypeId__", "com.example.producer.orders.OrderCreatedEvent");
+    message
+        .getMessageProperties()
+        .setHeader("cqrs.message.name", messageNamingStrategy.eventName(TestEvent.class));
+
+    rabbitTemplate.send("", "test-cqrs.integration-test.events", message);
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () -> assertThat(testEventHandler.getLastHandledData()).isEqualTo("renamed-producer"));
+  }
 }
