@@ -24,6 +24,11 @@ Add a store: `spring-boot-cqrs-jdbc` with a `DataSource` (production), or
 `cqrs.idempotency.store=in-memory` (tests, single instance). An application with `@Idempotent`
 handlers and no store fails at startup.
 
+The JDBC store is configured only when the application has a single `DataSource` and a single
+`PlatformTransactionManager`, or one of each marked `@Primary`. A second transaction manager, such as
+a `KafkaTransactionManager` or a `RabbitTransactionManager`, makes it back off: mark the JDBC or JPA
+transaction manager `@Primary`, or define the `JdbcIdempotencyStore` bean yourself.
+
 ```kotlin
 implementation("com.borjaglez:spring-boot-cqrs-jdbc:<version>")
 ```
@@ -40,14 +45,17 @@ implementation("com.borjaglez:spring-boot-cqrs-jdbc:<version>")
 - **Failure.** A handler that throws leaves no marker; the redelivery runs it again.
 - **Duplicates.** A duplicate event is skipped (logged at `DEBUG`). A duplicate `void` command is
   skipped and returns `null`. A duplicate command whose handler returns a result throws
-  `DuplicateMessageException`; the result is not stored.
+  `DuplicateMessageException`; the result is not stored. It is not retried, and the RabbitMQ and
+  Kafka consumers drop it (logged at `DEBUG`) when no reply is expected; a caller of
+  `dispatchAndReceive` or `dispatchAndWait` receives the error.
 - **Local and remote.** It applies wherever the handler runs. Local dispatch creates a new id per
   message, so it costs one marker write and never skips.
 - **Consuming side only.** Deduplication runs in the registries, which only run on the consuming
   side; sending-side middleware (`DispatchPhase.OUTBOUND`) is unaffected.
-- **Queries** are not deduplicated: `@Idempotent` on any `@HandleQuery` method fails at startup.
-  So does `@Idempotent` on a method that is not a `@HandleCommand` or `@HandleEvent` method inside a
-  handler class.
+- **Queries** are not deduplicated: `@Idempotent` on a `@HandleQuery` method fails at startup. So
+  does `@Idempotent` on a method that is not a `@HandleCommand` or `@HandleEvent` method. Both
+  checks only apply to handler beans (classes annotated `@CommandHandler`, `@EventHandler` or
+  `@QueryHandler`); elsewhere the annotation is ignored.
 
 ## Stores and guarantees
 
@@ -87,6 +95,10 @@ CREATE INDEX IF NOT EXISTS cqrs_processed_message_at ON cqrs_processed_message (
 
 The script is tested on PostgreSQL and H2. On MySQL, drop `IF NOT EXISTS` from the index statement.
 
+`message_id` holds up to 64 characters and `handler_id` up to 255. `processed_at` is a `TIMESTAMP`
+without time zone written in the JVM's time zone; run every instance in the same time zone (UTC is
+simplest) so that the cleanup cutoffs of all instances agree.
+
 `cqrs.jdbc.idempotency.table-name` may be schema-qualified (`audit.processed_message`). The index is
 named `<table>_at` after the unqualified table name (`processed_message_at`).
 
@@ -102,7 +114,12 @@ dead-letter queue.
 ## With retry
 
 `RetryMiddleware` retries commands in-process. A failed attempt releases the marker, so the next
-attempt runs the handler; the order between the two does not matter.
+attempt runs the handler; the order between the two does not matter. With the JDBC store, the
+marker of a failed attempt goes away when its transaction rolls back. If the command is dispatched
+locally inside the caller's transaction, the attempts share that transaction: the next attempt sees
+the marker of the failed one and skips the handler (and the transaction is rollback-only anyway).
+Start the transaction inside the retry, as described in
+[middleware.md](middleware.md#retrymiddleware).
 
 ## Testing
 
@@ -112,11 +129,18 @@ attempt runs the handler; the order between the two does not matter.
 ## Without the annotation
 
 `IdempotentInvoker` is a bean; use it in code that is not a library handler, such as a plain
-`@KafkaListener`:
+`@KafkaListener`. The message id must identify the message, not its content or its key: records
+that share a key would be dropped as duplicates. Use an id the producer sets once per message, for
+example in a header:
 
 ```java
-invoker.invoke("audit-listener", record.key(), () -> {
+String messageId = new String(record.headers().lastHeader("message-id").value(), UTF_8);
+invoker.invoke("audit-listener", messageId, () -> {
   audit.save(record.value());
   return null;
 });
 ```
+
+`record.topic() + "-" + record.partition() + "-" + record.offset()` also identifies a record across
+redeliveries, as long as it fits. The message id holds up to 64 characters and the handler id up to
+255 (the `message_id` and `handler_id` columns).

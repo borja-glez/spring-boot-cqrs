@@ -36,6 +36,9 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 /**
  * An event with two idempotent handlers in one application: the second fails once, RabbitMQ
  * redelivers the whole event through the retry queue, and only the failed handler runs again.
+ *
+ * <p>The consumer is handed the same event object on both deliveries; that the event id survives
+ * serialization is covered by {@code MessageIdentityRoundTripTest} in the starters.
  */
 @EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 class RabbitMqIdempotencyIntegrationTest {

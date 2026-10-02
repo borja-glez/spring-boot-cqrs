@@ -130,6 +130,9 @@ default.
 Use `@Import` to register the handlers you want to exercise; the discoverer
 picks them up automatically.
 
+`@Idempotent` handlers use an in-memory store in `@CqrsTest`; see
+[Idempotent Handlers](idempotency.md#testing).
+
 ```java
 @CqrsTest
 @Import({CreateOrderCommandHandler.class, OrderCreatedEventHandler.class})
