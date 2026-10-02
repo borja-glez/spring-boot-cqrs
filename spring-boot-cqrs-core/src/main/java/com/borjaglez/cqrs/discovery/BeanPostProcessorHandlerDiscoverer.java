@@ -26,6 +26,7 @@ import com.borjaglez.cqrs.event.Event;
 import com.borjaglez.cqrs.event.annotation.EventHandler;
 import com.borjaglez.cqrs.event.annotation.HandleEvent;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
+import com.borjaglez.cqrs.idempotency.Idempotent;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.annotation.HandleQuery;
@@ -110,6 +111,25 @@ public class BeanPostProcessorHandlerDiscoverer
                   queryHandler.remote() && method.getAnnotation(HandleQuery.class).remote()),
           method -> method.isAnnotationPresent(HandleQuery.class));
     }
+
+    if (commandHandler != null || eventHandler != null || queryHandler != null) {
+      ReflectionUtils.doWithMethods(
+          targetClass,
+          method -> {
+            throw new IllegalStateException(
+                "Method "
+                    + method.toGenericString()
+                    + " on bean '"
+                    + beanName
+                    + "' is annotated with @Idempotent but not with @HandleCommand or"
+                    + " @HandleEvent");
+          },
+          method ->
+              method.isAnnotationPresent(Idempotent.class)
+                  && !method.isAnnotationPresent(HandleCommand.class)
+                  && !method.isAnnotationPresent(HandleEvent.class)
+                  && !method.isAnnotationPresent(HandleQuery.class));
+    }
   }
 
   private void registerCommandHandler(Object bean, String beanName, Method method, boolean remote) {
@@ -120,7 +140,13 @@ public class BeanPostProcessorHandlerDiscoverer
     boolean requiresValidation = hasValidAnnotation(method);
     Method invocable = invocableMethod(bean, beanName, method);
     commandHandlerRegistry.register(
-        commandClass, bean, invocable, messageName, requiresValidation, remote);
+        commandClass,
+        bean,
+        invocable,
+        messageName,
+        requiresValidation,
+        remote,
+        idempotencyKey(beanName, method));
   }
 
   private void registerEventHandler(Object bean, String beanName, Method method, boolean remote) {
@@ -131,7 +157,25 @@ public class BeanPostProcessorHandlerDiscoverer
     Method invocable = invocableMethod(bean, beanName, method);
     Expression condition = parseCondition(beanName, method);
     eventHandlerRegistry.register(
-        eventClass, bean, invocable, messageName, condition, beanResolver, remote);
+        eventClass,
+        bean,
+        invocable,
+        messageName,
+        condition,
+        beanResolver,
+        remote,
+        idempotencyKey(beanName, method));
+  }
+
+  /** The handler id of an {@code @Idempotent} method, or {@code null} when it is not one. */
+  private static String idempotencyKey(String beanName, Method method) {
+    Idempotent idempotent = method.getAnnotation(Idempotent.class);
+    if (idempotent == null) {
+      return null;
+    }
+    return StringUtils.hasText(idempotent.name())
+        ? idempotent.name()
+        : beanName + "#" + method.getName();
   }
 
   /** Parses the {@code @HandleEvent} condition once, failing startup when it is malformed. */
@@ -157,6 +201,14 @@ public class BeanPostProcessorHandlerDiscoverer
   }
 
   private void registerQueryHandler(Object bean, String beanName, Method method, boolean remote) {
+    if (method.isAnnotationPresent(Idempotent.class)) {
+      throw new IllegalStateException(
+          "Handler method "
+              + method.toGenericString()
+              + " on bean '"
+              + beanName
+              + "' is a query handler; @Idempotent applies to command and event handlers only");
+    }
     Class<?>[] paramTypes = method.getParameterTypes();
     validateSingleParameter(beanName, method, paramTypes, Query.class);
     Class<?> queryClass = paramTypes[0];

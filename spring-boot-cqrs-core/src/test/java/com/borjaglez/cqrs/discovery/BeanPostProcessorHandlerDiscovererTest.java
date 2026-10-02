@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.discovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -661,6 +662,58 @@ class BeanPostProcessorHandlerDiscovererTest {
     @com.borjaglez.cqrs.query.annotation.HandleQuery
     public String ask(TestQuery query) {
       return "local";
+    }
+  }
+
+  @Test
+  void idempotentCommandHandlerGetsTheDefaultHandlerId() {
+    discoverer.discover(new IdempotentCommandHandler(), "ordersHandler");
+
+    assertThat(commandRegistry.getHandlerInfo(TestCommand.class))
+        .get()
+        .extracting(CommandHandlerRegistry.HandlerInfo::idempotencyKey)
+        .isEqualTo("ordersHandler#handle");
+  }
+
+  @Test
+  void idempotentEventHandlerUsesTheExplicitName() {
+    discoverer.discover(new IdempotentEventHandler(), "projector");
+
+    assertThat(eventRegistry.getHandlerInfos(TestEvent.class))
+        .extracting(EventHandlerRegistry.HandlerInfo::idempotencyKey)
+        .containsExactlyInAnyOrder("stock-projector", null);
+  }
+
+  @Test
+  void idempotentQueryHandlerIsRejected() {
+    assertThatThrownBy(() -> discoverer.discover(new IdempotentQueryHandler(), "queries"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("on bean 'queries' is a query handler")
+        .hasMessageContaining("@Idempotent applies to command and event handlers only");
+  }
+
+  @Test
+  void idempotentMethodWithoutHandlerAnnotationIsRejected() {
+    assertThatThrownBy(
+            () -> discoverer.discover(new IdempotentWithoutHandleAnnotation(), "projector"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("on bean 'projector' is annotated with @Idempotent")
+        .hasMessageContaining("but not with @HandleCommand or @HandleEvent");
+  }
+
+  @Test
+  void idempotentQueryMethodOnACommandHandlerBeanIsNotTreatedAsMissingAnnotation() {
+    assertThatCode(() -> discoverer.discover(new IdempotentQueryOnCommandBean(), "mixed"))
+        .doesNotThrowAnyException();
+  }
+
+  @com.borjaglez.cqrs.command.annotation.CommandHandler
+  static class IdempotentQueryOnCommandBean {
+
+    @com.borjaglez.cqrs.query.annotation.HandleQuery
+    @com.borjaglez.cqrs.idempotency.Idempotent
+    public String handle(TestQuery query) {
+      return "x";
     }
   }
 }
