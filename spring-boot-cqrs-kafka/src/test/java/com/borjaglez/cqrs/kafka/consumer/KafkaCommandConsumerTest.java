@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.kafka.fixtures.TestCommand;
@@ -113,6 +114,34 @@ class KafkaCommandConsumerTest {
     when(registry.handle(command)).thenThrow(new RuntimeException("boom"));
 
     assertThatThrownBy(() -> consumer.consume(record)).hasMessage("boom");
+  }
+
+  @Test
+  void shouldDropADuplicateFireAndForgetCommand() {
+    TestCommand command = new TestCommand("value");
+    ConsumerRecord<String, byte[]> record = recordFor(command, null, null);
+    when(serializer.deserialize(record.value(), TestCommand.class)).thenReturn(command);
+    when(registry.handle(command))
+        .thenThrow(new DuplicateMessageException("orders#handle", command.getCommandId()));
+
+    consumer.consume(record);
+
+    verifyNoInteractions(publisher);
+  }
+
+  @Test
+  void shouldReplyWithErrorForADuplicateRequestReplyCommand() {
+    TestCommand command = new TestCommand("value");
+    ConsumerRecord<String, byte[]> record =
+        recordFor(command, KafkaRequestMode.REPLY, "reply-topic");
+    when(serializer.deserialize(record.value(), TestCommand.class)).thenReturn(command);
+    DuplicateMessageException duplicate =
+        new DuplicateMessageException("orders#handle", command.getCommandId());
+    when(registry.handle(command)).thenThrow(duplicate);
+
+    consumer.consume(record);
+
+    verify(publisher).publishErrorReply("reply-topic", correlationId(record), duplicate);
   }
 
   @Test
