@@ -24,6 +24,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.rabbitmq.fixtures.InternalCommand;
@@ -138,6 +139,32 @@ class RabbitMqCommandConsumerTest {
 
     assertThat(result).isNull();
     verify(rabbitTemplate).send("cqrs.commands.retry", "app", message);
+  }
+
+  @Test
+  void consumeShouldDropADuplicateFireAndForgetCommandWithoutRetry() {
+    TestCommand command = new TestCommand("test-data");
+    when(registry.handle(command))
+        .thenThrow(new DuplicateMessageException("orders#handle", command.getCommandId()));
+
+    Message message = createMessage("command");
+    Object result = consumer.consume(message, command);
+
+    assertThat(result).isNull();
+    verifyNoInteractions(rabbitTemplate);
+  }
+
+  @Test
+  void consumeShouldRethrowADuplicateCommandReply() {
+    TestCommand command = new TestCommand("test-data");
+    DuplicateMessageException duplicate =
+        new DuplicateMessageException("orders#handle", command.getCommandId());
+    when(registry.handle(command)).thenThrow(duplicate);
+
+    Message message = createMessage("command_reply");
+
+    assertThatThrownBy(() -> consumer.consume(message, command)).isSameAs(duplicate);
+    verifyNoInteractions(rabbitTemplate);
   }
 
   @Test

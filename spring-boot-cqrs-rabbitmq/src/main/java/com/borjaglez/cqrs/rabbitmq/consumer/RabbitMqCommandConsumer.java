@@ -3,12 +3,15 @@ package com.borjaglez.cqrs.rabbitmq.consumer;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
 import com.borjaglez.cqrs.middleware.DispatchPhase;
@@ -18,6 +21,7 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
 public class RabbitMqCommandConsumer extends RabbitMqConsumer {
 
+  private static final Log LOG = LogFactory.getLog(RabbitMqCommandConsumer.class);
   private static final String HEADER_MESSAGE_TYPE = "cqrs.message.type";
 
   private final CommandHandlerRegistry registry;
@@ -137,6 +141,11 @@ public class RabbitMqCommandConsumer extends RabbitMqConsumer {
     } catch (RuntimeException e) {
       if ("command_reply".equals(messageType) || "command_wait".equals(messageType)) {
         throw e;
+      }
+      if (e instanceof DuplicateMessageException) {
+        // Nobody waits for a result, and the command was already processed: drop it.
+        LOG.debug("Dropping duplicate command: " + e.getMessage());
+        return null;
       }
       handleConsumptionError(message, exchangeName, appName, e);
       return null;
