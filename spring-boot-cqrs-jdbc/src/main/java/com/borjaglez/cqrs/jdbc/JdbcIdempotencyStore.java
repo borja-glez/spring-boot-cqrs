@@ -94,8 +94,13 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     try {
       acquisition = insertMarker(handlerId, messageId);
     } catch (RuntimeException e) {
-      // Keep the caller's transaction usable (PostgreSQL aborts it after a failed statement).
-      rollbackToSavepoint(holder, savepoint);
+      // Keep the caller's transaction usable (PostgreSQL aborts it after a failed statement), but
+      // never hide why the insert failed.
+      try {
+        rollbackToSavepoint(holder, savepoint);
+      } catch (TransactionSystemException rollbackFailure) {
+        e.addSuppressed(rollbackFailure);
+      }
       releaseSavepoint(holder, savepoint);
       throw e;
     }

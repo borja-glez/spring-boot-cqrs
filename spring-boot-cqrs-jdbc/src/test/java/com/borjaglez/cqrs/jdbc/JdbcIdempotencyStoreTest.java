@@ -206,6 +206,24 @@ class JdbcIdempotencyStoreTest {
   }
 
   @Test
+  void keepsTheInsertFailureWhenTheRollbackToTheSavepointFails() throws Exception {
+    JdbcIdempotencyStore broken =
+        new JdbcIdempotencyStore(dataSource, transactionManager, "missing_table");
+    Connection connection = spy(dataSource.getConnection());
+    doThrow(new SQLException("no rollback")).when(connection).rollback(any(Savepoint.class));
+
+    withBoundConnection(
+        connection,
+        () ->
+            assertThatThrownBy(() -> broken.tryAcquire("h", "m"))
+                .isInstanceOf(BadSqlGrammarException.class)
+                .hasSuppressedException(
+                    new TransactionSystemException("Could not roll back to JDBC savepoint")));
+
+    verify(connection).releaseSavepoint(any());
+  }
+
+  @Test
   void translatesAFailureToCreateTheSavepoint() throws Exception {
     Connection connection = spy(dataSource.getConnection());
     doThrow(new SQLException("no savepoint")).when(connection).setSavepoint(any());
