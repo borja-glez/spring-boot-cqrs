@@ -33,8 +33,8 @@ public class EventHandlerRegistry {
    *     runs
    * @param remote whether the handler may receive the event from a remote transport; {@code false}
    *     when it is marked {@code remote = false}
-   * @param idempotencyKey the handler id in the idempotency store, or {@code null} when the handler
-   *     is not {@code @Idempotent}
+   * @param handlerId the handler id in the idempotency store, or {@code null} when the handler is
+   *     not {@code @Idempotent}
    */
   public record HandlerInfo(
       Object bean,
@@ -42,7 +42,7 @@ public class EventHandlerRegistry {
       String messageName,
       EventHandlerCondition condition,
       boolean remote,
-      String idempotencyKey) {
+      String handlerId) {
 
     /** Creates the information of a remote handler without condition. */
     public HandlerInfo(Object bean, MethodHandle handle, String messageName) {
@@ -67,7 +67,7 @@ public class EventHandlerRegistry {
 
     /** Whether the handler is {@code @Idempotent}. */
     public boolean idempotent() {
-      return idempotencyKey != null;
+      return handlerId != null;
     }
   }
 
@@ -137,8 +137,8 @@ public class EventHandlerRegistry {
    * @param condition the parsed condition, or {@code null} for a handler that always runs
    * @param beanResolver resolves {@code @beanName} references in the condition; may be {@code null}
    * @param remote whether the handler may receive the event from a remote transport
-   * @param idempotencyKey the handler id in the idempotency store, or {@code null} when the handler
-   *     is not {@code @Idempotent}
+   * @param handlerId the handler id in the idempotency store, or {@code null} when the handler is
+   *     not {@code @Idempotent}
    */
   public void register(
       Class<?> eventClass,
@@ -148,14 +148,14 @@ public class EventHandlerRegistry {
       Expression condition,
       BeanResolver beanResolver,
       boolean remote,
-      String idempotencyKey) {
+      String handlerId) {
     MethodHandle handle = MethodHandleUtil.unreflect(method);
     EventHandlerCondition handlerCondition =
         condition == null
             ? null
             : new EventHandlerCondition(condition, beanResolver, method.toGenericString());
     HandlerInfo info =
-        new HandlerInfo(bean, handle, messageName, handlerCondition, remote, idempotencyKey);
+        new HandlerInfo(bean, handle, messageName, handlerCondition, remote, handlerId);
     handlers.computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>()).add(info);
     messageNames.add(messageName, eventClass);
   }
@@ -189,13 +189,13 @@ public class EventHandlerRegistry {
       if (!info.idempotent()) {
         invoke(info, event);
       } else if (invoker(info)
-          .invoke(info.idempotencyKey(), event.getEventId(), () -> invoke(info, event))
+          .invoke(info.handlerId(), event.getEventId(), () -> invoke(info, event))
           .duplicate()) {
         LOG.debug(
             "Skipping event "
                 + event.getEventId()
                 + " already processed by idempotent handler "
-                + info.idempotencyKey());
+                + info.handlerId());
       }
     }
   }
@@ -217,7 +217,7 @@ public class EventHandlerRegistry {
     if (invoker == null) {
       throw new IllegalStateException(
           "Handler "
-              + info.idempotencyKey()
+              + info.handlerId()
               + " is @Idempotent but no IdempotencyStore is configured yet; add"
               + " spring-boot-cqrs-jdbc with a DataSource, set cqrs.idempotency.store=in-memory,"
               + " or define an IdempotencyStore bean");

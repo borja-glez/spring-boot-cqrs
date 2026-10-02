@@ -670,7 +670,7 @@ class BeanPostProcessorHandlerDiscovererTest {
 
     assertThat(commandRegistry.getHandlerInfo(TestCommand.class))
         .get()
-        .extracting(CommandHandlerRegistry.HandlerInfo::idempotencyKey)
+        .extracting(CommandHandlerRegistry.HandlerInfo::handlerId)
         .isEqualTo("ordersHandler#handle");
   }
 
@@ -679,7 +679,7 @@ class BeanPostProcessorHandlerDiscovererTest {
     discoverer.discover(new IdempotentEventHandler(), "projector");
 
     assertThat(eventRegistry.getHandlerInfos(TestEvent.class))
-        .extracting(EventHandlerRegistry.HandlerInfo::idempotencyKey)
+        .extracting(EventHandlerRegistry.HandlerInfo::handlerId)
         .containsExactlyInAnyOrder("stock-projector", null);
   }
 

@@ -70,13 +70,13 @@ public class IdempotencyRegistrar implements SmartInitializingSingleton {
     for (Class<?> command : commandHandlerRegistry.getRegisteredCommands()) {
       commandHandlerRegistry
           .getHandlerInfo(command)
-          .map(CommandHandlerRegistry.HandlerInfo::idempotencyKey)
+          .map(CommandHandlerRegistry.HandlerInfo::handlerId)
           .ifPresent(keys::add);
     }
     for (Class<?> event : eventHandlerRegistry.getRegisteredEvents()) {
       for (EventHandlerRegistry.HandlerInfo info : eventHandlerRegistry.getHandlerInfos(event)) {
         if (info.idempotent()) {
-          keys.add(info.idempotencyKey());
+          keys.add(info.handlerId());
         }
       }
     }

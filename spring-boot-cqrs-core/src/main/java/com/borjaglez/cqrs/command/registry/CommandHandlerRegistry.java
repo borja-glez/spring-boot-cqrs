@@ -29,8 +29,8 @@ public class CommandHandlerRegistry {
    * @param requiresValidation whether the command parameter is annotated with {@code @Valid}
    * @param remote whether the handler may receive the command from a remote transport; {@code
    *     false} when it is marked {@code remote = false}
-   * @param idempotencyKey the handler id in the idempotency store, or {@code null} when the handler
-   *     is not {@code @Idempotent}
+   * @param handlerId the handler id in the idempotency store, or {@code null} when the handler is
+   *     not {@code @Idempotent}
    */
   public record HandlerInfo(
       Object bean,
@@ -38,7 +38,7 @@ public class CommandHandlerRegistry {
       String messageName,
       boolean requiresValidation,
       boolean remote,
-      String idempotencyKey) {
+      String handlerId) {
 
     /** Creates the information of a remote handler. */
     public HandlerInfo(
@@ -58,7 +58,7 @@ public class CommandHandlerRegistry {
 
     /** Whether the handler is {@code @Idempotent}. */
     public boolean idempotent() {
-      return idempotencyKey != null;
+      return handlerId != null;
     }
   }
 
@@ -94,8 +94,8 @@ public class CommandHandlerRegistry {
    * Registers the handler of a command.
    *
    * @param remote whether the handler may receive the command from a remote transport
-   * @param idempotencyKey the handler id in the idempotency store, or {@code null} when the handler
-   *     is not {@code @Idempotent}
+   * @param handlerId the handler id in the idempotency store, or {@code null} when the handler is
+   *     not {@code @Idempotent}
    */
   public void register(
       Class<?> commandClass,
@@ -104,10 +104,10 @@ public class CommandHandlerRegistry {
       String messageName,
       boolean requiresValidation,
       boolean remote,
-      String idempotencyKey) {
+      String handlerId) {
     MethodHandle handle = MethodHandleUtil.unreflect(method);
     HandlerInfo info =
-        new HandlerInfo(bean, handle, messageName, requiresValidation, remote, idempotencyKey);
+        new HandlerInfo(bean, handle, messageName, requiresValidation, remote, handlerId);
     HandlerInfo existing = handlers.putIfAbsent(commandClass, info);
     if (existing != null) {
       throw new CommandAlreadyRegisteredException(commandClass);
@@ -124,15 +124,14 @@ public class CommandHandlerRegistry {
       return invoke(info, command);
     }
     Outcome<Object> outcome =
-        invoker(info)
-            .invoke(info.idempotencyKey(), command.getCommandId(), () -> invoke(info, command));
+        invoker(info).invoke(info.handlerId(), command.getCommandId(), () -> invoke(info, command));
     if (!outcome.duplicate()) {
       return outcome.result();
     }
     if (info.handle().type().returnType() == void.class) {
       return null;
     }
-    throw new DuplicateMessageException(info.idempotencyKey(), command.getCommandId());
+    throw new DuplicateMessageException(info.handlerId(), command.getCommandId());
   }
 
   private static Object invoke(HandlerInfo info, Command command) {
@@ -150,7 +149,7 @@ public class CommandHandlerRegistry {
     if (invoker == null) {
       throw new IllegalStateException(
           "Handler "
-              + info.idempotencyKey()
+              + info.handlerId()
               + " is @Idempotent but no IdempotencyStore is configured yet; add"
               + " spring-boot-cqrs-jdbc with a DataSource, set cqrs.idempotency.store=in-memory,"
               + " or define an IdempotencyStore bean");

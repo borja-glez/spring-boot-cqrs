@@ -79,7 +79,7 @@ needs to decide between returning `null` and throwing `DuplicateMessageException
 ### Registries and discovery
 
 - `EventHandlerRegistry.HandlerInfo` and `CommandHandlerRegistry.HandlerInfo` gain a nullable
-  `String idempotencyKey` (the handler id). `null` means not idempotent and the invocation path is
+  `String handlerId` (the handler id). `null` means not idempotent and the invocation path is
   exactly today's.
 - `BeanPostProcessorHandlerDiscoverer` reads `@Idempotent` on `@HandleEvent` / `@HandleCommand`
   methods and passes the handler id (explicit `name` or `beanName#methodName`) to `register`. New

@@ -503,7 +503,7 @@ class EventHandlerRegistryTest {
 
     assertThat(registry.getHandlerInfos(TestEvent.class))
         .extracting(
-            EventHandlerRegistry.HandlerInfo::idempotencyKey,
+            EventHandlerRegistry.HandlerInfo::handlerId,
             EventHandlerRegistry.HandlerInfo::idempotent)
         .containsExactly(
             tuple("projector#first", true), tuple("projector#second", true), tuple(null, false));
@@ -515,7 +515,7 @@ class EventHandlerRegistryTest {
         new EventHandlerRegistry.HandlerInfo(
             new Object(), MethodHandles.constant(String.class, "x"), "name", null, false);
 
-    assertThat(info.idempotencyKey()).isNull();
+    assertThat(info.handlerId()).isNull();
     assertThat(info.idempotent()).isFalse();
   }
 

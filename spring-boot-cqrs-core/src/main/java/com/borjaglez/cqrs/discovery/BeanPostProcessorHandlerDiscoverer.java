@@ -145,7 +145,7 @@ public class BeanPostProcessorHandlerDiscoverer
         messageName,
         requiresValidation,
         remote,
-        idempotencyKey(beanName, method));
+        handlerId(beanName, method));
   }
 
   private void registerEventHandler(Object bean, String beanName, Method method, boolean remote) {
@@ -163,11 +163,11 @@ public class BeanPostProcessorHandlerDiscoverer
         condition,
         beanResolver,
         remote,
-        idempotencyKey(beanName, method));
+        handlerId(beanName, method));
   }
 
   /** The handler id of an {@code @Idempotent} method, or {@code null} when it is not one. */
-  private static String idempotencyKey(String beanName, Method method) {
+  private static String handlerId(String beanName, Method method) {
     Idempotent idempotent = method.getAnnotation(Idempotent.class);
     if (idempotent == null) {
       return null;

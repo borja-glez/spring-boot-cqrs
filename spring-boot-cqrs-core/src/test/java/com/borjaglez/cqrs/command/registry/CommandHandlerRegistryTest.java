@@ -304,7 +304,7 @@ class CommandHandlerRegistryTest {
         new CommandHandlerRegistry.HandlerInfo(
             new Object(), MethodHandles.constant(String.class, "x"), "name", false, true);
 
-    assertThat(info.idempotencyKey()).isNull();
+    assertThat(info.handlerId()).isNull();
     assertThat(info.idempotent()).isFalse();
   }
 }
