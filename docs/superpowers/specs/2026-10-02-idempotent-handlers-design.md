@@ -84,11 +84,16 @@ needs to decide between returning `null` and throwing `DuplicateMessageException
 - `BeanPostProcessorHandlerDiscoverer` reads `@Idempotent` on `@HandleEvent` / `@HandleCommand`
   methods and passes the handler id (explicit `name` or `beanName#methodName`) to `register`. New
   `register` overloads are added; the existing ones keep working.
-- The registries receive the `IdempotentInvoker` (nullable). Registering an `@Idempotent` handler
-  when no invoker is available fails at startup with a message naming the handler and telling the
-  user to add `spring-boot-cqrs-jdbc` or set `cqrs.idempotency.store=in-memory`.
-- `@Idempotent` on a `@HandleQuery` method, or on a method without a handler annotation, fails at
-  startup.
+- The registries are created before any `DataSource` (the discoverer is a `BeanPostProcessor`), so
+  they receive the `IdempotentInvoker` late, through `setIdempotentInvoker`. An
+  `IdempotencyRegistrar` (`SmartInitializingSingleton`, core) sets it on both registries once all
+  singletons exist, before any listener container starts. When there is no invoker and some handler
+  is `@Idempotent`, it fails startup with a message naming the handlers and telling the user to add
+  `spring-boot-cqrs-jdbc` or set `cqrs.idempotency.store=in-memory`. Invoking an `@Idempotent`
+  handler before the invoker is set throws `IllegalStateException`.
+- Inside a handler class (`@CommandHandler`, `@EventHandler`, `@QueryHandler`), `@Idempotent` on a
+  `@HandleQuery` method or on a method without a handler annotation fails at startup. On other beans
+  the annotation has no effect.
 - Event duplicate: the handler is skipped and a `DEBUG` log names handler and `eventId`. The loop
   continues with the next handler.
 - Command duplicate: a `void` handler is skipped and the registry returns `null`; a handler with a
@@ -171,8 +176,10 @@ dependency on `@EnableScheduling`): every `cleanup-interval` it runs
 - `@AutoConfiguration(afterName = {...})` listing the DataSource and transaction-manager
   auto-configurations of both Boot 3 and Boot 4 (packages differ).
 - `@ConditionalOnSingleCandidate(DataSource.class)` and `PlatformTransactionManager`.
-- Store `@ConditionalOnMissingBean(IdempotencyStore.class)`, skipped when
-  `cqrs.idempotency.store=in-memory`.
+- Ordered with `beforeName = "com.borjaglez.cqrs.autoconfigure.CqrsIdempotencyAutoConfiguration"`
+  (same class name in both starters) so the starter sees the store.
+- Store `@ConditionalOnMissingBean(IdempotencyStore.class)`, only when `cqrs.idempotency.store` is
+  `jdbc` or unset.
 - Schema initializer with `ResourceDatabasePopulator` according to `cqrs.jdbc.initialize-schema`
   (`embedded` initializes only embedded databases).
 - Cleanup bean when `cqrs.jdbc.idempotency.cleanup-enabled=true`.
@@ -182,7 +189,8 @@ dependency on `@EnableScheduling`): every `cleanup-interval` it runs
 `CqrsIdempotencyAutoConfiguration`:
 
 - `InMemoryIdempotencyStore` only when `cqrs.idempotency.store=in-memory`.
-- `IdempotentInvoker` when an `IdempotencyStore` bean exists; passed to both registries.
+- `IdempotentInvoker` when an `IdempotencyStore` bean exists.
+- `IdempotencyRegistrar` always, which hands the invoker to both registries or fails fast.
 - `@CqrsTest` (test module) sets `cqrs.idempotency.store=in-memory` by default.
 
 ## Properties
@@ -214,9 +222,10 @@ Regression first, failing before the change:
    no marker; two concurrent transactions apply once; duplicate inside an outer transaction keeps
    it usable (also with `JpaTransactionManager`); cleanup by retention; `initialize-schema` modes;
    custom table name.
-6. RabbitMQ Testcontainers integration (in `spring-boot-cqrs-rabbitmq`, using the jdbc module with H2
-   as a test dependency): an event with two handlers, one fails once; the retry exchange redelivers;
-   the successful handler is not re-applied.
+6. RabbitMQ Testcontainers integration (in `spring-boot-cqrs-rabbitmq`, with the core
+   `InMemoryIdempotencyStore`; the JDBC store's transactional behaviour is covered by its own tests):
+   an event with two handlers, one fails once; the retry exchange redelivers; the successful handler
+   is not re-applied.
 7. Auto-configuration tests in both starters and in the jdbc module; `verifyBoot3Compatibility` and
    `verifyBoot4Compatibility`.
 
