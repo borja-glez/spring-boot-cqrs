@@ -19,6 +19,7 @@ import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.command.CommandNotRegisteredException;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestQuery;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
 import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 
 class RetryPolicyTest {
@@ -37,7 +38,8 @@ class RetryPolicyTest {
             IllegalArgumentException.class,
             ConstraintViolationException.class,
             CommandNotRegisteredException.class,
-            QueryNotRegisteredException.class)
+            QueryNotRegisteredException.class,
+            DuplicateMessageException.class)
         .containsExactlyInAnyOrderElementsOf(RetryPolicy.DEFAULT_NON_RETRIABLE_EXCEPTIONS);
   }
 
@@ -55,6 +57,7 @@ class RetryPolicyTest {
     assertThat(policy.isRetriable(new ConstraintViolationException(Set.of()))).isFalse();
     assertThat(policy.isRetriable(new CommandNotRegisteredException(TestCommand.class))).isFalse();
     assertThat(policy.isRetriable(new QueryNotRegisteredException(TestQuery.class))).isFalse();
+    assertThat(policy.isRetriable(new DuplicateMessageException("orders#handle", "id"))).isFalse();
   }
 
   @Test
@@ -136,7 +139,7 @@ class RetryPolicyTest {
         .containsExactlyInAnyOrder(IllegalStateException.class, UncheckedIOException.class);
     assertThat(policy.nonRetriableExceptions())
         .contains(UnsupportedOperationException.class, IllegalArgumentException.class)
-        .hasSize(5);
+        .hasSize(6);
     assertThat(policy.isRetriable(new RuntimeException("no longer retriable"))).isFalse();
   }
 
