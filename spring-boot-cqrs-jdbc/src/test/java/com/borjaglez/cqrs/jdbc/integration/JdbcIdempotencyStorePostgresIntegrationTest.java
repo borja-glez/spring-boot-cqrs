@@ -130,7 +130,7 @@ class JdbcIdempotencyStorePostgresIntegrationTest {
                         sleep(300);
                         throw new IllegalStateException("first fails");
                       }));
-      firstInserted.await(10, TimeUnit.SECONDS);
+      assertThat(firstInserted.await(10, TimeUnit.SECONDS)).isTrue();
       Future<?> second = executor.submit(() -> invoker.invoke("h", "m", applied::incrementAndGet));
       assertThat(first)
           .failsWithin(30, TimeUnit.SECONDS)

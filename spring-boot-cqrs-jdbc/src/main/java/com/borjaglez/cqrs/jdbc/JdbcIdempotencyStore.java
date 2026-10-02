@@ -40,7 +40,7 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
   private static final Pattern TABLE_NAME =
       Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)?");
 
-  private static final Log LOGGER = LogFactory.getLog(JdbcIdempotencyStore.class);
+  private static final Log LOG = LogFactory.getLog(JdbcIdempotencyStore.class);
 
   private final JdbcTemplate jdbc;
   private final TransactionTemplate scope;
@@ -90,7 +90,15 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       return insertMarker(handlerId, messageId);
     }
     Savepoint savepoint = createSavepoint(holder);
-    Acquisition acquisition = insertMarker(handlerId, messageId);
+    Acquisition acquisition;
+    try {
+      acquisition = insertMarker(handlerId, messageId);
+    } catch (RuntimeException e) {
+      // Keep the caller's transaction usable (PostgreSQL aborts it after a failed statement).
+      rollbackToSavepoint(holder, savepoint);
+      releaseSavepoint(holder, savepoint);
+      throw e;
+    }
     if (acquisition == Acquisition.DUPLICATE) {
       rollbackToSavepoint(holder, savepoint);
     }
@@ -128,7 +136,7 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       holder.getConnection().releaseSavepoint(savepoint);
     } catch (SQLException e) {
       // Some drivers do not support releasing a savepoint; the transaction end frees it anyway.
-      LOGGER.debug("Could not release JDBC savepoint", e);
+      LOG.debug("Could not release JDBC savepoint", e);
     }
   }
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -19,6 +20,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -183,6 +185,24 @@ class JdbcIdempotencyStoreTest {
 
     withBoundConnection(
         connection, () -> assertThat(store.tryAcquire("h", "m")).isEqualTo(Acquisition.ACQUIRED));
+
+    verify(connection).releaseSavepoint(any());
+  }
+
+  @Test
+  void rollsBackToTheSavepointWhenTheInsertFailsForAnotherReason() throws Exception {
+    JdbcIdempotencyStore broken =
+        new JdbcIdempotencyStore(dataSource, transactionManager, "missing_table");
+    Connection connection = spy(dataSource.getConnection());
+
+    withBoundConnection(
+        connection,
+        () ->
+            assertThatThrownBy(() -> broken.tryAcquire("h", "m"))
+                .isInstanceOf(BadSqlGrammarException.class));
+
+    verify(connection).rollback(any(Savepoint.class));
+    verify(connection).releaseSavepoint(any());
   }
 
   @Test
