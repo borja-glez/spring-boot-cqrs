@@ -151,8 +151,9 @@ public class CommandHandlerRegistry {
           "Handler "
               + info.handlerId()
               + " is @Idempotent but no IdempotencyStore is configured yet; add"
-              + " spring-boot-cqrs-jdbc with a DataSource, set cqrs.idempotency.store=in-memory,"
-              + " or define an IdempotencyStore bean");
+              + " spring-boot-cqrs-jdbc with a DataSource (the JDBC store needs a single DataSource"
+              + " and a single, or @Primary, PlatformTransactionManager), set"
+              + " cqrs.idempotency.store=in-memory, or define an IdempotencyStore bean");
     }
     return invoker;
   }

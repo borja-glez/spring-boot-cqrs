@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.idempotency;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -91,6 +92,25 @@ class IdempotentInvokerTest {
                     }))
         .isSameAs(failure);
     verify(store).release("h", "m");
+  }
+
+  @Test
+  void keepsTheEffectFailureWhenTheReleaseFails() {
+    when(store.tryAcquire("h", "m")).thenReturn(Acquisition.ACQUIRED);
+    IllegalStateException failure = new IllegalStateException("boom");
+    IllegalStateException releaseFailure = new IllegalStateException("release failed");
+    doThrow(releaseFailure).when(store).release("h", "m");
+
+    assertThatThrownBy(
+            () ->
+                invoker.invoke(
+                    "h",
+                    "m",
+                    () -> {
+                      throw failure;
+                    }))
+        .isSameAs(failure)
+        .hasSuppressedException(releaseFailure);
   }
 
   @Test

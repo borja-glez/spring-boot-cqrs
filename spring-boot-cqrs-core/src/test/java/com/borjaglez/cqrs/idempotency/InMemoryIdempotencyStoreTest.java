@@ -128,6 +128,13 @@ class InMemoryIdempotencyStoreTest {
   }
 
   @Test
+  void rejectsANullClock() {
+    assertThatThrownBy(() -> new InMemoryIdempotencyStore(RETENTION, LEASE, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("clock");
+  }
+
+  @Test
   void usesTheSystemClockByDefault() {
     InMemoryIdempotencyStore systemStore = new InMemoryIdempotencyStore(RETENTION, LEASE);
 

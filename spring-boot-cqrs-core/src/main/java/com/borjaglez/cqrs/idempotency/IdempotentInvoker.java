@@ -25,11 +25,20 @@ public final class IdempotentInvoker {
           try {
             result = effect.get();
           } catch (RuntimeException | Error e) {
-            store.release(handlerId, messageId);
+            release(handlerId, messageId, e);
             throw e;
           }
           store.complete(handlerId, messageId);
           return Outcome.applied(result);
         });
+  }
+
+  /** Releases the marker; a failing release must not hide why the effect failed. */
+  private void release(String handlerId, String messageId, Throwable effectFailure) {
+    try {
+      store.release(handlerId, messageId);
+    } catch (RuntimeException | Error releaseFailure) {
+      effectFailure.addSuppressed(releaseFailure);
+    }
   }
 }

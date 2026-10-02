@@ -71,11 +71,16 @@ public class EventHandlerRegistry {
     }
   }
 
+  /** An {@code @Idempotent} handler of an event class, identified by its handler id. */
+  private record IdempotentHandler(Class<?> eventClass, String handlerId) {}
+
   private static final Log LOG = LogFactory.getLog(EventHandlerRegistry.class);
 
   private final ConcurrentHashMap<Class<?>, List<HandlerInfo>> handlers = new ConcurrentHashMap<>();
   private final MessageNameIndex messageNames = new MessageNameIndex();
   private final Set<Class<?>> warnedUnhandledSubclasses = ConcurrentHashMap.newKeySet();
+  private final ConcurrentHashMap<IdempotentHandler, Method> idempotentHandlers =
+      new ConcurrentHashMap<>();
   private volatile IdempotentInvoker idempotentInvoker;
 
   /** Sets the invoker that deduplicates {@code @Idempotent} handlers. */
@@ -149,6 +154,9 @@ public class EventHandlerRegistry {
       BeanResolver beanResolver,
       boolean remote,
       String handlerId) {
+    if (handlerId != null) {
+      rejectSharedHandlerId(eventClass, method, handlerId);
+    }
     MethodHandle handle = MethodHandleUtil.unreflect(method);
     EventHandlerCondition handlerCondition =
         condition == null
@@ -158,6 +166,27 @@ public class EventHandlerRegistry {
         new HandlerInfo(bean, handle, messageName, handlerCondition, remote, handlerId);
     handlers.computeIfAbsent(eventClass, k -> new CopyOnWriteArrayList<>()).add(info);
     messageNames.add(messageName, eventClass);
+  }
+
+  /**
+   * Two idempotent handlers of the same event under one handler id would share a marker, so the
+   * second one would never run.
+   */
+  private void rejectSharedHandlerId(Class<?> eventClass, Method method, String handlerId) {
+    Method previous =
+        idempotentHandlers.putIfAbsent(new IdempotentHandler(eventClass, handlerId), method);
+    if (previous != null) {
+      throw new IllegalStateException(
+          "Handlers "
+              + previous.toGenericString()
+              + " and "
+              + method.toGenericString()
+              + " of event "
+              + eventClass.getName()
+              + " share the @Idempotent handler id '"
+              + handlerId
+              + "'; give each handler a distinct @Idempotent name");
+    }
   }
 
   /** Runs every handler of the event, local and remote. */
@@ -219,8 +248,9 @@ public class EventHandlerRegistry {
           "Handler "
               + info.handlerId()
               + " is @Idempotent but no IdempotencyStore is configured yet; add"
-              + " spring-boot-cqrs-jdbc with a DataSource, set cqrs.idempotency.store=in-memory,"
-              + " or define an IdempotencyStore bean");
+              + " spring-boot-cqrs-jdbc with a DataSource (the JDBC store needs a single DataSource"
+              + " and a single, or @Primary, PlatformTransactionManager), set"
+              + " cqrs.idempotency.store=in-memory, or define an IdempotencyStore bean");
     }
     return invoker;
   }

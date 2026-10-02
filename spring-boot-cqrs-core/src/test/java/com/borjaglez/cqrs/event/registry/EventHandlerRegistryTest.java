@@ -487,13 +487,53 @@ class EventHandlerRegistryTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Handler projector#first is @Idempotent but no IdempotencyStore is configured yet;"
-                + " add spring-boot-cqrs-jdbc with a DataSource, set"
+                + " add spring-boot-cqrs-jdbc with a DataSource (the JDBC store needs a single"
+                + " DataSource and a single, or @Primary, PlatformTransactionManager), set"
                 + " cqrs.idempotency.store=in-memory, or define an IdempotencyStore bean");
     assertThat(handlers.firstCalls).hasValue(0);
   }
 
   @Test
-  void handlerInfoKeepsTheIdempotencyKey() throws Exception {
+  void rejectsTwoIdempotentHandlersOfTheSameEventWithTheSameHandlerId() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    Method first = IdempotentEventHandlers.class.getMethod("first", TestEvent.class);
+    Method second = IdempotentEventHandlers.class.getMethod("second", TestEvent.class);
+    registry.register(TestEvent.class, handlers, first, "test.event", null, null, true, "shared");
+
+    assertThatThrownBy(
+            () ->
+                registry.register(
+                    TestEvent.class, handlers, second, "test.event", null, null, true, "shared"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage(
+            "Handlers "
+                + first.toGenericString()
+                + " and "
+                + second.toGenericString()
+                + " of event "
+                + TestEvent.class.getName()
+                + " share the @Idempotent handler id 'shared'; give each handler a distinct"
+                + " @Idempotent name");
+    assertThat(registry.getHandlerInfos(TestEvent.class)).hasSize(1);
+  }
+
+  @Test
+  void acceptsTheSameHandlerIdForDifferentEvents() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    Method first = IdempotentEventHandlers.class.getMethod("first", TestEvent.class);
+    registry.register(TestEvent.class, handlers, first, "test.event", null, null, true, "shared");
+
+    registry.register(
+        OtherTestEvent.class, handlers, first, "other.event", null, null, true, "shared");
+
+    assertThat(registry.getHandlerInfos(OtherTestEvent.class)).hasSize(1);
+  }
+
+  /** A second event class; the registry does not check the handler's parameter type. */
+  static class OtherTestEvent extends TestEvent {}
+
+  @Test
+  void handlerInfoKeepsTheHandlerId() throws Exception {
     registerIdempotentHandlers();
     registry.register(
         TestEvent.class,

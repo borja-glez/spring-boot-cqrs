@@ -53,7 +53,7 @@ class IdempotencyRegistrarTest {
         new IdempotentInvoker(
             new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5)));
 
-    new IdempotencyRegistrar(commands, events, invoker).afterSingletonsInstantiated();
+    new IdempotencyRegistrar(commands, events, () -> invoker).afterSingletonsInstantiated();
     TestEvent event = new TestEvent("data");
     events.handle(event);
     events.handle(event);
@@ -68,7 +68,7 @@ class IdempotencyRegistrarTest {
         new IdempotentInvoker(
             new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5)));
 
-    new IdempotencyRegistrar(commands, events, invoker).afterSingletonsInstantiated();
+    new IdempotencyRegistrar(commands, events, () -> invoker).afterSingletonsInstantiated();
 
     assertThatCode(() -> commands.handle(new TestCommand("data"))).doesNotThrowAnyException();
   }
@@ -80,14 +80,15 @@ class IdempotencyRegistrarTest {
 
     assertThatThrownBy(
             () ->
-                new IdempotencyRegistrar(commands, events, (IdempotentInvoker) null)
+                new IdempotencyRegistrar(commands, events, () -> null)
                     .afterSingletonsInstantiated())
         .isInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Handlers [orders#handle, projector#first] are annotated with @Idempotent but no"
                 + " IdempotencyStore bean is configured; add spring-boot-cqrs-jdbc with a"
-                + " DataSource, set cqrs.idempotency.store=in-memory, or define an"
-                + " IdempotencyStore bean");
+                + " DataSource (the JDBC store needs a single DataSource and a single, or"
+                + " @Primary, PlatformTransactionManager), set cqrs.idempotency.store=in-memory,"
+                + " or define an IdempotencyStore bean");
   }
 
   @Test
@@ -106,7 +107,7 @@ class IdempotencyRegistrarTest {
 
     assertThatCode(
             () ->
-                new IdempotencyRegistrar(commands, events, (IdempotentInvoker) null)
+                new IdempotencyRegistrar(commands, events, () -> null)
                     .afterSingletonsInstantiated())
         .doesNotThrowAnyException();
   }

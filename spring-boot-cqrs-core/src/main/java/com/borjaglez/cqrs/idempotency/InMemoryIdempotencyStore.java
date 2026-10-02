@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.idempotency;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -34,7 +35,7 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   public InMemoryIdempotencyStore(Duration retention, Duration lease, Clock clock) {
     this.retention = positive("retention", retention);
     this.lease = positive("lease", lease);
-    this.clock = clock;
+    this.clock = Objects.requireNonNull(clock, "clock");
   }
 
   @Override

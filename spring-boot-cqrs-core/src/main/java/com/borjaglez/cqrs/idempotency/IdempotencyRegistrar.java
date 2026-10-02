@@ -24,16 +24,6 @@ public class IdempotencyRegistrar implements SmartInitializingSingleton {
   private final Supplier<IdempotentInvoker> invoker;
 
   /**
-   * @param invoker the invoker, or {@code null} when no {@link IdempotencyStore} is configured
-   */
-  public IdempotencyRegistrar(
-      CommandHandlerRegistry commandHandlerRegistry,
-      EventHandlerRegistry eventHandlerRegistry,
-      IdempotentInvoker invoker) {
-    this(commandHandlerRegistry, eventHandlerRegistry, () -> invoker);
-  }
-
-  /**
    * @param invoker supplies the invoker, or {@code null} when no {@link IdempotencyStore} is
    *     configured; called once all singletons exist
    */
@@ -60,8 +50,9 @@ public class IdempotencyRegistrar implements SmartInitializingSingleton {
           "Handlers "
               + idempotentHandlers
               + " are annotated with @Idempotent but no IdempotencyStore bean is configured; add"
-              + " spring-boot-cqrs-jdbc with a DataSource, set cqrs.idempotency.store=in-memory,"
-              + " or define an IdempotencyStore bean");
+              + " spring-boot-cqrs-jdbc with a DataSource (the JDBC store needs a single DataSource"
+              + " and a single, or @Primary, PlatformTransactionManager), set"
+              + " cqrs.idempotency.store=in-memory, or define an IdempotencyStore bean");
     }
   }
 

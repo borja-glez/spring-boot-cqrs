@@ -85,7 +85,7 @@ public class CqrsTestConfiguration {
       EventHandlerRegistry eventHandlerRegistry,
       IdempotentInvoker idempotentInvoker) {
     return new IdempotencyRegistrar(
-        commandHandlerRegistry, eventHandlerRegistry, idempotentInvoker);
+        commandHandlerRegistry, eventHandlerRegistry, () -> idempotentInvoker);
   }
 
   @Bean
