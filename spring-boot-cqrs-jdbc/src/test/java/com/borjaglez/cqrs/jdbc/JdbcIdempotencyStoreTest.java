@@ -2,7 +2,13 @@ package com.borjaglez.cqrs.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -14,10 +20,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.borjaglez.cqrs.idempotency.Acquisition;
@@ -153,5 +162,53 @@ class JdbcIdempotencyStoreTest {
         .hasMessage("Invalid table name: null");
     assertThat(JdbcIdempotencyStore.validTableName("cqrs.processed_message"))
         .isEqualTo("cqrs.processed_message");
+  }
+
+  private void withBoundConnection(Connection connection, Runnable action) throws SQLException {
+    connection.setAutoCommit(false);
+    TransactionSynchronizationManager.bindResource(dataSource, new ConnectionHolder(connection));
+    try {
+      action.run();
+    } finally {
+      TransactionSynchronizationManager.unbindResource(dataSource);
+      connection.rollback();
+      connection.close();
+    }
+  }
+
+  @Test
+  void ignoresAFailureToReleaseTheSavepoint() throws Exception {
+    Connection connection = spy(dataSource.getConnection());
+    doThrow(new SQLException("no release")).when(connection).releaseSavepoint(any());
+
+    withBoundConnection(
+        connection, () -> assertThat(store.tryAcquire("h", "m")).isEqualTo(Acquisition.ACQUIRED));
+  }
+
+  @Test
+  void translatesAFailureToCreateTheSavepoint() throws Exception {
+    Connection connection = spy(dataSource.getConnection());
+    doThrow(new SQLException("no savepoint")).when(connection).setSavepoint(any());
+
+    withBoundConnection(
+        connection,
+        () ->
+            assertThatThrownBy(() -> store.tryAcquire("h", "m"))
+                .isInstanceOf(TransactionSystemException.class)
+                .hasMessage("Could not create JDBC savepoint"));
+  }
+
+  @Test
+  void translatesAFailureToRollBackToTheSavepoint() throws Exception {
+    store.tryAcquire("h", "m");
+    Connection connection = spy(dataSource.getConnection());
+    doThrow(new SQLException("no rollback")).when(connection).rollback(any(Savepoint.class));
+
+    withBoundConnection(
+        connection,
+        () ->
+            assertThatThrownBy(() -> store.tryAcquire("h", "m"))
+                .isInstanceOf(TransactionSystemException.class)
+                .hasMessage("Could not roll back to JDBC savepoint"));
   }
 }

@@ -154,14 +154,19 @@ configurable; the script uses the default name.
 - `runInScope`: `TransactionTemplate` with `PROPAGATION_REQUIRED` on the application's
   `PlatformTransactionManager`. A handler's own `@Transactional` joins it; with JPA the
   `JdbcTemplate` shares the connection.
-- `tryAcquire`: `INSERT` the marker inside a savepoint. On `DuplicateKeyException`, roll back to the
-  savepoint and return `DUPLICATE`. The savepoint keeps PostgreSQL from aborting an outer
-  transaction (local dispatch inside the caller's transaction).
+- `tryAcquire`: takes the `ConnectionHolder` bound to the `DataSource` by the transaction manager
+  (DataSource, Jdbc and JPA managers with their data source set all bind one, and `JdbcTemplate`
+  uses that same connection), creates a JDBC savepoint, `INSERT`s the marker, and releases the
+  savepoint. On `DuplicateKeyException` it rolls back to the savepoint and returns `DUPLICATE`, so
+  PostgreSQL does not abort an outer transaction (local dispatch inside the caller's transaction).
+  A failure to release the savepoint is ignored. Without a bound holder (JTA, direct call) it does
+  a plain insert and maps the duplicate key to `DUPLICATE`.
 - A concurrent delivery blocks on the uncommitted row; after the first commits it gets the
   duplicate key and skips; if the first rolls back, its insert succeeds and it runs the effect.
 - `complete` and `release`: no-ops; commit and rollback do the work.
-- Risk: savepoints under `JpaTransactionManager` depend on the JPA dialect. Covered by a test; the
-  fallback is a per-dialect insert-if-absent statement (`ON CONFLICT DO NOTHING`).
+- Risk: `PROPAGATION_NESTED` is not supported by `JpaTransactionManager` (its `JpaDialect` has no
+  savepoint manager), so the savepoint is managed manually on the JDBC connection. A test with a
+  `JpaTransactionManager` on H2 covers it and passes.
 
 ### Cleanup
 

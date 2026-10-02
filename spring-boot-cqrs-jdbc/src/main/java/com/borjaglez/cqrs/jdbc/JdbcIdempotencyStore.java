@@ -1,5 +1,7 @@
 package com.borjaglez.cqrs.jdbc;
 
+import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -8,10 +10,14 @@ import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.borjaglez.cqrs.idempotency.Acquisition;
@@ -22,7 +28,10 @@ import com.borjaglez.cqrs.idempotency.IdempotencyStore;
  * (joining the caller's one when there is one) and {@link #tryAcquire} inserts the marker in it, so
  * the marker commits with the handler's database work and a rollback removes both. A concurrent
  * delivery of the same message blocks on the uncommitted row and then sees a duplicate key. The
- * insert runs in a savepoint so a duplicate does not abort the caller's transaction.
+ * insert runs in a JDBC savepoint on the transaction's connection, so a duplicate does not abort
+ * the caller's transaction. This works under DataSource, Jdbc and JPA transaction managers, as long
+ * as the manager binds the {@link DataSource}'s connection (the JPA one does when its data source
+ * is set, which Spring Boot does).
  */
 public class JdbcIdempotencyStore implements IdempotencyStore {
 
@@ -31,9 +40,11 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
   private static final Pattern TABLE_NAME =
       Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)?");
 
+  private static final Log LOGGER = LogFactory.getLog(JdbcIdempotencyStore.class);
+
   private final JdbcTemplate jdbc;
   private final TransactionTemplate scope;
-  private final TransactionTemplate savepoint;
+  private final DataSource dataSource;
   private final String insertSql;
   private final String deleteSql;
   private final Clock clock;
@@ -49,10 +60,9 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       String tableName,
       Clock clock) {
     String table = validTableName(tableName);
+    this.dataSource = dataSource;
     this.jdbc = new JdbcTemplate(dataSource);
     this.scope = new TransactionTemplate(transactionManager);
-    this.savepoint = new TransactionTemplate(transactionManager);
-    this.savepoint.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
     this.insertSql =
         "INSERT INTO " + table + " (handler_id, message_id, processed_at) VALUES (?, ?, ?)";
     this.deleteSql = "DELETE FROM " + table + " WHERE processed_at < ?";
@@ -74,12 +84,51 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
   @Override
   public Acquisition tryAcquire(String handlerId, String messageId) {
+    ConnectionHolder holder =
+        (ConnectionHolder) TransactionSynchronizationManager.getResource(dataSource);
+    if (holder == null) {
+      return insertMarker(handlerId, messageId);
+    }
+    Savepoint savepoint = createSavepoint(holder);
+    Acquisition acquisition = insertMarker(handlerId, messageId);
+    if (acquisition == Acquisition.DUPLICATE) {
+      rollbackToSavepoint(holder, savepoint);
+    }
+    releaseSavepoint(holder, savepoint);
+    return acquisition;
+  }
+
+  private Acquisition insertMarker(String handlerId, String messageId) {
     try {
-      savepoint.executeWithoutResult(
-          status -> jdbc.update(insertSql, handlerId, messageId, Timestamp.from(clock.instant())));
+      jdbc.update(insertSql, handlerId, messageId, Timestamp.from(clock.instant()));
       return Acquisition.ACQUIRED;
     } catch (DuplicateKeyException e) {
       return Acquisition.DUPLICATE;
+    }
+  }
+
+  private static Savepoint createSavepoint(ConnectionHolder holder) {
+    try {
+      return holder.createSavepoint();
+    } catch (SQLException e) {
+      throw new TransactionSystemException("Could not create JDBC savepoint", e);
+    }
+  }
+
+  private static void rollbackToSavepoint(ConnectionHolder holder, Savepoint savepoint) {
+    try {
+      holder.getConnection().rollback(savepoint);
+    } catch (SQLException e) {
+      throw new TransactionSystemException("Could not roll back to JDBC savepoint", e);
+    }
+  }
+
+  private static void releaseSavepoint(ConnectionHolder holder, Savepoint savepoint) {
+    try {
+      holder.getConnection().releaseSavepoint(savepoint);
+    } catch (SQLException e) {
+      // Some drivers do not support releasing a savepoint; the transaction end frees it anyway.
+      LOGGER.debug("Could not release JDBC savepoint", e);
     }
   }
 
