@@ -17,6 +17,7 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -49,6 +50,7 @@ import com.borjaglez.cqrs.idempotency.IdempotencyStore;
     havingValue = "jdbc",
     matchIfMissing = true)
 @EnableConfigurationProperties(JdbcCqrsProperties.class)
+@ImportRuntimeHints(JdbcIdempotencyRuntimeHints.class)
 public class CqrsJdbcIdempotencyAutoConfiguration {
 
   static final Duration DEFAULT_RETENTION = Duration.ofDays(7);
