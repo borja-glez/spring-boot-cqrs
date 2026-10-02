@@ -3,7 +3,9 @@ package com.borjaglez.cqrs.command.registry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
+import java.time.Duration;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,11 +14,15 @@ import com.borjaglez.cqrs.command.CommandAlreadyRegisteredException;
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.command.CommandNotRegisteredException;
 import com.borjaglez.cqrs.fixtures.CheckedThrowingCommandHandler;
+import com.borjaglez.cqrs.fixtures.CountingCommandHandlers;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestCommandHandler;
 import com.borjaglez.cqrs.fixtures.TestReturningCommandHandler;
 import com.borjaglez.cqrs.fixtures.ThrowingCommandHandler;
 import com.borjaglez.cqrs.fixtures.UnannotatedCommand;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
+import com.borjaglez.cqrs.idempotency.IdempotentInvoker;
+import com.borjaglez.cqrs.idempotency.InMemoryIdempotencyStore;
 
 class CommandHandlerRegistryTest {
 
@@ -185,5 +191,124 @@ class CommandHandlerRegistryTest {
         UnannotatedCommand.class, new TestCommandHandler(), method, "unannotated-command", false);
 
     assertThat(registry.findMessageClass("unannotated-command")).isEmpty();
+  }
+
+  private IdempotentInvoker invoker() {
+    return new IdempotentInvoker(
+        new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5)));
+  }
+
+  @Test
+  void duplicateVoidCommandIsSkipped() throws Exception {
+    CountingCommandHandlers handlers = new CountingCommandHandlers();
+    registry.register(
+        TestCommand.class,
+        handlers,
+        CountingCommandHandlers.class.getMethod("handle", TestCommand.class),
+        "test.command",
+        false,
+        true,
+        "orders#handle");
+    registry.setIdempotentInvoker(invoker());
+    TestCommand command = new TestCommand("data");
+
+    assertThat(registry.handle(command)).isNull();
+    assertThat(registry.handle(command)).isNull();
+
+    assertThat(handlers.calls).hasValue(1);
+  }
+
+  @Test
+  void duplicateCommandWithAResultThrows() throws Exception {
+    CountingCommandHandlers handlers = new CountingCommandHandlers();
+    registry.register(
+        TestCommand.class,
+        handlers,
+        CountingCommandHandlers.class.getMethod("handleAndReturn", TestCommand.class),
+        "test.command",
+        false,
+        true,
+        "orders#handleAndReturn");
+    registry.setIdempotentInvoker(invoker());
+    TestCommand command = new TestCommand("data");
+
+    assertThat(registry.handle(command)).isEqualTo("result-1");
+    assertThatThrownBy(() -> registry.handle(command))
+        .isInstanceOf(DuplicateMessageException.class)
+        .hasMessage(
+            "Message "
+                + command.getCommandId()
+                + " was already processed by idempotent handler orders#handleAndReturn");
+    assertThat(handlers.calls).hasValue(1);
+  }
+
+  @Test
+  void failedIdempotentCommandRunsAgain() throws Exception {
+    Method method = ThrowingCommandHandler.class.getMethod("handle", TestCommand.class);
+    registry.register(
+        TestCommand.class,
+        new ThrowingCommandHandler(),
+        method,
+        "test.command",
+        false,
+        true,
+        "throwing#handle");
+    registry.setIdempotentInvoker(invoker());
+    TestCommand command = new TestCommand("data");
+
+    assertThatThrownBy(() -> registry.handle(command)).isInstanceOf(RuntimeException.class);
+    assertThatThrownBy(() -> registry.handle(command))
+        .isInstanceOf(RuntimeException.class)
+        .isNotInstanceOf(DuplicateMessageException.class);
+  }
+
+  @Test
+  void checkedFailureOfAnIdempotentCommandIsWrapped() throws Exception {
+    Method method =
+        CheckedThrowingCommandHandler.class.getMethod("handle", UnannotatedCommand.class);
+    registry.register(
+        UnannotatedCommand.class,
+        new CheckedThrowingCommandHandler(),
+        method,
+        "test.command",
+        false,
+        true,
+        "checked#handle");
+    registry.setIdempotentInvoker(invoker());
+
+    assertThatThrownBy(() -> registry.handle(new UnannotatedCommand("data")))
+        .isInstanceOf(CommandHandlerExecutionException.class);
+  }
+
+  @Test
+  void idempotentCommandWithoutInvokerFailsLoudly() throws Exception {
+    CountingCommandHandlers handlers = new CountingCommandHandlers();
+    registry.register(
+        TestCommand.class,
+        handlers,
+        CountingCommandHandlers.class.getMethod("handle", TestCommand.class),
+        "test.command",
+        false,
+        true,
+        "orders#handle");
+
+    assertThatThrownBy(() -> registry.handle(new TestCommand("data")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage(
+            "Handler orders#handle is @Idempotent but no IdempotencyStore is configured yet;"
+                + " add spring-boot-cqrs-jdbc with a DataSource (the JDBC store needs a single"
+                + " DataSource and a single, or @Primary, PlatformTransactionManager), set"
+                + " cqrs.idempotency.store=in-memory, or define an IdempotencyStore bean");
+    assertThat(handlers.calls).hasValue(0);
+  }
+
+  @Test
+  void handlerInfoWithThePreviousCanonicalSignatureIsNotIdempotent() {
+    CommandHandlerRegistry.HandlerInfo info =
+        new CommandHandlerRegistry.HandlerInfo(
+            new Object(), MethodHandles.constant(String.class, "x"), "name", false, true);
+
+    assertThat(info.handlerId()).isNull();
+    assertThat(info.idempotent()).isFalse();
   }
 }

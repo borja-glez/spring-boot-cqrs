@@ -1,5 +1,6 @@
 package com.borjaglez.cqrs.test.annotation;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
@@ -15,6 +16,9 @@ import com.borjaglez.cqrs.command.spring.SpringCommandBus;
 import com.borjaglez.cqrs.discovery.BeanPostProcessorHandlerDiscoverer;
 import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
 import com.borjaglez.cqrs.event.spring.SpringEventBus;
+import com.borjaglez.cqrs.idempotency.IdempotencyRegistrar;
+import com.borjaglez.cqrs.idempotency.IdempotentInvoker;
+import com.borjaglez.cqrs.idempotency.InMemoryIdempotencyStore;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 import com.borjaglez.cqrs.naming.MessageNamingStrategy;
@@ -60,6 +64,28 @@ public class CqrsTestConfiguration {
       MessageNamingStrategy namingStrategy) {
     return new BeanPostProcessorHandlerDiscoverer(
         commandHandlerRegistry, eventHandlerRegistry, queryHandlerRegistry, namingStrategy);
+  }
+
+  @Bean
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public InMemoryIdempotencyStore inMemoryIdempotencyStore() {
+    return new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5));
+  }
+
+  @Bean
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public IdempotentInvoker idempotentInvoker(InMemoryIdempotencyStore store) {
+    return new IdempotentInvoker(store);
+  }
+
+  @Bean
+  @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+  public IdempotencyRegistrar idempotencyRegistrar(
+      CommandHandlerRegistry commandHandlerRegistry,
+      EventHandlerRegistry eventHandlerRegistry,
+      IdempotentInvoker idempotentInvoker) {
+    return new IdempotencyRegistrar(
+        commandHandlerRegistry, eventHandlerRegistry, () -> idempotentInvoker);
   }
 
   @Bean

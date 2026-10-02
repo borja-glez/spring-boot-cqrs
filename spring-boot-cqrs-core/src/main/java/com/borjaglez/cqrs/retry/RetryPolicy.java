@@ -10,6 +10,7 @@ import java.util.Set;
 import jakarta.validation.ConstraintViolationException;
 
 import com.borjaglez.cqrs.command.CommandNotRegisteredException;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
 import com.borjaglez.cqrs.query.QueryNotRegisteredException;
 
 /**
@@ -44,14 +45,16 @@ public record RetryPolicy(
 
   /**
    * Exception types never retried by default: failures that another attempt cannot fix (invalid
-   * arguments, validation errors, missing handlers).
+   * arguments, validation errors, missing handlers, a message an idempotent handler already
+   * processed).
    */
   public static final Set<Class<? extends Throwable>> DEFAULT_NON_RETRIABLE_EXCEPTIONS =
       Set.of(
           IllegalArgumentException.class,
           ConstraintViolationException.class,
           CommandNotRegisteredException.class,
-          QueryNotRegisteredException.class);
+          QueryNotRegisteredException.class,
+          DuplicateMessageException.class);
 
   public RetryPolicy {
     if (maxAttempts < 1) {

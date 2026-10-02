@@ -11,5 +11,8 @@ dependencies {
     implementation(libs.jackson.databind.versioned)
     implementation(libs.spring.boot4.docker.compose)
     testImplementation(libs.spring.boot4.starter.test)
+    testImplementation(project(":spring-boot-cqrs-jdbc"))
+    testImplementation(libs.spring.boot4.starter.jdbc)
+    testRuntimeOnly(libs.h2.versioned)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

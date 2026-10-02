@@ -263,7 +263,7 @@ Retries a failed command or query dispatch in process, with a backoff between at
 
 - **Commands and queries only.** Events, and any other message, pass through untouched: an event may have several handlers, and retrying the dispatch would run again those that already succeeded.
 - **Attempts.** `maxAttempts` counts the first attempt (`1` means no retry), like `cqrs.rabbitmq.retry.max-attempts`. When the policy gives up, the exception of the last attempt is rethrown as is, not wrapped.
-- **Classification.** A failure is retriable when the exception, or a cause in its chain, is an instance of a retriable type and neither it nor any cause is an instance of a non-retriable type: non-retriable wins. By default every `RuntimeException` is retriable except `IllegalArgumentException`, `jakarta.validation.ConstraintViolationException`, `CommandNotRegisteredException` and `QueryNotRegisteredException`, so validation failures and missing handlers fail at once. A checked exception thrown by a handler reaches the chain wrapped in `CommandHandlerExecutionException` / `QueryHandlerExecutionException`, a `RuntimeException`, so it is retried unless a cause in the chain is non-retriable; a checked exception thrown by a middleware is classified by its own type (not retried unless listed in `retryOn`).
+- **Classification.** A failure is retriable when the exception, or a cause in its chain, is an instance of a retriable type and neither it nor any cause is an instance of a non-retriable type: non-retriable wins. By default every `RuntimeException` is retriable except `IllegalArgumentException`, `jakarta.validation.ConstraintViolationException`, `CommandNotRegisteredException`, `QueryNotRegisteredException` and `DuplicateMessageException`, so validation failures, missing handlers and duplicates of idempotent commands fail at once. A checked exception thrown by a handler reaches the chain wrapped in `CommandHandlerExecutionException` / `QueryHandlerExecutionException`, a `RuntimeException`, so it is retried unless a cause in the chain is non-retriable; a checked exception thrown by a middleware is classified by its own type (not retried unless listed in `retryOn`).
 - **Backoff.** `BackoffStrategy.fixed(delay)`, `exponential(initial, multiplier, max)` (`min(max, initial * multiplier^(failedAttempts - 1))`) or `exponentialWithJitter(initial, multiplier, max, jitterFactor)` (the exponential delay scaled by a random factor in `[1 - jitterFactor, 1 + jitterFactor]`, capped at `max`). The default is exponential with jitter: 100 ms, x2, capped at 5 s, jitter 0.1.
 - **Interruption.** If the thread is interrupted while waiting, the interrupt flag is restored and the last handler exception is rethrown (with the `InterruptedException` suppressed).
 
@@ -292,6 +292,12 @@ RetryMiddleware retryMiddleware() {
 **Remote buses.** The middleware keeps the default phases, `LOCAL` and `INBOUND`: with RabbitMQ and Kafka it runs in the consumer (see [Middleware on Remote Buses](#middleware-on-remote-buses)), before the transport's own retry, and not on the sender, so a failed remote send (or a failed remote request/reply) is not retried by it. The attempts multiply: with `cqrs.retry.max-attempts=3` and `cqrs.rabbitmq.retry.max-attempts=3` a failing handler runs up to 9 times before the message is dead-lettered. Lower one of them when you enable both.
 
 **Transactions.** Retrying an optimistic-lock failure only helps when the transaction starts inside the retry: in the handler itself, or in a middleware ordered after `RetryMiddleware`. If the caller's transaction wraps the dispatch, it is already marked rollback-only after the first failure and every retry fails too.
+
+Retrying an `@Idempotent` command is safe: a failed attempt leaves no marker once its transaction
+rolls back, so the next attempt runs the handler. When the command is dispatched locally inside the
+caller's transaction, the attempts share it and the marker of the failed attempt is still there: the
+next attempt skips the handler. Start the transaction inside the retry, as above. Events are still not retried in-process; with `@Idempotent` handlers a transport
+redelivery only re-runs the handlers that failed. See [Idempotent Handlers](idempotency.md).
 
 ## Message Context & Correlation ID
 

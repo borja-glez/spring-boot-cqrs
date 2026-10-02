@@ -3,11 +3,14 @@ package com.borjaglez.cqrs.kafka.consumer;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.context.MessageContext;
+import com.borjaglez.cqrs.idempotency.DuplicateMessageException;
 import com.borjaglez.cqrs.kafka.KafkaMessagePublisher;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaMessageHeaders;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestMode;
@@ -17,6 +20,8 @@ import com.borjaglez.cqrs.middleware.DispatchPhase;
 import com.borjaglez.cqrs.serialization.MessageSerializer;
 
 public class KafkaCommandConsumer extends AbstractKafkaConsumer {
+
+  private static final Log LOG = LogFactory.getLog(KafkaCommandConsumer.class);
 
   private final CommandHandlerRegistry registry;
   private final List<BusMiddleware> middlewares;
@@ -74,6 +79,11 @@ public class KafkaCommandConsumer extends AbstractKafkaConsumer {
     } catch (RuntimeException e) {
       if (requestMode != null && replyTopic != null && correlationId != null) {
         publisher.publishErrorReply(replyTopic, correlationId, e);
+        return;
+      }
+      if (e instanceof DuplicateMessageException) {
+        // Nobody waits for a result, and the command was already processed: drop it.
+        LOG.debug("Dropping duplicate command: " + e.getMessage());
         return;
       }
       throw e;

@@ -2,8 +2,11 @@ package com.borjaglez.cqrs.event.registry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
+import java.time.Duration;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,9 +18,13 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 import com.borjaglez.cqrs.event.EventHandlerExecutionException;
 import com.borjaglez.cqrs.fixtures.CheckedThrowingEventHandler;
+import com.borjaglez.cqrs.fixtures.IdempotentEventHandlers;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestEventHandler;
 import com.borjaglez.cqrs.fixtures.ThrowingEventHandler;
+import com.borjaglez.cqrs.idempotency.Acquisition;
+import com.borjaglez.cqrs.idempotency.IdempotentInvoker;
+import com.borjaglez.cqrs.idempotency.InMemoryIdempotencyStore;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -29,11 +36,14 @@ class EventHandlerRegistryTest {
   private EventHandlerRegistry registry;
   private Logger registryLogger;
   private ListAppender<ILoggingEvent> logs;
+  private Level previousLevel;
 
   @BeforeEach
   void setUp() {
     registry = new EventHandlerRegistry();
     registryLogger = (Logger) LoggerFactory.getLogger(EventHandlerRegistry.class);
+    previousLevel = registryLogger.getLevel();
+    registryLogger.setLevel(Level.DEBUG);
     logs = new ListAppender<>();
     logs.start();
     registryLogger.addAppender(logs);
@@ -42,6 +52,7 @@ class EventHandlerRegistryTest {
   @AfterEach
   void tearDown() {
     registryLogger.detachAppender(logs);
+    registryLogger.setLevel(previousLevel);
     logs.stop();
   }
 
@@ -368,5 +379,206 @@ class EventHandlerRegistryTest {
 
     assertThat(registry.findMessageClass("test.event")).contains(TestEvent.class);
     assertThat(registry.findMessageClass("other.event")).isEmpty();
+  }
+
+  private IdempotentEventHandlers registerIdempotentHandlers() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    registry.register(
+        TestEvent.class,
+        handlers,
+        IdempotentEventHandlers.class.getMethod("first", TestEvent.class),
+        "test.event",
+        null,
+        null,
+        true,
+        "projector#first");
+    registry.register(
+        TestEvent.class,
+        handlers,
+        IdempotentEventHandlers.class.getMethod("second", TestEvent.class),
+        "test.event",
+        null,
+        null,
+        true,
+        "projector#second");
+    registry.setIdempotentInvoker(
+        new IdempotentInvoker(
+            new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5))));
+    return handlers;
+  }
+
+  @Test
+  void redeliveredEventDoesNotReapplyHandlersThatAlreadySucceeded() throws Exception {
+    IdempotentEventHandlers handlers = registerIdempotentHandlers();
+    handlers.failuresLeft.set(1);
+    TestEvent event = new TestEvent("data");
+
+    assertThatThrownBy(() -> registry.handleRemote(event))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("second failed");
+    registry.handleRemote(event); // redelivery with the same eventId
+
+    assertThat(handlers.firstCalls).hasValue(1);
+    assertThat(handlers.secondCalls).hasValue(1);
+  }
+
+  @Test
+  void sameEventTwiceIsAppliedOncePerHandler() throws Exception {
+    IdempotentEventHandlers handlers = registerIdempotentHandlers();
+    TestEvent event = new TestEvent("data");
+
+    registry.handle(event);
+    registry.handle(event);
+    registry.handle(new TestEvent("other"));
+
+    assertThat(handlers.firstCalls).hasValue(2);
+    assertThat(handlers.secondCalls).hasValue(2);
+    assertThat(logs.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.DEBUG
+                    && e.getFormattedMessage()
+                        .equals(
+                            "Skipping event "
+                                + event.getEventId()
+                                + " already processed by idempotent handler projector#first"));
+  }
+
+  @Test
+  void idempotentHandlerSkippedByItsConditionLeavesNoMarker() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    Expression onlyOther = new SpelExpressionParser().parseExpression("data == 'other'");
+    registry.register(
+        TestEvent.class,
+        handlers,
+        IdempotentEventHandlers.class.getMethod("first", TestEvent.class),
+        "test.event",
+        onlyOther,
+        null,
+        true,
+        "projector#first");
+    InMemoryIdempotencyStore store =
+        new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5));
+    registry.setIdempotentInvoker(new IdempotentInvoker(store));
+
+    TestEvent event = new TestEvent("data");
+
+    registry.handle(event);
+
+    assertThat(handlers.firstCalls).hasValue(0);
+    assertThat(store.tryAcquire("projector#first", event.getEventId()))
+        .isEqualTo(Acquisition.ACQUIRED);
+  }
+
+  @Test
+  void idempotentHandlerWithoutInvokerFailsLoudly() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    registry.register(
+        TestEvent.class,
+        handlers,
+        IdempotentEventHandlers.class.getMethod("first", TestEvent.class),
+        "test.event",
+        null,
+        null,
+        true,
+        "projector#first");
+
+    assertThatThrownBy(() -> registry.handle(new TestEvent("data")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage(
+            "Handler projector#first is @Idempotent but no IdempotencyStore is configured yet;"
+                + " add spring-boot-cqrs-jdbc with a DataSource (the JDBC store needs a single"
+                + " DataSource and a single, or @Primary, PlatformTransactionManager), set"
+                + " cqrs.idempotency.store=in-memory, or define an IdempotencyStore bean");
+    assertThat(handlers.firstCalls).hasValue(0);
+  }
+
+  @Test
+  void rejectsTwoIdempotentHandlersOfTheSameEventWithTheSameHandlerId() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    Method first = IdempotentEventHandlers.class.getMethod("first", TestEvent.class);
+    Method second = IdempotentEventHandlers.class.getMethod("second", TestEvent.class);
+    registry.register(TestEvent.class, handlers, first, "test.event", null, null, true, "shared");
+
+    assertThatThrownBy(
+            () ->
+                registry.register(
+                    TestEvent.class, handlers, second, "test.event", null, null, true, "shared"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage(
+            "Handlers "
+                + first.toGenericString()
+                + " and "
+                + second.toGenericString()
+                + " of event "
+                + TestEvent.class.getName()
+                + " share the @Idempotent handler id 'shared'; give each handler a distinct"
+                + " @Idempotent name");
+    assertThat(registry.getHandlerInfos(TestEvent.class)).hasSize(1);
+  }
+
+  @Test
+  void acceptsTheSameHandlerIdForDifferentEvents() throws Exception {
+    IdempotentEventHandlers handlers = new IdempotentEventHandlers();
+    Method first = IdempotentEventHandlers.class.getMethod("first", TestEvent.class);
+    registry.register(TestEvent.class, handlers, first, "test.event", null, null, true, "shared");
+
+    registry.register(
+        OtherTestEvent.class, handlers, first, "other.event", null, null, true, "shared");
+
+    assertThat(registry.getHandlerInfos(OtherTestEvent.class)).hasSize(1);
+  }
+
+  /** A second event class; the registry does not check the handler's parameter type. */
+  static class OtherTestEvent extends TestEvent {}
+
+  @Test
+  void handlerInfoKeepsTheHandlerId() throws Exception {
+    registerIdempotentHandlers();
+    registry.register(
+        TestEvent.class,
+        new TestEventHandler(),
+        TestEventHandler.class.getMethod("handle", TestEvent.class),
+        "test.event");
+
+    assertThat(registry.getHandlerInfos(TestEvent.class))
+        .extracting(
+            EventHandlerRegistry.HandlerInfo::handlerId,
+            EventHandlerRegistry.HandlerInfo::idempotent)
+        .containsExactly(
+            tuple("projector#first", true), tuple("projector#second", true), tuple(null, false));
+  }
+
+  @Test
+  void handlerInfoWithThePreviousCanonicalSignatureIsNotIdempotent() {
+    EventHandlerRegistry.HandlerInfo info =
+        new EventHandlerRegistry.HandlerInfo(
+            new Object(), MethodHandles.constant(String.class, "x"), "name", null, false);
+
+    assertThat(info.handlerId()).isNull();
+    assertThat(info.idempotent()).isFalse();
+  }
+
+  @Test
+  void checkedFailureOfAnIdempotentHandlerIsWrappedAndReleased() throws Exception {
+    Method method = CheckedThrowingEventHandler.class.getMethod("handle", TestEvent.class);
+    registry.register(
+        TestEvent.class,
+        new CheckedThrowingEventHandler(),
+        method,
+        "test.event",
+        null,
+        null,
+        true,
+        "checked#handle");
+    InMemoryIdempotencyStore store =
+        new InMemoryIdempotencyStore(Duration.ofDays(7), Duration.ofMinutes(5));
+    registry.setIdempotentInvoker(new IdempotentInvoker(store));
+    TestEvent event = new TestEvent("data");
+
+    assertThatThrownBy(() -> registry.handle(event))
+        .isInstanceOf(EventHandlerExecutionException.class);
+    assertThat(store.tryAcquire("checked#handle", event.getEventId()))
+        .isEqualTo(Acquisition.ACQUIRED);
   }
 }

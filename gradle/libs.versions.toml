@@ -20,6 +20,8 @@ micrometer-boot4 = "1.15.10"
 # Micrometer context-propagation: versions managed by the Spring Boot 3.5.12 and 4.0.4 BOMs
 context-propagation = "1.1.4"
 context-propagation-boot4 = "1.2.1"
+# H2: version managed by the Spring Boot 4.0.4 BOM
+h2-boot4 = "2.4.240"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
@@ -28,6 +30,7 @@ spring-kafka = { module = "org.springframework.kafka:spring-kafka" }
 spring-kafka-test = { module = "org.springframework.kafka:spring-kafka-test" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
 spring-boot-starter-json = { module = "org.springframework.boot:spring-boot-starter-json" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
@@ -52,12 +55,16 @@ spring-boot4-starter-validation = { module = "org.springframework.boot:spring-bo
 spring-boot4-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor", version.ref = "spring-boot4" }
 spring-boot4-autoconfigure-processor = { module = "org.springframework.boot:spring-boot-autoconfigure-processor", version.ref = "spring-boot4" }
 spring-boot4-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp", version.ref = "spring-boot4" }
+spring-boot4-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc", version.ref = "spring-boot4" }
 spring-boot4-docker-compose = { module = "org.springframework.boot:spring-boot-docker-compose", version.ref = "spring-boot4" }
 spring-boot4-devtools = { module = "org.springframework.boot:spring-boot-devtools", version.ref = "spring-boot4" }
 
 spring-context = { module = "org.springframework:spring-context", version.ref = "spring-framework" }
 spring-tx = { module = "org.springframework:spring-tx", version.ref = "spring-framework" }
+spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "spring-framework" }
 h2 = { module = "com.h2database:h2" }
+h2-versioned = { module = "com.h2database:h2", version.ref = "h2-boot4" }
+postgresql = { module = "org.postgresql:postgresql" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakarta-validation" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
@@ -83,6 +90,7 @@ testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
 testcontainers-rabbitmq = { module = "org.testcontainers:rabbitmq" }
 testcontainers-kafka = { module = "org.testcontainers:kafka" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
 
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }

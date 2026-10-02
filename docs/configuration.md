@@ -8,6 +8,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 - [Context Propagation Properties](#context-propagation-properties)
 - [Tracing Properties](#tracing-properties)
 - [Retry Properties](#retry-properties)
+- [Idempotency Properties](#idempotency-properties)
 - [Actuator Endpoints](#actuator-endpoints)
 - [Kafka Properties](#kafka-properties)
 - [RabbitMQ Properties](#rabbitmq-properties)
@@ -152,11 +153,29 @@ With `enabled: true`, and no `RetryMiddleware` bean defined by the application, 
 | `exponential` | `min(max-delay, initial-delay * multiplier^(n - 1))` |
 | `exponential-jitter` | the `exponential` delay times a random factor in `[1 - jitter-factor, 1 + jitter-factor]`, capped at `max-delay` |
 
-The default non-retriable exceptions are `java.lang.IllegalArgumentException`, `jakarta.validation.ConstraintViolationException`, `CommandNotRegisteredException` and `QueryNotRegisteredException`; a failure whose exception or any cause matches one of them is never retried.
+The default non-retriable exceptions are `java.lang.IllegalArgumentException`, `jakarta.validation.ConstraintViolationException`, `CommandNotRegisteredException`, `QueryNotRegisteredException` and `DuplicateMessageException`; a failure whose exception or any cause matches one of them is never retried.
 
 Invalid values fail startup with an `InvalidConfigurationPropertyValueException` naming the property: `max-attempts` below 1, a negative delay, `multiplier` below 1, `jitter-factor` outside `[0, 1]`, or an exception class name that cannot be loaded or is not a `Throwable`.
 
 With RabbitMQ or Kafka the middleware runs in the consumer, not on the sender, before the transport retry: the attempts multiply (`cqrs.retry.max-attempts` x `cqrs.rabbitmq.retry.max-attempts`, or x `cqrs.kafka.error-handling.max-attempts`, handler runs before dead-lettering). Per-type policies and the transaction caveat are described in [middleware.md](middleware.md#retrymiddleware).
+
+## Idempotency Properties
+
+See [Idempotent Handlers](idempotency.md).
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `cqrs.idempotency.store` | `jdbc` / `in-memory` | unset | Store of `@Idempotent` handlers. Unset uses the JDBC store when `spring-boot-cqrs-jdbc` and a `DataSource` are present. Write `in-memory` exactly (lowercase, with a hyphen): other spellings such as `IN_MEMORY` do not activate the in-memory store. |
+| `cqrs.idempotency.retention` | `Duration` | `7d` | How long a processed message is remembered; must be positive |
+| `cqrs.idempotency.in-memory.lease` | `Duration` | `5m` | How long a delivery in progress blocks duplicates in the in-memory store |
+| `cqrs.jdbc.initialize-schema` | `embedded` / `always` / `never` | `embedded` | When to create the processed-message table |
+| `cqrs.jdbc.idempotency.table-name` | `String` | `cqrs_processed_message` | Table of processed messages; may be schema-qualified |
+| `cqrs.jdbc.idempotency.cleanup-enabled` | `boolean` | `true` | Delete markers older than the retention periodically |
+| `cqrs.jdbc.idempotency.cleanup-interval` | `Duration` | `1h` | Delay between two cleanups; must be positive |
+
+The JDBC store needs a single `DataSource` and a single `PlatformTransactionManager`, or one of each
+marked `@Primary`. With a second transaction manager (a `KafkaTransactionManager`, a
+`RabbitTransactionManager`) it backs off; mark the JDBC or JPA transaction manager `@Primary`.
 
 ## Actuator Endpoints
 
@@ -301,6 +320,17 @@ cqrs:
       strategy: exponential-jitter
       initial-delay: 100ms
       max-delay: 2s
+  idempotency:
+    store: jdbc                      # jdbc | in-memory; unset = jdbc when available
+    retention: 7d
+    in-memory:
+      lease: 5m
+  jdbc:
+    initialize-schema: embedded      # embedded | always | never
+    idempotency:
+      table-name: cqrs_processed_message
+      cleanup-enabled: true
+      cleanup-interval: 1h
   rabbitmq:
     enabled: true
     prefix: order-service
