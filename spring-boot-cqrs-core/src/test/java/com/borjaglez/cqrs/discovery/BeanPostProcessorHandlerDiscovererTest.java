@@ -1,7 +1,6 @@
 package com.borjaglez.cqrs.discovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -702,9 +701,11 @@ class BeanPostProcessorHandlerDiscovererTest {
   }
 
   @Test
-  void idempotentQueryMethodOnACommandHandlerBeanIsNotTreatedAsMissingAnnotation() {
-    assertThatCode(() -> discoverer.discover(new IdempotentQueryOnCommandBean(), "mixed"))
-        .doesNotThrowAnyException();
+  void idempotentQueryMethodOnANonQueryHandlerBeanIsRejected() {
+    assertThatThrownBy(() -> discoverer.discover(new IdempotentQueryOnCommandBean(), "mixed"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(
+            "is annotated with @Idempotent but not with @HandleCommand or @HandleEvent");
   }
 
   @com.borjaglez.cqrs.command.annotation.CommandHandler

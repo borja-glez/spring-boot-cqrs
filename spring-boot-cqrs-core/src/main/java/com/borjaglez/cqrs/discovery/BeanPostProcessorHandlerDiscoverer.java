@@ -127,8 +127,7 @@ public class BeanPostProcessorHandlerDiscoverer
           method ->
               method.isAnnotationPresent(Idempotent.class)
                   && !method.isAnnotationPresent(HandleCommand.class)
-                  && !method.isAnnotationPresent(HandleEvent.class)
-                  && !method.isAnnotationPresent(HandleQuery.class));
+                  && !method.isAnnotationPresent(HandleEvent.class));
     }
   }
 
