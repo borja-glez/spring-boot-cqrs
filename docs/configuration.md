@@ -8,6 +8,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 - [Context Propagation Properties](#context-propagation-properties)
 - [Tracing Properties](#tracing-properties)
 - [Retry Properties](#retry-properties)
+- [Idempotency Properties](#idempotency-properties)
 - [Actuator Endpoints](#actuator-endpoints)
 - [Kafka Properties](#kafka-properties)
 - [RabbitMQ Properties](#rabbitmq-properties)
@@ -158,6 +159,20 @@ Invalid values fail startup with an `InvalidConfigurationPropertyValueException`
 
 With RabbitMQ or Kafka the middleware runs in the consumer, not on the sender, before the transport retry: the attempts multiply (`cqrs.retry.max-attempts` x `cqrs.rabbitmq.retry.max-attempts`, or x `cqrs.kafka.error-handling.max-attempts`, handler runs before dead-lettering). Per-type policies and the transaction caveat are described in [middleware.md](middleware.md#retrymiddleware).
 
+## Idempotency Properties
+
+See [Idempotent Handlers](idempotency.md).
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `cqrs.idempotency.store` | `jdbc` / `in-memory` | unset | Store of `@Idempotent` handlers. Unset uses the JDBC store when `spring-boot-cqrs-jdbc` and a `DataSource` are present. |
+| `cqrs.idempotency.retention` | `Duration` | `7d` | How long a processed message is remembered; must be positive |
+| `cqrs.idempotency.in-memory.lease` | `Duration` | `5m` | How long a delivery in progress blocks duplicates in the in-memory store |
+| `cqrs.jdbc.initialize-schema` | `embedded` / `always` / `never` | `embedded` | When to create the processed-message table |
+| `cqrs.jdbc.idempotency.table-name` | `String` | `cqrs_processed_message` | Table of processed messages; may be schema-qualified |
+| `cqrs.jdbc.idempotency.cleanup-enabled` | `boolean` | `true` | Delete markers older than the retention periodically |
+| `cqrs.jdbc.idempotency.cleanup-interval` | `Duration` | `1h` | Delay between two cleanups; must be positive |
+
 ## Actuator Endpoints
 
 This library does not introduce its own `cqrs.actuator.*` properties. When `spring-boot-starter-actuator` is on the classpath, the boot3 and boot4 starters expose `/actuator/cqrs` and contribute a `cqrs` section to `/actuator/info`. Standard Spring Boot management properties control them:
@@ -301,6 +316,17 @@ cqrs:
       strategy: exponential-jitter
       initial-delay: 100ms
       max-delay: 2s
+  idempotency:
+    store: jdbc                      # jdbc | in-memory; unset = jdbc when available
+    retention: 7d
+    in-memory:
+      lease: 5m
+  jdbc:
+    initialize-schema: embedded      # embedded | always | never
+    idempotency:
+      table-name: cqrs_processed_message
+      cleanup-enabled: true
+      cleanup-interval: 1h
   rabbitmq:
     enabled: true
     prefix: order-service

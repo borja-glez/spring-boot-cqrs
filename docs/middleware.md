@@ -293,6 +293,10 @@ RetryMiddleware retryMiddleware() {
 
 **Transactions.** Retrying an optimistic-lock failure only helps when the transaction starts inside the retry: in the handler itself, or in a middleware ordered after `RetryMiddleware`. If the caller's transaction wraps the dispatch, it is already marked rollback-only after the first failure and every retry fails too.
 
+Retrying an `@Idempotent` command is safe: a failed attempt leaves no marker, so the next attempt
+runs the handler. Events are still not retried in-process; with `@Idempotent` handlers a transport
+redelivery only re-runs the handlers that failed. See [Idempotent Handlers](idempotency.md).
+
 ## Message Context & Correlation ID
 
 `MessageContext` is an immutable value object living in `com.borjaglez.cqrs.context`. It is the single place from which handlers read propagated metadata.
