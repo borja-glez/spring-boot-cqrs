@@ -26,6 +26,7 @@ public class CqrsProperties {
   private ContextProperties context = new ContextProperties();
   private TracingProperties tracing = new TracingProperties();
   private RetryProperties retry = new RetryProperties();
+  private IdempotencyProperties idempotency = new IdempotencyProperties();
 
   @Getter
   @Setter
@@ -117,5 +118,32 @@ public class CqrsProperties {
       EXPONENTIAL,
       EXPONENTIAL_JITTER
     }
+  }
+
+  @Getter
+  @Setter
+  public static class IdempotencyProperties {
+    /**
+     * Store of @Idempotent handlers: jdbc (the default when spring-boot-cqrs-jdbc and a DataSource
+     * are present) or in-memory (single instance, tests).
+     */
+    private StoreType store;
+
+    /** How long a processed message is remembered. */
+    private Duration retention = Duration.ofDays(7);
+
+    private InMemoryIdempotencyProperties inMemory = new InMemoryIdempotencyProperties();
+
+    public enum StoreType {
+      JDBC,
+      IN_MEMORY
+    }
+  }
+
+  @Getter
+  @Setter
+  public static class InMemoryIdempotencyProperties {
+    /** How long a delivery being processed blocks duplicates in the in-memory store. */
+    private Duration lease = Duration.ofMinutes(5);
   }
 }
