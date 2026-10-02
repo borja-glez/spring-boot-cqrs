@@ -72,6 +72,22 @@ class JdbcIdempotencySchemaInitializerTest {
   }
 
   @Test
+  void embeddedModeSkipsWhenSpringBootCannotTellEmbeddedDatabases() throws Exception {
+    DataSource dataSource = embedded();
+
+    new JdbcIdempotencySchemaInitializer(
+            dataSource, InitializeSchema.EMBEDDED, JdbcIdempotencyStore.DEFAULT_TABLE_NAME, false)
+        .afterPropertiesSet();
+
+    assertThat(tableExists(dataSource, "cqrs_processed_message")).isFalse();
+  }
+
+  @Test
+  void detectsSpringBootEmbeddedDatabaseSupport() {
+    assertThat(JdbcIdempotencySchemaInitializer.EMBEDDED_DATABASE_CHECK_PRESENT).isTrue();
+  }
+
+  @Test
   void neverModeDoesNothing() throws Exception {
     DataSource dataSource = mock(DataSource.class);
     new JdbcIdempotencySchemaInitializer(
