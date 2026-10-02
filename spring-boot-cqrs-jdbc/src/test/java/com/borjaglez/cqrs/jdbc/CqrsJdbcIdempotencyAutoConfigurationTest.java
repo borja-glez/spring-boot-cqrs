@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 
@@ -11,6 +12,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerA
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import com.borjaglez.cqrs.autoconfigure.CqrsAutoConfiguration;
 import com.borjaglez.cqrs.autoconfigure.CqrsIdempotencyAutoConfiguration;
@@ -104,7 +106,26 @@ class CqrsJdbcIdempotencyAutoConfigurationTest {
             context -> {
               assertThat(context).doesNotHaveBean(JdbcIdempotencyStore.class);
               assertThat(context).doesNotHaveBean(JdbcIdempotencyCleanup.class);
+              assertThat(context).doesNotHaveBean(JdbcIdempotencySchemaInitializer.class);
               assertThat(context).hasSingleBean(IdempotentInvoker.class);
+            });
+  }
+
+  @Test
+  void backsOffWhenThereIsMoreThanOneTransactionManager() {
+    contextRunner
+        .withBean(
+            "firstTransactionManager",
+            PlatformTransactionManager.class,
+            () -> mock(PlatformTransactionManager.class))
+        .withBean(
+            "secondTransactionManager",
+            PlatformTransactionManager.class,
+            () -> mock(PlatformTransactionManager.class))
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).doesNotHaveBean(JdbcIdempotencyStore.class);
             });
   }
 

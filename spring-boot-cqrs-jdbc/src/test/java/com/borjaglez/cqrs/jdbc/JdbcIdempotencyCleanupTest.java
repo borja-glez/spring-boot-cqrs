@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
@@ -55,5 +56,26 @@ class JdbcIdempotencyCleanupTest {
     cleanup.stop(); // idempotent
 
     assertThat(cleanup.isRunning()).isFalse();
+  }
+
+  @Test
+  void rejectsNonPositiveRetentionAndInterval() {
+    Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+
+    assertThatThrownBy(
+            () -> new JdbcIdempotencyCleanup(store, Duration.ZERO, Duration.ofMinutes(1), clock))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("retention");
+    assertThatThrownBy(
+            () ->
+                new JdbcIdempotencyCleanup(
+                    store, Duration.ofDays(1), Duration.ofMinutes(-1), clock))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("interval");
+    assertThatThrownBy(
+            () ->
+                new JdbcIdempotencyCleanup(
+                    store, Duration.ofDays(-1), Duration.ofMinutes(1), clock))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

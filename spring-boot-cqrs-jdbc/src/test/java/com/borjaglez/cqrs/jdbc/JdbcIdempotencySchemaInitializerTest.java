@@ -92,6 +92,22 @@ class JdbcIdempotencySchemaInitializerTest {
   }
 
   @Test
+  void schemaQualifiedTableGetsAnUnqualifiedIndexName() throws Exception {
+    DataSource dataSource = embedded();
+    new JdbcIdempotencySchemaInitializer(dataSource, InitializeSchema.ALWAYS, "PUBLIC.markers")
+        .afterPropertiesSet();
+
+    assertThat(tableExists(dataSource, "markers")).isTrue();
+    assertThat(
+            new JdbcTemplate(dataSource)
+                .queryForObject(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.INDEXES"
+                        + " WHERE LOWER(INDEX_NAME) = 'markers_at'",
+                    Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
   void rejectsAnUnsafeTableName() {
     assertThatThrownBy(
             () ->

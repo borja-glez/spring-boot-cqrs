@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandi
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,7 +43,6 @@ import com.borjaglez.cqrs.idempotency.IdempotencyStore;
     beforeName = "com.borjaglez.cqrs.autoconfigure.CqrsIdempotencyAutoConfiguration")
 @ConditionalOnClass(JdbcTemplate.class)
 @ConditionalOnSingleCandidate(DataSource.class)
-@ConditionalOnBean(PlatformTransactionManager.class)
 @ConditionalOnProperty(
     prefix = "cqrs.idempotency",
     name = "store",
@@ -53,38 +53,44 @@ public class CqrsJdbcIdempotencyAutoConfiguration {
 
   static final Duration DEFAULT_RETENTION = Duration.ofDays(7);
 
-  @Bean
-  @ConditionalOnMissingBean
-  public JdbcIdempotencySchemaInitializer jdbcIdempotencySchemaInitializer(
-      DataSource dataSource, JdbcCqrsProperties properties) {
-    return new JdbcIdempotencySchemaInitializer(
-        dataSource, properties.getInitializeSchema(), properties.getIdempotency().getTableName());
-  }
+  /** Nested so that both the DataSource and the transaction manager must be a single candidate. */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnSingleCandidate(PlatformTransactionManager.class)
+  static class JdbcIdempotencyConfiguration {
 
-  @Bean
-  @ConditionalOnMissingBean(IdempotencyStore.class)
-  @DependsOn("jdbcIdempotencySchemaInitializer")
-  public JdbcIdempotencyStore jdbcIdempotencyStore(
-      DataSource dataSource,
-      PlatformTransactionManager transactionManager,
-      JdbcCqrsProperties properties) {
-    return new JdbcIdempotencyStore(
-        dataSource, transactionManager, properties.getIdempotency().getTableName());
-  }
+    @Bean
+    @ConditionalOnMissingBean({JdbcIdempotencySchemaInitializer.class, IdempotencyStore.class})
+    public JdbcIdempotencySchemaInitializer jdbcIdempotencySchemaInitializer(
+        DataSource dataSource, JdbcCqrsProperties properties) {
+      return new JdbcIdempotencySchemaInitializer(
+          dataSource, properties.getInitializeSchema(), properties.getIdempotency().getTableName());
+    }
 
-  @Bean
-  @ConditionalOnMissingBean
-  @ConditionalOnBean(JdbcIdempotencyStore.class)
-  @ConditionalOnBooleanProperty(
-      name = "cqrs.jdbc.idempotency.cleanup-enabled",
-      matchIfMissing = true)
-  public JdbcIdempotencyCleanup jdbcIdempotencyCleanup(
-      JdbcIdempotencyStore store, JdbcCqrsProperties properties, Environment environment) {
-    Duration retention =
-        Binder.get(environment)
-            .bind("cqrs.idempotency.retention", Duration.class)
-            .orElse(DEFAULT_RETENTION);
-    return new JdbcIdempotencyCleanup(
-        store, retention, properties.getIdempotency().getCleanupInterval(), Clock.systemUTC());
+    @Bean
+    @ConditionalOnMissingBean(IdempotencyStore.class)
+    @DependsOn("jdbcIdempotencySchemaInitializer")
+    public JdbcIdempotencyStore jdbcIdempotencyStore(
+        DataSource dataSource,
+        PlatformTransactionManager transactionManager,
+        JdbcCqrsProperties properties) {
+      return new JdbcIdempotencyStore(
+          dataSource, transactionManager, properties.getIdempotency().getTableName());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(JdbcIdempotencyStore.class)
+    @ConditionalOnBooleanProperty(
+        name = "cqrs.jdbc.idempotency.cleanup-enabled",
+        matchIfMissing = true)
+    public JdbcIdempotencyCleanup jdbcIdempotencyCleanup(
+        JdbcIdempotencyStore store, JdbcCqrsProperties properties, Environment environment) {
+      Duration retention =
+          Binder.get(environment)
+              .bind("cqrs.idempotency.retention", Duration.class)
+              .orElse(DEFAULT_RETENTION);
+      return new JdbcIdempotencyCleanup(
+          store, retention, properties.getIdempotency().getCleanupInterval(), Clock.systemUTC());
+    }
   }
 }

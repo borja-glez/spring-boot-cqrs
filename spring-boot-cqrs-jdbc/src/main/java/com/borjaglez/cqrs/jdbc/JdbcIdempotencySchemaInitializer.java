@@ -21,6 +21,8 @@ public class JdbcIdempotencySchemaInitializer implements InitializingBean {
 
   public static final String SCHEMA_LOCATION = "com/borjaglez/cqrs/jdbc/schema-idempotency.sql";
 
+  private static final String DEFAULT_INDEX_NAME = JdbcIdempotencyStore.DEFAULT_TABLE_NAME + "_at";
+
   private final DataSource dataSource;
   private final InitializeSchema mode;
   private final String tableName;
@@ -53,9 +55,15 @@ public class JdbcIdempotencySchemaInitializer implements InitializingBean {
     try {
       return new ClassPathResource(SCHEMA_LOCATION)
           .getContentAsString(StandardCharsets.UTF_8)
+          .replace(DEFAULT_INDEX_NAME, unqualified(tableName) + "_at")
           .replace(JdbcIdempotencyStore.DEFAULT_TABLE_NAME, tableName);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /** The index lives in the table's schema, so its own name must not be qualified. */
+  private static String unqualified(String tableName) {
+    return tableName.substring(tableName.lastIndexOf('.') + 1);
   }
 }

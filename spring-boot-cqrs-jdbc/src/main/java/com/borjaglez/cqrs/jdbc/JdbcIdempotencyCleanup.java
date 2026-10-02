@@ -26,6 +26,12 @@ public class JdbcIdempotencyCleanup implements SmartLifecycle {
 
   public JdbcIdempotencyCleanup(
       JdbcIdempotencyStore store, Duration retention, Duration interval, Clock clock) {
+    if (retention.isZero() || retention.isNegative()) {
+      throw new IllegalArgumentException("retention must be positive: " + retention);
+    }
+    if (interval.toMillis() <= 0) {
+      throw new IllegalArgumentException("interval must be at least 1 ms: " + interval);
+    }
     this.store = store;
     this.retention = retention;
     this.interval = interval;
