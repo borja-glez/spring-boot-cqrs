@@ -218,6 +218,14 @@ class CqrsJdbcOutboxAutoConfigurationTest {
   }
 
   @Test
+  void logsTheEventBusTheRelayPublishesThrough(CapturedOutput output) {
+    enabled.run(context -> assertThat(context).hasNotFailed());
+
+    assertThat(output)
+        .contains("The outbox relay publishes through the event bus 'remoteEventBus'");
+  }
+
+  @Test
   void rabbitMqTargetWithoutConfirmsLogsAWarning(CapturedOutput output) {
     base.withPropertyValues("cqrs.outbox.enabled=true")
         .withConfiguration(AutoConfigurations.of(RabbitBusConfiguration.class))

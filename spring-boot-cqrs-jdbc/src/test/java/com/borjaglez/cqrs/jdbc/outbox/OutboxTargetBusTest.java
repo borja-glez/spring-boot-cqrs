@@ -37,7 +37,7 @@ class OutboxTargetBusTest {
             OutboxTargetBus.resolve(
                 buses("springEventBus", local, "kafkaEventBus", kafka, "outboxEventBus", outbox),
                 null))
-        .isSameAs(kafka);
+        .isEqualTo("kafkaEventBus");
   }
 
   @Test
@@ -45,12 +45,13 @@ class OutboxTargetBusTest {
     assertThat(
             OutboxTargetBus.resolve(
                 buses("springEventBus", local, "kafkaEventBus", kafka), "springEventBus"))
-        .isSameAs(local);
+        .isEqualTo("springEventBus");
   }
 
   @Test
   void blankConfiguredNameIsIgnored() {
-    assertThat(OutboxTargetBus.resolve(buses("kafkaEventBus", kafka), " ")).isSameAs(kafka);
+    assertThat(OutboxTargetBus.resolve(buses("kafkaEventBus", kafka), " "))
+        .isEqualTo("kafkaEventBus");
   }
 
   @Test

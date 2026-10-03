@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.jdbc.outbox;
 
 import java.time.Clock;
+import java.util.Map;
 
 import javax.sql.DataSource;
 
@@ -105,9 +106,10 @@ public class CqrsJdbcOutboxAutoConfiguration {
           OutboxProperties properties,
           Environment environment) {
         OutboxProperties.Relay relay = properties.getRelay();
-        EventBus target =
-            OutboxTargetBus.resolve(
-                beanFactory.getBeansOfType(EventBus.class), relay.getEventBus());
+        Map<String, EventBus> buses = beanFactory.getBeansOfType(EventBus.class);
+        String targetName = OutboxTargetBus.resolve(buses, relay.getEventBus());
+        EventBus target = buses.get(targetName);
+        LOG.info("The outbox relay publishes through the event bus '" + targetName + "'");
         if (OutboxTargetBus.publishesWithoutConfirms(target, environment)) {
           LOG.warn(
               "The outbox relays through RabbitMQ without publisher confirms: rows are marked"

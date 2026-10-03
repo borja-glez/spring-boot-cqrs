@@ -18,7 +18,8 @@ final class OutboxTargetBus {
 
   private OutboxTargetBus() {}
 
-  static EventBus resolve(Map<String, EventBus> buses, String configuredName) {
+  /** The bean name of the event bus the relay publishes through. */
+  static String resolve(Map<String, EventBus> buses, String configuredName) {
     if (StringUtils.hasText(configuredName)) {
       EventBus bus = buses.get(configuredName);
       if (bus == null) {
@@ -33,7 +34,7 @@ final class OutboxTargetBus {
         throw new IllegalStateException(
             PROPERTY + " cannot name the outbox bus itself ('" + configuredName + "')");
       }
-      return bus;
+      return configuredName;
     }
     Map<String, EventBus> candidates = new TreeMap<>();
     buses.forEach(
@@ -43,7 +44,7 @@ final class OutboxTargetBus {
           }
         });
     if (candidates.size() == 1) {
-      return candidates.values().iterator().next();
+      return candidates.keySet().iterator().next();
     }
     String problem =
         candidates.isEmpty()
