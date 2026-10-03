@@ -130,24 +130,31 @@ public class OutboxEventTypeResolver {
   }
 
   private static Map<String, String> readGeneratedIndex(ClassLoader classLoader) {
-    try {
-      InputStream in = classLoader.getResourceAsStream(INDEX_LOCATION);
-      if (in == null) {
-        return null;
-      }
-      Properties properties = new Properties();
-      try {
-        properties.load(in);
-      } finally {
-        in.close();
-      }
-      Map<String, String> names = new HashMap<>();
-      properties
-          .stringPropertyNames()
-          .forEach(name -> names.put(name, properties.getProperty(name)));
-      return names;
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+    InputStream in = classLoader.getResourceAsStream(INDEX_LOCATION);
+    if (in == null) {
+      return null;
     }
+    Properties properties = new Properties();
+    IOException failure = null;
+    try {
+      properties.load(in);
+    } catch (IOException e) {
+      failure = e;
+    }
+    try {
+      in.close();
+    } catch (IOException e) {
+      if (failure == null) {
+        failure = e;
+      } else {
+        failure.addSuppressed(e);
+      }
+    }
+    if (failure != null) {
+      throw new UncheckedIOException(failure);
+    }
+    Map<String, String> names = new HashMap<>();
+    properties.stringPropertyNames().forEach(name -> names.put(name, properties.getProperty(name)));
+    return names;
   }
 }

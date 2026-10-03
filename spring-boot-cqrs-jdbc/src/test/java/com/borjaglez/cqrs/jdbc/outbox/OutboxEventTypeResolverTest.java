@@ -135,7 +135,8 @@ class OutboxEventTypeResolverTest {
         };
 
     assertThatThrownBy(() -> resolver(Set.of(), loader).resolve("x", "com.example.Gone"))
-        .isInstanceOf(UncheckedIOException.class);
+        .isInstanceOf(UncheckedIOException.class)
+        .hasRootCauseMessage("unreadable");
   }
 
   @Test
@@ -159,7 +160,30 @@ class OutboxEventTypeResolverTest {
         };
 
     assertThatThrownBy(() -> resolver(Set.of(), loader).resolve("x", "com.example.Gone"))
-        .isInstanceOf(UncheckedIOException.class);
+        .isInstanceOf(UncheckedIOException.class)
+        .hasRootCauseMessage("unreadable")
+        .cause()
+        .hasSuppressedException(new IOException("not closable"));
+  }
+
+  @Test
+  void anIndexThatFailsToCloseIsReported() {
+    ClassLoader loader =
+        new ClassLoader(classLoader) {
+          @Override
+          public InputStream getResourceAsStream(String name) {
+            return new ByteArrayInputStream(new byte[0]) {
+              @Override
+              public void close() throws IOException {
+                throw new IOException("not closable");
+              }
+            };
+          }
+        };
+
+    assertThatThrownBy(() -> resolver(Set.of(), loader).resolve("x", "com.example.Gone"))
+        .isInstanceOf(UncheckedIOException.class)
+        .hasRootCauseMessage("not closable");
   }
 
   @Test
