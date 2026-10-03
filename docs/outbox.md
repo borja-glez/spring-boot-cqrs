@@ -86,26 +86,49 @@ cqrs:
   relay committed, the event is published again. Make consumers idempotent with
   [`@Idempotent`](idempotency.md).
 - **Order.** With one relaying instance, events are published in insertion order (except around a
-  row that was set aside, below). Several instances never publish the same row twice, but their
-  batches run in parallel and are not ordered against each other. When strict order matters, set
-  `cqrs.outbox.relay.enabled=false` on every instance but one.
+  row that was set aside, below). Several instances never publish the same row concurrently, but
+  their batches run in parallel and are not ordered against each other. When strict order matters,
+  set `cqrs.outbox.relay.enabled=false` on every instance but one.
 - **Broker outages.** A failure of the event bus (broker down, timeout, rejection) stops the
   batch, increments `attempts`, stores `last_error`, and is retried at the next run, forever. No
   event is skipped.
 - The batch transaction stays open while it publishes (it holds the row locks): keep
   `batch-size` moderate.
+- **Kafka timeouts.** While the broker is unreachable, a Kafka send blocks for up to
+  `max.block.ms` (60 s by default) and waits up to `delivery.timeout.ms` (120 s) for the
+  acknowledgement, and the batch transaction and its row locks stay open that long. Lower them
+  for the relaying application (they apply to its Kafka producer; `delivery.timeout.ms` must be at
+  least `linger.ms` + `request.timeout.ms`):
+
+  ```yaml
+  spring:
+    kafka:
+      producer:
+        properties:
+          max.block.ms: 10000
+          request.timeout.ms: 10000
+          delivery.timeout.ms: 30000
+  ```
 
 ## Rows that cannot be read
 
-A row whose class cannot be found (by logical name, then by class name), whose payload cannot be
-deserialized, or whose stored message context or trace cannot be read is retried like any failure. During a rolling deploy this gives the new class time to
-reach the relaying instance. After `cqrs.outbox.relay.max-attempts` attempts (10) it is **set
-aside**: `failed_at` is set, an ERROR is logged, and later rows continue. Set-aside rows are never
-deleted automatically. To retry one:
+A row whose class cannot be found or linked (by logical name, then by class name), whose payload
+cannot be deserialized, or whose stored message context or trace cannot be read is retried like
+any failure: the batch stops there and the next run tries again. Each such failure increments
+`read_failures`; `attempts` counts every failed attempt, event bus failures included. Once
+`read_failures` reaches `cqrs.outbox.relay.max-attempts` (10) the row is **set aside**:
+`failed_at` is set, an ERROR is logged, and later rows continue. Event bus failures never set a
+row aside. Set-aside rows are never deleted automatically. To retry one:
 
 ```sql
 UPDATE cqrs_outbox SET failed_at = NULL, attempts = 0, read_failures = 0 WHERE event_id = '...';
 ```
+
+The retry window is about `max-attempts` x `interval` (10 seconds by default) and is shared by all
+instances: every relay that fails to read the row counts a failure. During a rolling deploy, old
+instances that do not have a new event class yet can set its rows aside before the new instances
+take over. To avoid it, raise `cqrs.outbox.relay.max-attempts`, ship new event classes one release
+before you publish them, or set `cqrs.outbox.relay.enabled=false` on the old instances.
 
 ## Renaming event classes
 
@@ -141,6 +164,11 @@ CREATE INDEX IF NOT EXISTS cqrs_outbox_pending ON cqrs_outbox (id) WHERE publish
 CREATE INDEX IF NOT EXISTS cqrs_outbox_published ON cqrs_outbox (published_at) WHERE published_at IS NOT NULL;
 ```
 
+`event_id` holds up to 64 characters: publishing an event whose custom event id is longer fails
+the insert, and with it the caller's transaction. `created_at`, `published_at` and `failed_at` are
+`TIMESTAMP` without time zone written from an `Instant` in the JVM's time zone; run every instance
+in the same time zone (UTC is simplest) so that the retention cutoffs of all instances agree.
+
 PostgreSQL and H2 are supported. Another database works if you create an equivalent table and it
 accepts `SELECT ... FETCH FIRST n ROWS ONLY FOR UPDATE SKIP LOCKED`.
 
@@ -174,7 +202,7 @@ logical-name index (`META-INF/cqrs/outbox-event-names.properties`) are generated
 | `cqrs.outbox.relay.event-bus` | unset | Bean name of the event bus to publish through |
 | `cqrs.outbox.relay.interval` | `1s` | Delay between two relay runs |
 | `cqrs.outbox.relay.batch-size` | `100` | Rows relayed per transaction |
-| `cqrs.outbox.relay.max-attempts` | `10` | Failed reads after which an unreadable row is set aside; bus failures never set a row aside |
+| `cqrs.outbox.relay.max-attempts` | `10` | Failed reads (`read_failures`) after which an unreadable row is set aside; bus failures never set a row aside |
 | `cqrs.jdbc.outbox.table-name` | `cqrs_outbox` | Outbox table; may be schema-qualified |
 | `cqrs.jdbc.outbox.cleanup-enabled` | `true` | Delete published rows older than the retention |
 | `cqrs.jdbc.outbox.cleanup-interval` | `1h` | Delay between two cleanups |

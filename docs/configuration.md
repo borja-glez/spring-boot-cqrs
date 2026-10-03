@@ -189,7 +189,7 @@ See [Transactional Outbox](outbox.md).
 | `cqrs.outbox.relay.event-bus` | `String` | unset | Bean name of the `EventBus` to publish through; unset uses the only one other than `springEventBus` |
 | `cqrs.outbox.relay.interval` | `Duration` | `1s` | Delay between two relay runs; must be positive |
 | `cqrs.outbox.relay.batch-size` | `int` | `100` | Rows relayed per transaction; at least 1 |
-| `cqrs.outbox.relay.max-attempts` | `int` | `10` | Failed reads after which an unreadable row is set aside; at least 1 |
+| `cqrs.outbox.relay.max-attempts` | `int` | `10` | Failed reads (`read_failures`) after which an unreadable row is set aside; event bus failures never set a row aside; at least 1 |
 | `cqrs.jdbc.outbox.table-name` | `String` | `cqrs_outbox` | Outbox table; may be schema-qualified |
 | `cqrs.jdbc.outbox.cleanup-enabled` | `boolean` | `true` | Delete published rows older than the retention periodically |
 | `cqrs.jdbc.outbox.cleanup-interval` | `Duration` | `1h` | Delay between two cleanups; must be positive |
