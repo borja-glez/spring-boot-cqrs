@@ -116,7 +116,7 @@ Implements `EventBus`. Publishes events to the events topic.
 
 - `publish(event)` returns only after the broker has acknowledged the record. If the send fails (for example, the broker is unreachable), the exception thrown by `KafkaMessagePublisher.publish` is rethrown unchanged and the event is **not** delivered in-process: there is no local fallback. Local handlers receive a published event through this application's own event consumer group
 - `publish(List<Event>)` publishes the events one by one, in order, and stops at the first failure, rethrowing it. The events before the failing one have been sent; the failing one and those after it have not. There is no batching or rollback
-- It is not wrapped by the transactional event bus: a caller inside a transaction publishes before the commit. For reliable publication consistent with the database, use the Outbox Pattern (see [Transactional event publishing](../README.md#transactional-event-publishing))
+- It is not wrapped by the transactional event bus: a caller inside a transaction publishes before the commit. For reliable publication consistent with the database, publish through the transactional outbox of spring-boot-cqrs-jdbc (see [Transactional Outbox](outbox.md))
 
 ### KafkaQueryBus
 

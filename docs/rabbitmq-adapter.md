@@ -130,7 +130,7 @@ Implements `EventBus`. Publishes events to the event exchange.
 - `publish(event)` sends the event to the events exchange. If the send fails (for example, the broker is unreachable), the `AmqpException` thrown by `RabbitMqPublisher.publish` is rethrown unchanged and the event is **not** delivered in-process: there is no local fallback. Local handlers receive a published event through this application's own events queue
 - Without publisher confirms (the default), `publish(event)` returns once the message has been written to the channel, before the broker has accepted it: a message the broker drops afterwards is not detected. Enable [publisher confirms](#publisher-confirms) when the caller needs to know that the broker accepted the event
 - `publish(List<Event>)` publishes the events one by one, in order, and stops at the first failure, rethrowing it. The events before the failing one have been sent; the failing one and those after it have not. There is no batching or rollback
-- It is not wrapped by the transactional event bus: a caller inside a transaction publishes before the commit. For reliable publication consistent with the database, use the Outbox Pattern (see [Transactional event publishing](../README.md#transactional-event-publishing))
+- It is not wrapped by the transactional event bus: a caller inside a transaction publishes before the commit. For reliable publication consistent with the database, publish through the transactional outbox of spring-boot-cqrs-jdbc (see [Transactional Outbox](outbox.md))
 
 #### Publisher confirms
 

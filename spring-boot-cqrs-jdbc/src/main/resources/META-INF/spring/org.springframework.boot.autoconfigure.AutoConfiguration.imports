@@ -1,1 +1,2 @@
 com.borjaglez.cqrs.jdbc.CqrsJdbcIdempotencyAutoConfiguration
+com.borjaglez.cqrs.jdbc.outbox.CqrsJdbcOutboxAutoConfiguration

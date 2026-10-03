@@ -36,8 +36,9 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
  * There is no batching or rollback.
  *
  * <p>This bus is not wrapped by the transactional event bus, so a caller inside a transaction
- * publishes before the transaction commits. Use an outbox when publication has to be reliable and
- * consistent with the transaction.
+ * publishes before the transaction commits. When publication has to be reliable and consistent with
+ * the transaction, publish through {@code OutboxEventBus} of spring-boot-cqrs-jdbc, which stores
+ * the event in the transaction and relays it through this bus after commit.
  */
 public class RabbitMqEventBus implements EventBus {
 
