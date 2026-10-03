@@ -168,7 +168,7 @@ See [Idempotent Handlers](idempotency.md).
 | `cqrs.idempotency.store` | `jdbc` / `in-memory` | unset | Store of `@Idempotent` handlers. Unset uses the JDBC store when `spring-boot-cqrs-jdbc` and a `DataSource` are present. Write `in-memory` exactly (lowercase, with a hyphen): other spellings such as `IN_MEMORY` do not activate the in-memory store. |
 | `cqrs.idempotency.retention` | `Duration` | `7d` | How long a processed message is remembered; must be positive |
 | `cqrs.idempotency.in-memory.lease` | `Duration` | `5m` | How long a delivery in progress blocks duplicates in the in-memory store |
-| `cqrs.jdbc.initialize-schema` | `embedded` / `always` / `never` | `embedded` | When to create the processed-message table |
+| `cqrs.jdbc.initialize-schema` | `embedded` / `always` / `never` | `embedded` | When to create the library's tables (processed messages, outbox) |
 | `cqrs.jdbc.idempotency.table-name` | `String` | `cqrs_processed_message` | Table of processed messages; may be schema-qualified |
 | `cqrs.jdbc.idempotency.cleanup-enabled` | `boolean` | `true` | Delete markers older than the retention periodically |
 | `cqrs.jdbc.idempotency.cleanup-interval` | `Duration` | `1h` | Delay between two cleanups; must be positive |
@@ -176,6 +176,23 @@ See [Idempotent Handlers](idempotency.md).
 The JDBC store needs a single `DataSource` and a single `PlatformTransactionManager`, or one of each
 marked `@Primary`. With a second transaction manager (a `KafkaTransactionManager`, a
 `RabbitTransactionManager`) it backs off; mark the JDBC or JPA transaction manager `@Primary`.
+
+## Outbox Properties
+
+See [Transactional Outbox](outbox.md).
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `cqrs.outbox.enabled` | `boolean` | `false` | Store events published through `OutboxEventBus` and relay them after commit |
+| `cqrs.outbox.retention` | `Duration` | `7d` | How long published rows are kept; must be positive |
+| `cqrs.outbox.relay.enabled` | `boolean` | `true` | Whether this instance relays pending rows |
+| `cqrs.outbox.relay.event-bus` | `String` | unset | Bean name of the `EventBus` to publish through; unset uses the only one other than `springEventBus` |
+| `cqrs.outbox.relay.interval` | `Duration` | `1s` | Delay between two relay runs; must be positive |
+| `cqrs.outbox.relay.batch-size` | `int` | `100` | Rows relayed per transaction; at least 1 |
+| `cqrs.outbox.relay.max-attempts` | `int` | `10` | Failed reads after which an unreadable row is set aside; at least 1 |
+| `cqrs.jdbc.outbox.table-name` | `String` | `cqrs_outbox` | Outbox table; may be schema-qualified |
+| `cqrs.jdbc.outbox.cleanup-enabled` | `boolean` | `true` | Delete published rows older than the retention periodically |
+| `cqrs.jdbc.outbox.cleanup-interval` | `Duration` | `1h` | Delay between two cleanups; must be positive |
 
 ## Actuator Endpoints
 
@@ -331,6 +348,18 @@ cqrs:
       table-name: cqrs_processed_message
       cleanup-enabled: true
       cleanup-interval: 1h
+    outbox:
+      table-name: cqrs_outbox
+      cleanup-enabled: true
+      cleanup-interval: 1h
+  outbox:
+    enabled: false
+    retention: 7d
+    relay:
+      enabled: true
+      interval: 1s
+      batch-size: 100
+      max-attempts: 10
   rabbitmq:
     enabled: true
     prefix: order-service

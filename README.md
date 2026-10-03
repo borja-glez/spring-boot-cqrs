@@ -138,7 +138,7 @@ That is all you need. The starter auto-configures the bus, discovers your handle
 | `spring-boot-cqrs-boot4-starter` | Spring Boot 4 auto-configuration |
 | `spring-boot-cqrs-kafka` | Distributed messaging adapter for Kafka with request/reply support and configurable partition keys |
 | `spring-boot-cqrs-rabbitmq` | Distributed messaging adapter with retry and dead-letter queue support |
-| `spring-boot-cqrs-jdbc` | JDBC idempotency store for `@Idempotent` handlers |
+| `spring-boot-cqrs-jdbc` | JDBC idempotency store for `@Idempotent` handlers and transactional outbox for reliable event publication |
 | `spring-boot-cqrs-test` | Test utilities: spy/in-memory buses, AssertJ assertions, `@CqrsTest` slice annotation |
 | `examples` | Runnable sample applications |
 
@@ -235,7 +235,7 @@ cqrs:
     transactional: false
 ```
 
-This improves transactional consistency, but it is **not** a durable delivery mechanism for external brokers. If you need reliable broker publication, use the **Outbox Pattern**. See **[examples/example-outbox](examples/example-outbox)** for a complete optional example.
+This improves transactional consistency, but it is **not** a durable delivery mechanism for external brokers: the event is lost if the process stops or the broker is down after commit. To publish to Kafka or RabbitMQ reliably, enable the transactional outbox of `spring-boot-cqrs-jdbc` and publish through `OutboxEventBus`: the event is stored in your transaction and relayed after commit, at least once. See [docs/outbox.md](docs/outbox.md) and [examples/example-outbox](examples/example-outbox).
 
 ### Queries
 
@@ -606,7 +606,7 @@ See [docs/configuration.md](docs/configuration.md) for full details with YAML ex
 The repository includes five example applications:
 
 - **[example-basic](examples/example-basic)** -- Commands, events, queries, and a REST controller (Spring Boot 3)
-- **[example-outbox](examples/example-outbox)** -- Optional Outbox Pattern with JPA, H2, and scheduled publication (Spring Boot 3)
+- **[example-outbox](examples/example-outbox)** -- Transactional outbox with PostgreSQL and Kafka (Spring Boot 3)
 - **[example-middleware](examples/example-middleware)** -- Custom logging, authorization, and transactional middleware (Spring Boot 3)
 - **[example-rabbitmq](examples/example-rabbitmq)** -- Distributed messaging with RabbitMQ (Spring Boot 3)
 - **[boot4-demo](examples/boot4-demo)** -- Minimal example running on Spring Boot 4
@@ -618,6 +618,7 @@ The repository includes five example applications:
 - [Kafka Adapter](docs/kafka-adapter.md) -- Topics, request/reply, partition keys, consumers
 - [RabbitMQ Adapter](docs/rabbitmq-adapter.md) -- Exchanges, queues, retry, dead-letter, consumers
 - [Idempotent Handlers](docs/idempotency.md) -- @Idempotent, stores, schema, retention
+- [Transactional Outbox](docs/outbox.md) -- OutboxEventBus, relay, guarantees, schema
 - [Configuration Reference](docs/configuration.md) -- All properties with YAML examples
 - [Actuator Endpoints](docs/actuator.md) -- `/actuator/cqrs`, `info` contributor, transport health
 - [Testing](docs/testing.md) -- Test utilities: spy buses, in-memory buses, AssertJ assertions, `@CqrsTest` slice
