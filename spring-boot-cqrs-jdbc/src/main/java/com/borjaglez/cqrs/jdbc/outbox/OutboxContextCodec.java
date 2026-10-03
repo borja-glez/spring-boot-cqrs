@@ -40,18 +40,37 @@ public class OutboxContextCodec {
 
   /** Runs {@code action} with the captured context restored and inside the captured trace. */
   public void runWithin(byte[] captured, Runnable action) {
-    Map<String, Map<String, String>> decoded = decode(captured);
-    MessageContext context = MessageContext.of(decoded.getOrDefault(CONTEXT_KEY, Map.of()));
-    try (MessageContext.Scope ignored = MessageContext.scope(context)) {
-      tracing.run(decoded.getOrDefault(TRACE_KEY, Map.of()), action);
+    runWithin(decode(captured), action);
+  }
+
+  /**
+   * Same as {@link #runWithin(byte[], Runnable)} for an already {@linkplain #decode decoded}
+   * capture.
+   */
+  public void runWithin(Captured captured, Runnable action) {
+    try (MessageContext.Scope ignored =
+        MessageContext.scope(MessageContext.of(captured.context()))) {
+      tracing.run(captured.trace(), action);
     }
   }
 
+  /**
+   * Reads a stored capture; {@code null} gives {@link Captured#NONE}. Fails on unreadable bytes.
+   */
   @SuppressWarnings("unchecked")
-  private Map<String, Map<String, String>> decode(byte[] captured) {
+  public Captured decode(byte[] captured) {
     if (captured == null) {
-      return Map.of();
+      return Captured.NONE;
     }
-    return (Map<String, Map<String, String>>) serializer.deserialize(captured, Map.class);
+    Map<String, Map<String, String>> decoded =
+        (Map<String, Map<String, String>>) serializer.deserialize(captured, Map.class);
+    return new Captured(
+        decoded.getOrDefault(CONTEXT_KEY, Map.of()), decoded.getOrDefault(TRACE_KEY, Map.of()));
+  }
+
+  /** A decoded capture: the message context entries and the trace headers. */
+  public record Captured(Map<String, String> context, Map<String, String> trace) {
+
+    public static final Captured NONE = new Captured(Map.of(), Map.of());
   }
 }

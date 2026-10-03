@@ -73,7 +73,7 @@ class OutboxContextCodecTest {
     AtomicReference<Boolean> empty = new AtomicReference<>();
 
     try (MessageContext.Scope ignored = correlation("outer")) {
-      codec.runWithin(null, () -> empty.set(MessageContext.current().isEmpty()));
+      codec.runWithin((byte[]) null, () -> empty.set(MessageContext.current().isEmpty()));
       assertThat(MessageContext.current().correlationId()).isEqualTo("outer");
     }
 
@@ -97,6 +97,27 @@ class OutboxContextCodecTest {
                     }))
         .hasMessage("boom");
     assertThat(MessageContext.current().isEmpty()).isTrue();
+  }
+
+  @Test
+  void decodeOfNothingIsEmptyAndRunWithinAcceptsADecodedCapture() {
+    byte[] captured;
+    try (MessageContext.Scope ignored = correlation("corr-3")) {
+      captured = codec.capture();
+    }
+    AtomicReference<String> seen = new AtomicReference<>();
+
+    assertThat(codec.decode(null)).isEqualTo(OutboxContextCodec.Captured.NONE);
+    codec.runWithin(
+        codec.decode(captured), () -> seen.set(MessageContext.current().correlationId()));
+
+    assertThat(seen).hasValue("corr-3");
+  }
+
+  @Test
+  void corruptBytesFailToDecode() {
+    assertThatThrownBy(() -> codec.decode("not json".getBytes()))
+        .isInstanceOf(RuntimeException.class);
   }
 
   @Test
