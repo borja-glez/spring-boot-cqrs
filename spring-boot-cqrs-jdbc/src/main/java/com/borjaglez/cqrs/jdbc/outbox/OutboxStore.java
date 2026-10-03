@@ -1,5 +1,6 @@
 package com.borjaglez.cqrs.jdbc.outbox;
 
+import java.sql.DatabaseMetaData;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Clock;
@@ -10,6 +11,8 @@ import javax.sql.DataSource;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.SqlParameterValue;
+import org.springframework.jdbc.support.JdbcUtils;
+import org.springframework.jdbc.support.MetaDataAccessException;
 
 import com.borjaglez.cqrs.jdbc.JdbcIdempotencyStore;
 
@@ -28,7 +31,9 @@ public class OutboxStore {
   private final JdbcTemplate jdbc;
   private final Clock clock;
   private final String insertSql;
-  private final String lockSql;
+  private final DataSource dataSource;
+  private final String table;
+  private volatile String lockSql;
   private final String publishedSql;
   private final String failedSql;
   private final String deleteSql;
@@ -46,13 +51,8 @@ public class OutboxStore {
             + table
             + " (event_id, event_name, event_class, payload, context, created_at)"
             + " VALUES (?, ?, ?, ?, ?, ?)";
-    this.lockSql =
-        "SELECT id, event_id, event_name, event_class, payload, context, attempts FROM "
-            + table
-            + " WHERE id IN (SELECT id FROM "
-            + table
-            + " WHERE published_at IS NULL AND failed_at IS NULL ORDER BY id"
-            + " FETCH FIRST %d ROWS ONLY) ORDER BY id FOR UPDATE SKIP LOCKED";
+    this.dataSource = dataSource;
+    this.table = table;
     this.publishedSql = "UPDATE " + table + " SET published_at = ? WHERE id = ?";
     this.failedSql =
         "UPDATE " + table + " SET attempts = ?, last_error = ?, failed_at = ? WHERE id = ?";
@@ -74,7 +74,7 @@ public class OutboxStore {
   /** Locks and returns up to {@code batchSize} pending rows, oldest first. */
   public List<OutboxRecord> lockBatch(int batchSize) {
     return jdbc.query(
-        lockSql.formatted(batchSize),
+        lockSql().formatted(batchSize),
         (rs, rowNum) ->
             new OutboxRecord(
                 rs.getLong("id"),
@@ -84,6 +84,41 @@ public class OutboxStore {
                 rs.getBytes("payload"),
                 rs.getBytes("context"),
                 rs.getInt("attempts")));
+  }
+
+  private String lockSql() {
+    String sql = lockSql;
+    if (sql == null) {
+      try {
+        String product =
+            JdbcUtils.extractDatabaseMetaData(dataSource, DatabaseMetaData::getDatabaseProductName);
+        sql = lockSql(product, table);
+      } catch (MetaDataAccessException e) {
+        throw new IllegalStateException("Cannot detect the database for the outbox", e);
+      }
+      lockSql = sql;
+    }
+    return sql;
+  }
+
+  /**
+   * The standard form is {@code ORDER BY id FETCH FIRST n ROWS ONLY FOR UPDATE SKIP LOCKED}. H2
+   * locks every matching row before it applies the limit, so a relay would lock the whole backlog
+   * and starve the others; for H2 the limit is applied in a subquery and only those ids are locked.
+   */
+  static String lockSql(String databaseProductName, String table) {
+    String columns =
+        "SELECT id, event_id, event_name, event_class, payload, context, attempts FROM ";
+    String pending = " WHERE published_at IS NULL AND failed_at IS NULL ORDER BY id";
+    if ("H2".equals(databaseProductName)) {
+      return columns
+          + table
+          + " WHERE id IN (SELECT id FROM "
+          + table
+          + pending
+          + " FETCH FIRST %d ROWS ONLY) ORDER BY id FOR UPDATE SKIP LOCKED";
+    }
+    return columns + table + pending + " FETCH FIRST %d ROWS ONLY FOR UPDATE SKIP LOCKED";
   }
 
   public void markPublished(long id) {

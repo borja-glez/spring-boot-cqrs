@@ -233,11 +233,22 @@ class OutboxStoreTest {
   }
 
   @Test
-  void embeddedModeSkipsADatabaseThatIsNotEmbedded() throws SQLException {
-    DataSource notEmbedded = mock(DataSource.class);
-    when(notEmbedded.getConnection()).thenThrow(new SQLException("not reachable"));
+  void usesTheSubqueryFormOnlyOnH2() {
+    assertThat(OutboxStore.lockSql("H2", "t"))
+        .contains("WHERE id IN (SELECT id FROM t")
+        .endsWith("FOR UPDATE SKIP LOCKED");
+    assertThat(OutboxStore.lockSql("PostgreSQL", "t"))
+        .doesNotContain("IN (SELECT")
+        .endsWith("ORDER BY id FETCH FIRST %d ROWS ONLY FOR UPDATE SKIP LOCKED");
+  }
 
-    new OutboxSchemaInitializer(notEmbedded, InitializeSchema.EMBEDDED, "other_outbox")
-        .afterPropertiesSet();
+  @Test
+  void lockBatchReportsAnUndetectableDatabase() throws SQLException {
+    DataSource broken = mock(DataSource.class);
+    when(broken.getConnection()).thenThrow(new SQLException("down"));
+
+    assertThatThrownBy(() -> new OutboxStore(broken, "t").lockBatch(1))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("detect");
   }
 }

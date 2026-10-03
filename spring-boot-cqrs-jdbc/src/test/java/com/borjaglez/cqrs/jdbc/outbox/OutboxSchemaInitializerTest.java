@@ -124,4 +124,13 @@ class OutboxSchemaInitializerTest {
             () -> new OutboxSchemaInitializer(dataSource, InitializeSchema.ALWAYS, "x; DROP"))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void embeddedModeSkipsADatabaseThatIsNotEmbedded() throws SQLException {
+    DataSource notEmbedded = mock(DataSource.class);
+    when(notEmbedded.getConnection()).thenThrow(new SQLException("not reachable"));
+
+    new OutboxSchemaInitializer(notEmbedded, InitializeSchema.EMBEDDED, "other_outbox")
+        .afterPropertiesSet();
+  }
 }
