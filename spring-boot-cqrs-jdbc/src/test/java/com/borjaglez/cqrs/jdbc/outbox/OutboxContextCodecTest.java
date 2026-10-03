@@ -2,15 +2,22 @@ package com.borjaglez.cqrs.jdbc.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.serialization.JacksonMessageSerializer;
+import com.borjaglez.cqrs.serialization.MessageSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class OutboxContextCodecTest {
@@ -118,6 +125,44 @@ class OutboxContextCodecTest {
   void corruptBytesFailToDecode() {
     assertThatThrownBy(() -> codec.decode("not json".getBytes()))
         .isInstanceOf(RuntimeException.class);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "null",
+        "{\"context\":null}",
+        "{\"trace\":null}",
+        "{\"context\":\"corr-1\"}",
+        "{\"trace\":[\"00-abc-def-01\"]}",
+        "{\"context\":{\"k\":1}}",
+        "{\"trace\":{\"traceparent\":null}}",
+        "{\"context\":{\"k\":{\"nested\":\"v\"}}}"
+      })
+  void wrongShapeFailsToDecode(String stored) {
+    assertThatThrownBy(() -> codec.decode(stored.getBytes()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("stored outbox context");
+  }
+
+  @Test
+  void nonStringKeyFailsToDecode() {
+    MessageSerializer serializer = mock(MessageSerializer.class);
+    when(serializer.deserialize(any(byte[].class), eq(Map.class)))
+        .thenReturn(Map.of(OutboxContextCodec.CONTEXT_KEY, Map.of(1, "v")));
+
+    assertThatThrownBy(() -> new OutboxContextCodec(serializer, tracing).decode(new byte[] {1}))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("'context'");
+  }
+
+  @Test
+  void decodeCopiesTheStoredEntriesAndTreatsMissingKeysAsEmpty() {
+    OutboxContextCodec.Captured decoded =
+        codec.decode("{\"context\":{\"k\":\"v\"},\"other\":1}".getBytes());
+
+    assertThat(decoded.context()).containsExactly(Map.entry("k", "v"));
+    assertThat(decoded.trace()).isEmpty();
   }
 
   @Test

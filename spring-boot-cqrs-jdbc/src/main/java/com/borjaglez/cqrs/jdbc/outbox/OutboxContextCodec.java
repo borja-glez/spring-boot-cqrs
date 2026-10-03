@@ -55,17 +55,42 @@ public class OutboxContextCodec {
   }
 
   /**
-   * Reads a stored capture; {@code null} gives {@link Captured#NONE}. Fails on unreadable bytes.
+   * Reads a stored capture; {@code null} gives {@link Captured#NONE}. A missing {@code "context"}
+   * or {@code "trace"} entry is empty. Fails on unreadable bytes, and with an {@link
+   * IllegalArgumentException} when the capture is not a map or one of its entries is not a map of
+   * strings to strings ({@code null} included), so the relay treats the row as unreadable.
    */
-  @SuppressWarnings("unchecked")
   public Captured decode(byte[] captured) {
     if (captured == null) {
       return Captured.NONE;
     }
-    Map<String, Map<String, String>> decoded =
-        (Map<String, Map<String, String>>) serializer.deserialize(captured, Map.class);
-    return new Captured(
-        decoded.getOrDefault(CONTEXT_KEY, Map.of()), decoded.getOrDefault(TRACE_KEY, Map.of()));
+    Map<?, ?> decoded = serializer.deserialize(captured, Map.class);
+    if (decoded == null) {
+      throw new IllegalArgumentException("The stored outbox context is not a map");
+    }
+    return new Captured(entries(decoded, CONTEXT_KEY), entries(decoded, TRACE_KEY));
+  }
+
+  private static Map<String, String> entries(Map<?, ?> decoded, String key) {
+    if (!decoded.containsKey(key)) {
+      return Map.of();
+    }
+    if (!(decoded.get(key) instanceof Map<?, ?> map)) {
+      throw wrongShape(key);
+    }
+    Map<String, String> entries = new LinkedHashMap<>();
+    for (Map.Entry<?, ?> entry : map.entrySet()) {
+      if (!(entry.getKey() instanceof String name) || !(entry.getValue() instanceof String value)) {
+        throw wrongShape(key);
+      }
+      entries.put(name, value);
+    }
+    return entries;
+  }
+
+  private static IllegalArgumentException wrongShape(String key) {
+    return new IllegalArgumentException(
+        "The stored outbox context entry '" + key + "' is not a map of strings to strings");
   }
 
   /** A decoded capture: the message context entries and the trace headers. */

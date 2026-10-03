@@ -257,6 +257,52 @@ class OutboxRelayTest {
     assertThat(target.published()).extracting(OutboxRelayTest::orderId).containsExactly("o-1");
   }
 
+  private String insertWithContext(String orderId, String context) {
+    TestOrderPlaced event = new TestOrderPlaced(orderId);
+    store.insert(
+        event.getEventId(),
+        "order-placed",
+        TestOrderPlaced.class.getName(),
+        serializer.serialize(event),
+        context.getBytes());
+    return event.getEventId();
+  }
+
+  @Test
+  void storedContextOfTheWrongShapeIsRetriedThenSetAsideAndLaterRowsContinue() {
+    String badContext = insertWithContext("bad-context", "{\"context\":{\"k\":1}}");
+    String badTrace = insertWithContext("bad-trace", "{\"trace\":null}");
+    publishInTransaction("o-1");
+    OutboxRelay relay = relay(target, 10, 2);
+
+    OutboxRelay.BatchResult first = relay.relayBatch();
+
+    assertThat(first).isEqualTo(new OutboxRelay.BatchResult(3, 0, 0, true, false));
+    assertThat(row(badContext))
+        .containsEntry("ATTEMPTS", 1)
+        .containsEntry("FAILED_AT", null)
+        .containsEntry(
+            "LAST_ERROR",
+            "java.lang.IllegalArgumentException: The stored outbox context entry 'context' is not"
+                + " a map of strings to strings");
+
+    OutboxRelay.BatchResult second = relay.relayBatch();
+    OutboxRelay.BatchResult third = relay.relayBatch();
+
+    assertThat(second).isEqualTo(new OutboxRelay.BatchResult(3, 0, 1, true, false));
+    assertThat(third).isEqualTo(new OutboxRelay.BatchResult(2, 1, 1, false, false));
+    assertThat(row(badContext)).containsEntry("ATTEMPTS", 2);
+    assertThat(row(badContext).get("FAILED_AT")).isInstanceOf(Timestamp.class);
+    assertThat(row(badTrace)).containsEntry("ATTEMPTS", 2);
+    assertThat(row(badTrace).get("FAILED_AT")).isInstanceOf(Timestamp.class);
+    assertThat(row(badTrace))
+        .containsEntry(
+            "LAST_ERROR",
+            "java.lang.IllegalArgumentException: The stored outbox context entry 'trace' is not"
+                + " a map of strings to strings");
+    assertThat(target.published()).extracting(OutboxRelayTest::orderId).containsExactly("o-1");
+  }
+
   @Test
   void exposesItsTargetAndRejectsInvalidLimits() {
     assertThat(relay(target, 1, 1).target()).isSameAs(target);
