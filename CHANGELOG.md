@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are marked with **BREAKING:**; [docs/upgrading.md](docs/upgrading.md)
 explains how to migrate.
+## [0.5.0] - 2026-10-03
+
+### Added
+- Add a transactional outbox for reliable event publication (#122) (484b51c)
+- Deduplicate redelivered commands and events with @Idempotent (#121) (f3e8551)
+- Resolve incoming messages by their logical name (#119) (23645c7)
+- Configure the reply timeout per bus (#118) (c5b582e)
+- Let a user bean replace the built-in context and validation middleware (#117) (cb395b5)
+
+### Documentation
+- Explain when to annotate messages with @CqrsMessage (#112) (0525c38)
+
+### Fixed
+- Use the application's Jackson mapper for RabbitMQ messages (#115) (c7db687)
+
+### Testing
+- Stop the outbox relay scheduler before relaying by hand (#123) (57cf9ba)
+
+### Build
+- Test the library on Java 25 in CI (#111) (628620f)
 ## [0.4.0] - 2026-09-26
 
 ### Added
