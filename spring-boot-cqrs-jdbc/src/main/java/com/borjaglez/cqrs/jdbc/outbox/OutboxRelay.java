@@ -17,10 +17,10 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
  * is marked published only after the target bus returned.
  *
  * <p>The batch stops at the first failure so later rows do not overtake the failing one. A row that
- * cannot be decoded (its class is unknown here, or its payload or stored context does not
- * deserialize) is set aside after {@code maxAttempts} attempts so the rest of the outbox keeps
- * moving. A failure of the target bus (broker down, timeout, rejection) is retried forever: an
- * outage must not park or reorder events.
+ * cannot be decoded (its class is unknown or cannot be linked here, or its payload or stored
+ * context does not deserialize) is set aside after {@code maxAttempts} attempts so the rest of the
+ * outbox keeps moving. A failure of the target bus (broker down, timeout, rejection) is retried
+ * forever: an outage must not park or reorder events.
  */
 public class OutboxRelay {
 
@@ -77,7 +77,9 @@ public class OutboxRelay {
       Decoded decoded;
       try {
         decoded = decode(row);
-      } catch (RuntimeException e) {
+      } catch (RuntimeException | LinkageError e) {
+        // A class that cannot be linked here (NoClassDefFoundError, a newer class file version)
+        // is as unreadable as an unknown one; other errors still roll the batch back.
         int attempts = row.attempts() + 1;
         if (attempts >= maxAttempts) {
           store.markFailed(row.id(), attempts, describe(e), true);
@@ -133,7 +135,7 @@ public class OutboxRelay {
     return new Decoded(event, contextCodec.decode(row.context()));
   }
 
-  private static String describe(RuntimeException e) {
+  private static String describe(Throwable e) {
     String type = e.getClass().getName();
     return e.getMessage() == null ? type : type + ": " + e.getMessage();
   }

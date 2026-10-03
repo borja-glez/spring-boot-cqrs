@@ -3,8 +3,10 @@ package com.borjaglez.cqrs.jdbc.outbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.sql.Timestamp;
 import java.util.Map;
@@ -300,6 +302,38 @@ class OutboxRelayTest {
             "LAST_ERROR",
             "java.lang.IllegalArgumentException: The stored outbox context entry 'trace' is not"
                 + " a map of strings to strings");
+    assertThat(target.published()).extracting(OutboxRelayTest::orderId).containsExactly("o-1");
+  }
+
+  @Test
+  void eventClassThatCannotBeLinkedIsRetriedThenSetAsideAndLaterRowsContinue() {
+    store.insert("unlinkable", "gone", "com.example.Gone", new byte[] {1}, null);
+    publishInTransaction("o-1");
+    OutboxEventTypeResolver linking = mock(OutboxEventTypeResolver.class);
+    when(linking.resolve(anyString(), anyString()))
+        .thenAnswer(
+            invocation -> {
+              if ("gone".equals(invocation.getArgument(0))) {
+                throw new NoClassDefFoundError("com/example/Gone");
+              }
+              return TestOrderPlaced.class;
+            });
+    OutboxRelay relay =
+        new OutboxRelay(store, linking, serializer, codec, target, transactionManager, 10, 2);
+
+    OutboxRelay.BatchResult first = relay.relayBatch();
+
+    assertThat(first).isEqualTo(new OutboxRelay.BatchResult(2, 0, 0, true, false));
+    assertThat(row("unlinkable"))
+        .containsEntry("ATTEMPTS", 1)
+        .containsEntry("FAILED_AT", null)
+        .containsEntry("LAST_ERROR", "java.lang.NoClassDefFoundError: com/example/Gone");
+
+    OutboxRelay.BatchResult second = relay.relayBatch();
+
+    assertThat(second).isEqualTo(new OutboxRelay.BatchResult(2, 1, 1, false, false));
+    assertThat(row("unlinkable")).containsEntry("ATTEMPTS", 2);
+    assertThat(row("unlinkable").get("FAILED_AT")).isInstanceOf(Timestamp.class);
     assertThat(target.published()).extracting(OutboxRelayTest::orderId).containsExactly("o-1");
   }
 
