@@ -39,7 +39,7 @@ tasks.register("quality") {
 tasks.register("verifyBoot3Compatibility") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Verifies the Boot 3 example application path."
-    dependsOn(":examples:example-basic:test")
+    dependsOn(":examples:example-basic:test", ":examples:example-outbox:test")
 }
 
 tasks.register("verifyBoot4Compatibility") {
@@ -65,6 +65,7 @@ tasks.register("spotlessCheckAll") {
         ":spring-boot-cqrs-boot3-starter:spotlessCheck",
         ":spring-boot-cqrs-boot4-starter:spotlessCheck",
         ":examples:example-basic:spotlessCheck",
+        ":examples:example-outbox:spotlessCheck",
         ":examples:example-rabbitmq:spotlessCheck",
         ":examples:example-middleware:spotlessCheck",
         ":examples:boot4-demo:spotlessCheck",
@@ -86,6 +87,7 @@ tasks.register("spotlessApplyAll") {
         ":spring-boot-cqrs-boot3-starter:spotlessApply",
         ":spring-boot-cqrs-boot4-starter:spotlessApply",
         ":examples:example-basic:spotlessApply",
+        ":examples:example-outbox:spotlessApply",
         ":examples:example-rabbitmq:spotlessApply",
         ":examples:example-middleware:spotlessApply",
         ":examples:boot4-demo:spotlessApply",

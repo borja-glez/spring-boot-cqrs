@@ -1,37 +1,29 @@
 # example-outbox
 
-Spring Boot 3 example showing the **Outbox Pattern** as an optional extension on top of `spring-boot-cqrs`.
+Transactional outbox with `spring-boot-cqrs-jdbc`, PostgreSQL and Kafka (Spring Boot 3).
 
-## What it demonstrates
-
-- a transactional command handler that saves domain state and an outbox row in the **same transaction**
-- a scheduled outbox publisher that reads pending rows and publishes events through `EventBus`
-- local event handling after the publisher marks rows as published
-
-## Important note
-
-This example sets `cqrs.events.transactional=false` on purpose.
-
-Why? Because the **outbox itself** already controls publication timing. If the transactional event bus also deferred publication again, the example would mark outbox rows as published before the actual send happened.
+`CreateOrderCommandHandler` saves the order and publishes `OrderCreatedEvent` through
+`OutboxEventBus` in the same transaction. The event is stored as a row of `cqrs_outbox`; after
+commit, the outbox relay publishes it through `KafkaEventBus` and marks the row published once
+Kafka acknowledged it. `OrderEventHandler` receives it back from Kafka.
 
 ## Run
 
+Docker Compose starts PostgreSQL and Kafka (`compose.yml`):
+
 ```bash
 ./gradlew :examples:example-outbox:bootRun
+curl -X POST localhost:8082/api/orders -H 'Content-Type: application/json' \
+  -d '{"product":"book","quantity":2}'
 ```
 
-## Try it
+The log shows `Received order-created from Kafka ...`. Inspect the outbox:
 
-Create an order:
-
-```bash
-curl -X POST http://localhost:8082/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{"product":"Keyboard","quantity":2}'
+```sql
+SELECT event_name, attempts, published_at, failed_at FROM cqrs_outbox;
 ```
 
-List orders:
+Stop the Kafka container and create another order: the row stays pending with growing `attempts`
+and is published when Kafka is back.
 
-```bash
-curl http://localhost:8082/api/orders
-```
+See [docs/outbox.md](../../docs/outbox.md).
