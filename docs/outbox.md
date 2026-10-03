@@ -104,7 +104,7 @@ aside**: `failed_at` is set, an ERROR is logged, and later rows continue. Set-as
 deleted automatically. To retry one:
 
 ```sql
-UPDATE cqrs_outbox SET failed_at = NULL, attempts = 0 WHERE event_id = '...';
+UPDATE cqrs_outbox SET failed_at = NULL, attempts = 0, read_failures = 0 WHERE event_id = '...';
 ```
 
 ## Renaming event classes
@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS cqrs_outbox (
   published_at TIMESTAMP,
   failed_at    TIMESTAMP,
   attempts     INT           NOT NULL DEFAULT 0,
+  read_failures INT          NOT NULL DEFAULT 0,
   last_error   VARCHAR(2000)
 );
 CREATE INDEX IF NOT EXISTS cqrs_outbox_pending ON cqrs_outbox (id) WHERE published_at IS NULL AND failed_at IS NULL;

@@ -40,8 +40,8 @@ public class OutboxProperties {
     private int batchSize = 100;
 
     /**
-     * Failed attempts to read a row (unknown class, unreadable payload) after which it is set
-     * aside. Failures of the event bus never set a row aside.
+     * Failed reads of a row (unknown class, unreadable payload or stored context) after which it is
+     * set aside. Failures of the event bus are not counted and never set a row aside.
      */
     private int maxAttempts = 10;
   }

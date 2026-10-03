@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS ${table} (
   published_at TIMESTAMP,
   failed_at    TIMESTAMP,
   attempts     INT           NOT NULL DEFAULT 0,
+  read_failures INT          NOT NULL DEFAULT 0,
   last_error   VARCHAR(2000)
 );
 CREATE INDEX IF NOT EXISTS ${index}_pending ON ${table} (id) WHERE published_at IS NULL AND failed_at IS NULL;

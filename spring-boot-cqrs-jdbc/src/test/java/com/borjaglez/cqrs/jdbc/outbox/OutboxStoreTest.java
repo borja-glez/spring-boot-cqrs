@@ -90,6 +90,7 @@ class OutboxStoreTest {
     assertThat(first.payload()).containsExactly(1);
     assertThat(first.context()).containsExactly(9);
     assertThat(first.attempts()).isZero();
+    assertThat(first.readFailures()).isZero();
     assertThat(rows.get(1).context()).isNull();
     assertThat(column("created_at", "e-1")).isEqualTo(Timestamp.from(NOW));
   }
@@ -157,14 +158,16 @@ class OutboxStoreTest {
   }
 
   @Test
-  void failedAttemptKeepsTheRowPendingWithItsError() {
+  void failedPublishKeepsTheRowPendingWithItsErrorAndItsReadFailures() {
     insert("e-1");
     long id = lock(1).get(0).id();
+    store.markReadFailed(id, 1, 1, "unreadable", false);
 
-    store.markFailed(id, 3, "java.lang.IllegalStateException: broker down", false);
+    store.markPublishFailed(id, 3, "java.lang.IllegalStateException: broker down");
 
     OutboxRecord row = lock(1).get(0);
     assertThat(row.attempts()).isEqualTo(3);
+    assertThat(row.readFailures()).isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT last_error FROM cqrs_outbox WHERE id = ?", String.class, id))
@@ -173,11 +176,28 @@ class OutboxStoreTest {
   }
 
   @Test
+  void failedReadKeepsTheRowPendingWithBothCounters() {
+    insert("e-1");
+    long id = lock(1).get(0).id();
+
+    store.markReadFailed(id, 5, 2, "java.lang.IllegalArgumentException: unknown", false);
+
+    OutboxRecord row = lock(1).get(0);
+    assertThat(row.attempts()).isEqualTo(5);
+    assertThat(row.readFailures()).isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT last_error FROM cqrs_outbox WHERE id = ?", String.class, id))
+        .isEqualTo("java.lang.IllegalArgumentException: unknown");
+    assertThat(column("failed_at", "e-1")).isNull();
+  }
+
+  @Test
   void setAsideRowIsNoLongerPending() {
     insert("e-1");
     long id = lock(1).get(0).id();
 
-    store.markFailed(id, 10, "poison", true);
+    store.markReadFailed(id, 10, 10, "poison", true);
 
     assertThat(lock(10)).isEmpty();
     assertThat(column("failed_at", "e-1")).isEqualTo(Timestamp.from(NOW));
@@ -187,19 +207,24 @@ class OutboxStoreTest {
   void longErrorsAreTruncatedAndNullErrorsKept() {
     insert("e-1");
     insert("e-2");
-    List<OutboxRecord> rows = lock(2);
+    insert("e-3");
+    insert("e-4");
+    List<OutboxRecord> rows = lock(4);
 
-    store.markFailed(rows.get(0).id(), 1, "x".repeat(5000), false);
-    store.markFailed(rows.get(1).id(), 1, null, false);
+    store.markReadFailed(rows.get(0).id(), 1, 1, "x".repeat(5000), false);
+    store.markReadFailed(rows.get(1).id(), 1, 1, null, false);
+    store.markPublishFailed(rows.get(2).id(), 1, "y".repeat(5000));
+    store.markPublishFailed(rows.get(3).id(), 1, null);
 
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT last_error FROM cqrs_outbox WHERE event_id = 'e-1'", String.class))
-        .hasSize(OutboxStore.MAX_ERROR_LENGTH);
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT last_error FROM cqrs_outbox WHERE event_id = 'e-2'", String.class))
-        .isNull();
+    assertThat(lastError("e-1")).hasSize(OutboxStore.MAX_ERROR_LENGTH);
+    assertThat(lastError("e-2")).isNull();
+    assertThat(lastError("e-3")).hasSize(OutboxStore.MAX_ERROR_LENGTH);
+    assertThat(lastError("e-4")).isNull();
+  }
+
+  private String lastError(String eventId) {
+    return jdbc.queryForObject(
+        "SELECT last_error FROM cqrs_outbox WHERE event_id = ?", String.class, eventId);
   }
 
   @Test
@@ -209,7 +234,7 @@ class OutboxStoreTest {
     insert("set-aside");
     List<OutboxRecord> rows = lock(3);
     store.markPublished(rows.get(0).id());
-    store.markFailed(rows.get(2).id(), 10, "poison", true);
+    store.markReadFailed(rows.get(2).id(), 10, 10, "poison", true);
 
     assertThat(store.deletePublishedBefore(NOW)).isZero();
     assertThat(store.deletePublishedBefore(NOW.plus(Duration.ofSeconds(1)))).isOne();

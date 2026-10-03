@@ -146,11 +146,43 @@ class OutboxRelayTest {
 
     assertThat(row(event.getEventId()))
         .containsEntry("ATTEMPTS", 3)
+        .containsEntry("READ_FAILURES", 0)
         .containsEntry("FAILED_AT", null);
 
     relay.relayBatch();
 
     assertThat(target.published()).hasSize(1);
+  }
+
+  @Test
+  void publishFailuresDoNotCountTowardSettingARowAside() {
+    TestOrderPlaced event = publishInTransaction("o-1");
+    OutboxRelay relay = relay(target, 10, 2);
+    for (int i = 0; i < 3; i++) {
+      target.failNext(new IllegalStateException("broker down"));
+      relay.relayBatch();
+    }
+    // The class is gone on this instance (for example after a rollback of the deploy).
+    jdbc.update(
+        "UPDATE cqrs_outbox SET event_name = 'missing', event_class = 'com.example.Missing'"
+            + " WHERE event_id = ?",
+        event.getEventId());
+
+    OutboxRelay.BatchResult firstRead = relay.relayBatch();
+
+    assertThat(firstRead).isEqualTo(new OutboxRelay.BatchResult(1, 0, 0, true, false));
+    assertThat(row(event.getEventId()))
+        .containsEntry("ATTEMPTS", 4)
+        .containsEntry("READ_FAILURES", 1)
+        .containsEntry("FAILED_AT", null);
+
+    OutboxRelay.BatchResult secondRead = relay.relayBatch();
+
+    assertThat(secondRead).isEqualTo(new OutboxRelay.BatchResult(1, 0, 1, false, false));
+    assertThat(row(event.getEventId()))
+        .containsEntry("ATTEMPTS", 5)
+        .containsEntry("READ_FAILURES", 2);
+    assertThat(row(event.getEventId()).get("FAILED_AT")).isInstanceOf(Timestamp.class);
   }
 
   @Test
@@ -164,7 +196,7 @@ class OutboxRelayTest {
 
     assertThat(first).isEqualTo(new OutboxRelay.BatchResult(2, 0, 0, true, false));
     assertThat(second).isEqualTo(new OutboxRelay.BatchResult(2, 1, 1, false, false));
-    assertThat(row("poison")).containsEntry("ATTEMPTS", 2);
+    assertThat(row("poison")).containsEntry("ATTEMPTS", 2).containsEntry("READ_FAILURES", 2);
     assertThat(row("poison").get("FAILED_AT")).isInstanceOf(Timestamp.class);
     assertThat((String) row("poison").get("LAST_ERROR")).contains("com.example.Missing");
     assertThat(target.published()).extracting(OutboxRelayTest::orderId).containsExactly("o-1");

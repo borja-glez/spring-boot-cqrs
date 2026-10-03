@@ -35,7 +35,8 @@ public class OutboxStore {
   private final String table;
   private volatile String lockSql;
   private final String publishedSql;
-  private final String failedSql;
+  private final String readFailedSql;
+  private final String publishFailedSql;
   private final String deleteSql;
 
   public OutboxStore(DataSource dataSource, String tableName) {
@@ -54,8 +55,11 @@ public class OutboxStore {
     this.dataSource = dataSource;
     this.table = table;
     this.publishedSql = "UPDATE " + table + " SET published_at = ? WHERE id = ?";
-    this.failedSql =
-        "UPDATE " + table + " SET attempts = ?, last_error = ?, failed_at = ? WHERE id = ?";
+    this.readFailedSql =
+        "UPDATE "
+            + table
+            + " SET attempts = ?, read_failures = ?, last_error = ?, failed_at = ? WHERE id = ?";
+    this.publishFailedSql = "UPDATE " + table + " SET attempts = ?, last_error = ? WHERE id = ?";
     this.deleteSql = "DELETE FROM " + table + " WHERE published_at < ?";
   }
 
@@ -83,7 +87,8 @@ public class OutboxStore {
                 rs.getString("event_class"),
                 rs.getBytes("payload"),
                 rs.getBytes("context"),
-                rs.getInt("attempts")));
+                rs.getInt("attempts"),
+                rs.getInt("read_failures")));
   }
 
   private String lockSql() {
@@ -108,7 +113,8 @@ public class OutboxStore {
    */
   static String lockSql(String databaseProductName, String table) {
     String columns =
-        "SELECT id, event_id, event_name, event_class, payload, context, attempts FROM ";
+        "SELECT id, event_id, event_name, event_class, payload, context, attempts, read_failures"
+            + " FROM ";
     String pending = " WHERE published_at IS NULL AND failed_at IS NULL ORDER BY id";
     if ("H2".equals(databaseProductName)) {
       return columns
@@ -126,16 +132,27 @@ public class OutboxStore {
   }
 
   /**
-   * Records a failed attempt. A row set aside ({@code setAside}) gets a {@code failed_at} and is no
-   * longer relayed; otherwise it stays pending.
+   * Records an attempt that could not read the row, with the new total of failed attempts and of
+   * failed reads. A row set aside ({@code setAside}) gets a {@code failed_at} and is no longer
+   * relayed; otherwise it stays pending.
    */
-  public void markFailed(long id, int attempts, String error, boolean setAside) {
+  public void markReadFailed(
+      long id, int attempts, int readFailures, String error, boolean setAside) {
     jdbc.update(
-        failedSql,
+        readFailedSql,
         attempts,
+        readFailures,
         truncate(error),
         new SqlParameterValue(Types.TIMESTAMP, setAside ? now() : null),
         id);
+  }
+
+  /**
+   * Records an attempt the event bus failed, with the new total of failed attempts; it stays
+   * pending.
+   */
+  public void markPublishFailed(long id, int attempts, String error) {
+    jdbc.update(publishFailedSql, attempts, truncate(error), id);
   }
 
   /** Deletes the rows published before {@code cutoff}; returns how many. */

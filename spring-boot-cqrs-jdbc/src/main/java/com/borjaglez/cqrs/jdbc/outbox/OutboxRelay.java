@@ -18,8 +18,8 @@ import com.borjaglez.cqrs.serialization.MessageSerializer;
  *
  * <p>The batch stops at the first failure so later rows do not overtake the failing one. A row that
  * cannot be decoded (its class is unknown or cannot be linked here, or its payload or stored
- * context does not deserialize) is set aside after {@code maxAttempts} attempts so the rest of the
- * outbox keeps moving. A failure of the target bus (broker down, timeout, rejection) is retried
+ * context does not deserialize) is set aside after {@code maxAttempts} failed reads so the rest of
+ * the outbox keeps moving. A failure of the target bus (broker down, timeout, rejection) is retried
  * forever: an outage must not park or reorder events.
  */
 public class OutboxRelay {
@@ -81,29 +81,30 @@ public class OutboxRelay {
         // A class that cannot be linked here (NoClassDefFoundError, a newer class file version)
         // is as unreadable as an unknown one; other errors still roll the batch back.
         int attempts = row.attempts() + 1;
-        if (attempts >= maxAttempts) {
-          store.markFailed(row.id(), attempts, describe(e), true);
+        int readFailures = row.readFailures() + 1;
+        if (readFailures >= maxAttempts) {
+          store.markReadFailed(row.id(), attempts, readFailures, describe(e), true);
           LOG.error(
               "Outbox event '"
                   + row.eventName()
                   + "' ("
                   + row.eventId()
                   + ") could not be read "
-                  + attempts
-                  + " times and was set aside; later events continue. Clear its failed_at to"
-                  + " retry it",
+                  + readFailures
+                  + " times and was set aside; later events continue. Clear its failed_at and"
+                  + " read_failures to retry it",
               e);
           setAside++;
           continue;
         }
-        store.markFailed(row.id(), attempts, describe(e), false);
+        store.markReadFailed(row.id(), attempts, readFailures, describe(e), false);
         LOG.warn(
             "Could not read outbox event '"
                 + row.eventName()
                 + "' ("
                 + row.eventId()
-                + "), attempt "
-                + attempts
+                + "), failed read "
+                + readFailures
                 + " of "
                 + maxAttempts
                 + "; the batch stops here",
@@ -113,7 +114,7 @@ public class OutboxRelay {
       try {
         contextCodec.runWithin(decoded.context(), () -> target.publish(decoded.event()));
       } catch (RuntimeException e) {
-        store.markFailed(row.id(), row.attempts() + 1, describe(e), false);
+        store.markPublishFailed(row.id(), row.attempts() + 1, describe(e));
         LOG.warn(
             "Could not publish outbox event '"
                 + row.eventName()
