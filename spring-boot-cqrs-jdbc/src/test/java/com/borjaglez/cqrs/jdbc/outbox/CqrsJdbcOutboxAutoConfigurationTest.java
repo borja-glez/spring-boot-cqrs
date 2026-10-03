@@ -122,6 +122,9 @@ class CqrsJdbcOutboxAutoConfigurationTest {
   void storedEventsAreRelayedToTheTargetBus() {
     enabled.run(
         context -> {
+          // The scheduler's first run starts on its own thread: stop it so it cannot lock the row
+          // and make the batch below skip it.
+          context.getBean(OutboxRelayScheduler.class).stop();
           TestOrderPlaced event = new TestOrderPlaced("o-1");
           new TransactionTemplate(context.getBean(PlatformTransactionManager.class))
               .executeWithoutResult(s -> context.getBean(OutboxEventBus.class).publish(event));
