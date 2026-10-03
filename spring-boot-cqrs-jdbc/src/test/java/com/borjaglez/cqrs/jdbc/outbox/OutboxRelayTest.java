@@ -282,12 +282,23 @@ class OutboxRelayTest {
         serializer.serialize(bad),
         "not json".getBytes());
     publishInTransaction("o-1");
+    OutboxRelay relay = relay(target, 10, 2);
 
-    OutboxRelay.BatchResult result = relay(target, 10, 1).relayBatch();
+    OutboxRelay.BatchResult first = relay.relayBatch();
 
-    assertThat(result).isEqualTo(new OutboxRelay.BatchResult(2, 1, 1, false, false));
-    assertThat(row(bad.getEventId())).containsEntry("ATTEMPTS", 1);
+    assertThat(first).isEqualTo(new OutboxRelay.BatchResult(2, 0, 0, true, false));
+    assertThat(row(bad.getEventId()))
+        .containsEntry("ATTEMPTS", 1)
+        .containsEntry("READ_FAILURES", 1)
+        .containsEntry("FAILED_AT", null);
+
+    OutboxRelay.BatchResult second = relay.relayBatch();
+
+    assertThat(second).isEqualTo(new OutboxRelay.BatchResult(2, 1, 1, false, false));
+    assertThat(row(bad.getEventId())).containsEntry("ATTEMPTS", 2);
     assertThat(row(bad.getEventId()).get("FAILED_AT")).isInstanceOf(Timestamp.class);
+    assertThat((String) row(bad.getEventId()).get("LAST_ERROR"))
+        .startsWith("java.io.UncheckedIOException");
     assertThat(target.published()).extracting(OutboxRelayTest::orderId).containsExactly("o-1");
   }
 

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -132,17 +133,23 @@ class OutboxRelayPostgresIntegrationTest {
         };
     OutboxRelay first = relay(store, counting);
     OutboxRelay second = relay(store, counting);
+    CyclicBarrier start = new CyclicBarrier(2);
     ExecutorService pool = Executors.newFixedThreadPool(2);
+    int publishedByFirst;
+    int publishedBySecond;
     try {
-      Future<?> a = pool.submit(() -> drain(first));
-      Future<?> b = pool.submit(() -> drain(second));
-      a.get(60, TimeUnit.SECONDS);
-      b.get(60, TimeUnit.SECONDS);
+      Future<Integer> a = pool.submit(() -> drain(first, start));
+      Future<Integer> b = pool.submit(() -> drain(second, start));
+      publishedByFirst = a.get(60, TimeUnit.SECONDS);
+      publishedBySecond = b.get(60, TimeUnit.SECONDS);
     } finally {
       pool.shutdownNow();
     }
     drain(first); // rows released by the other relay at the very end
 
+    // Both relays took part: the rows were shared, not drained by one of them alone.
+    assertThat(publishedByFirst).isPositive();
+    assertThat(publishedBySecond).isPositive();
     assertThat(deliveries).hasSize(200);
     assertThat(deliveries.values()).allSatisfy(count -> assertThat(count).hasValue(1));
     assertThat(
@@ -151,10 +158,20 @@ class OutboxRelayPostgresIntegrationTest {
         .isZero();
   }
 
-  private static void drain(OutboxRelay relay) {
-    while (relay.relayBatch().locked() > 0) {
-      // keep relaying until nothing is left for this relay
-    }
+  /** Relays until nothing is left for this relay; returns how many rows it published. */
+  private static int drain(OutboxRelay relay) {
+    int published = 0;
+    OutboxRelay.BatchResult result;
+    do {
+      result = relay.relayBatch();
+      published += result.published();
+    } while (result.locked() > 0);
+    return published;
+  }
+
+  private static int drain(OutboxRelay relay, CyclicBarrier start) throws Exception {
+    start.await(10, TimeUnit.SECONDS);
+    return drain(relay);
   }
 
   @Test
