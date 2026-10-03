@@ -17,8 +17,10 @@ dependencies {
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.boot.starter.jdbc)
+    testImplementation(libs.spring.boot.starter.json)
     testImplementation(libs.spring.boot.starter.data.jpa)
     testImplementation(project(":spring-boot-cqrs-boot3-starter"))
+    testImplementation(project(":spring-boot-cqrs-rabbitmq"))
     testImplementation(libs.micrometer.tracing)
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.datatype.jsr310)
