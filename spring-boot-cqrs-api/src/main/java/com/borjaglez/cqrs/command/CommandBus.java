@@ -1,5 +1,7 @@
 package com.borjaglez.cqrs.command;
 
+import java.util.Objects;
+
 import com.borjaglez.cqrs.ResultType;
 
 public interface CommandBus {
@@ -16,6 +18,7 @@ public interface CommandBus {
    * buses return the handler's result as it is, which this default does.
    */
   default <R> R dispatchAndReceive(Command command, ResultType<R> resultType) {
+    Objects.requireNonNull(resultType, "resultType must not be null");
     return dispatchAndReceive(command);
   }
 }
