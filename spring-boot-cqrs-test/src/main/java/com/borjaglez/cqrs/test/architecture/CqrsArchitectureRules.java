@@ -61,22 +61,28 @@ public final class CqrsArchitectureRules {
 
   private CqrsArchitectureRules() {}
 
-  /** Handler classes must stay free of Spring so they can be unit tested without a container. */
+  /**
+   * Handler classes, including those carrying a composed annotation meta-annotated with a handler
+   * annotation, must stay free of Spring so they can be unit tested without a container.
+   */
   public static ArchRule handlersDoNotDependOnSpring() {
     return noClasses()
         .that()
-        .areAnnotatedWith(CommandHandler.class)
+        .areMetaAnnotatedWith(CommandHandler.class)
         .or()
-        .areAnnotatedWith(QueryHandler.class)
+        .areMetaAnnotatedWith(QueryHandler.class)
         .or()
-        .areAnnotatedWith(EventHandler.class)
+        .areMetaAnnotatedWith(EventHandler.class)
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage("org.springframework..")
         .because("handlers hold business logic and must be testable without Spring");
   }
 
-  /** Handler methods are only discovered on classes carrying the matching class annotation. */
+  /**
+   * Handler methods are only discovered on classes carrying the matching class annotation, directly
+   * or as a meta-annotation.
+   */
   public static ArchRule handlerMethodsAreInHandlerClasses() {
     return methods()
         .that(
@@ -95,7 +101,7 @@ public final class CqrsArchitectureRules {
                 HANDLER_CLASS_BY_METHOD_ANNOTATION.forEach(
                     (methodAnnotation, classAnnotation) -> {
                       if (method.isAnnotatedWith(methodAnnotation)
-                          && !method.getOwner().isAnnotatedWith(classAnnotation)) {
+                          && !method.getOwner().isMetaAnnotatedWith(classAnnotation)) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 method,

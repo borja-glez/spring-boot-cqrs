@@ -18,8 +18,8 @@ class CqrsArchitectureRulesTest {
 
   @Test
   void fixturesAreImported() {
-    assertThat(GOOD).hasSize(6);
-    assertThat(BAD).hasSize(8);
+    assertThat(GOOD).hasSize(7);
+    assertThat(BAD).hasSize(9);
   }
 
   @Test
@@ -37,6 +37,12 @@ class CqrsArchitectureRulesTest {
   void handlersDoNotDependOnSpringFlagsSpringFieldsAndAnnotations() {
     assertViolation(
         CqrsArchitectureRules.handlersDoNotDependOnSpring(), "AnnotatedSpringEventHandler");
+  }
+
+  @Test
+  void handlersDoNotDependOnSpringSeesComposedHandlerAnnotations() {
+    assertViolation(
+        CqrsArchitectureRules.handlersDoNotDependOnSpring(), "ComposedSpringDependentHandler");
   }
 
   @Test
