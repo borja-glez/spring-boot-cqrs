@@ -1,12 +1,14 @@
 package com.borjaglez.cqrs.event.transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -206,6 +208,75 @@ class TransactionalEventBusTest {
 
     verify(delegate).publish(outer);
     verify(delegate, never()).publish(inner);
+  }
+
+  @Test
+  void isDeliveringAfterCommitOnlyWhileTheCommittedTransactionIsCurrent() {
+    List<String> seen = new ArrayList<>();
+    TransactionalEventBus observed =
+        new TransactionalEventBus(
+            new EventBus() {
+              @Override
+              public void publish(Event event) {
+                seen.add("delivering " + TransactionalEventBus.isDeliveringAfterCommit());
+                requiresNew()
+                    .executeWithoutResult(
+                        status ->
+                            seen.add(
+                                "in a new transaction "
+                                    + TransactionalEventBus.isDeliveringAfterCommit()));
+                seen.add("resumed " + TransactionalEventBus.isDeliveringAfterCommit());
+              }
+
+              @Override
+              public void publish(List<Event> events) {
+                events.forEach(this::publish);
+              }
+            });
+
+    seen.add("outside " + TransactionalEventBus.isDeliveringAfterCommit());
+    new TransactionTemplate(nesting)
+        .executeWithoutResult(
+            status -> {
+              observed.publish(new TestEvent("e"));
+              seen.add("before commit " + TransactionalEventBus.isDeliveringAfterCommit());
+            });
+    seen.add("after " + TransactionalEventBus.isDeliveringAfterCommit());
+
+    assertThat(seen)
+        .containsExactly(
+            "outside false",
+            "before commit false",
+            "delivering true",
+            "in a new transaction false",
+            "resumed true",
+            "after false");
+  }
+
+  @Test
+  void theDeliveryEndsWhenAHandlerFails() {
+    IllegalStateException failure = new IllegalStateException("boom");
+    TransactionalEventBus failing =
+        new TransactionalEventBus(
+            new EventBus() {
+              @Override
+              public void publish(Event event) {
+                throw failure;
+              }
+
+              @Override
+              public void publish(List<Event> events) {
+                events.forEach(this::publish);
+              }
+            });
+
+    assertThatThrownBy(
+            () ->
+                new TransactionTemplate(nesting)
+                    .executeWithoutResult(status -> failing.publish(new TestEvent("e"))))
+        .isSameAs(failure);
+
+    assertThat(TransactionalEventBus.isDeliveringAfterCommit()).isFalse();
   }
 
   @Test

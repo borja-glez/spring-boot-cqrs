@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.command.spring.SpringCommandBus;
+import com.borjaglez.cqrs.event.EventBus;
+import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
+import com.borjaglez.cqrs.event.spring.SpringEventBus;
+import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
 import com.borjaglez.cqrs.fixtures.TestCommand;
 import com.borjaglez.cqrs.fixtures.TestEvent;
 import com.borjaglez.cqrs.fixtures.TestQuery;
@@ -209,6 +214,126 @@ class TransactionMiddlewareTest {
     assertThat(handler.applied).isEqualTo(1);
   }
 
+  @Test
+  void anEventDispatchedImmediatelyInsideATransactionJoinsIt() throws Exception {
+    // cqrs.events.transactional=false: the event bus dispatches at once.
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    EventBus events =
+        new SpringEventBus(registryOf(handler), List.of(middleware(QueryTransactions.READ_ONLY)));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("e")));
+
+    assertThat(handler.seen).containsExactly("begin");
+    assertThat(transactionManager.events).containsExactly("begin", "commit");
+  }
+
+  @Test
+  void anEventDeliveredAfterCommitRunsInANewTransaction() throws Exception {
+    // cqrs.events.transactional=true (the default): the event is delivered after the commit, while
+    // the committed transaction is still bound to the thread.
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    EventBus events =
+        new TransactionalEventBus(
+            new SpringEventBus(
+                registryOf(handler), List.of(middleware(QueryTransactions.READ_ONLY))));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("e")));
+
+    assertThat(handler.seen).containsExactly("begin", "commit", "suspend", "begin");
+    assertThat(transactionManager.events)
+        .containsExactly("begin", "commit", "suspend", "begin", "commit", "resume");
+    assertThat(transactionManager.readOnly).containsExactly(false, false);
+  }
+
+  @Test
+  void workNestedInTheNewTransactionOfAnEventDeliveredAfterCommitJoinsIt() throws Exception {
+    TransactionMiddleware middleware = middleware(QueryTransactions.READ_ONLY);
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    handler.then = () -> middleware.process(new TestCommand("x"), message -> "a");
+    EventBus events =
+        new TransactionalEventBus(new SpringEventBus(registryOf(handler), List.of(middleware)));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("e")));
+
+    assertThat(transactionManager.events)
+        .containsExactly("begin", "commit", "suspend", "begin", "commit", "resume");
+  }
+
+  @Test
+  void eventsPublishedFromAnEventDeliveredAfterCommitGetATransactionOfTheirOwn() throws Exception {
+    TransactionMiddleware middleware = middleware(QueryTransactions.READ_ONLY);
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    EventBus events =
+        new TransactionalEventBus(new SpringEventBus(registryOf(handler), List.of(middleware)));
+    handler.then =
+        () -> {
+          if (handler.handled == 1) {
+            events.publish(new TestEvent("second"));
+          }
+          return null;
+        };
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("first")));
+
+    assertThat(handler.handled).isEqualTo(2);
+    assertThat(transactionManager.events)
+        .containsExactly(
+            "begin", "commit", "suspend", "begin", "commit", "suspend", "begin", "commit", "resume",
+            "resume");
+  }
+
+  @Test
+  void aQueryAskedWhileTheCommittedTransactionIsCurrentRunsInANewReadOnlyTransaction()
+      throws Exception {
+    // An event chain without the middleware: the handler runs in the committed transaction and asks
+    // a query whose chain has it.
+    TransactionMiddleware middleware = middleware(QueryTransactions.READ_ONLY);
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    handler.then = () -> middleware.process(new TestQuery("q"), message -> "a");
+    EventBus events = new TransactionalEventBus(new SpringEventBus(registryOf(handler), List.of()));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("e")));
+
+    assertThat(transactionManager.events)
+        .containsExactly("begin", "commit", "suspend", "begin", "commit", "resume");
+    assertThat(transactionManager.readOnly).containsExactly(false, true);
+  }
+
+  private static EventHandlerRegistry registryOf(RecordingEventHandler handler)
+      throws NoSuchMethodException {
+    EventHandlerRegistry registry = new EventHandlerRegistry();
+    registry.register(
+        TestEvent.class,
+        handler,
+        RecordingEventHandler.class.getMethod("handle", TestEvent.class),
+        "test.event");
+    return registry;
+  }
+
+  /** Records the transaction events that came before the event it handles, then runs more work. */
+  public static class RecordingEventHandler {
+    private final RecordingTransactionManager transactionManager;
+    final List<String> seen = new ArrayList<>();
+    int handled;
+    Callable<Object> then = () -> null;
+
+    RecordingEventHandler(RecordingTransactionManager transactionManager) {
+      this.transactionManager = transactionManager;
+    }
+
+    public void handle(TestEvent event) throws Exception {
+      handled++;
+      seen.clear();
+      seen.addAll(transactionManager.events);
+      then.call();
+    }
+  }
+
   public static class FlakyHandler {
     int calls;
     int applied;
@@ -222,7 +347,11 @@ class TransactionMiddlewareTest {
     }
   }
 
-  /** Records begin, commit and rollback; participates in an existing transaction. */
+  /**
+   * Records begin, commit, rollback, suspend and resume; participates in an existing transaction.
+   * As with a real manager, a transaction stays bound to the thread until its cleanup, which comes
+   * after the {@code afterCommit} callbacks.
+   */
   private static class RecordingTransactionManager extends AbstractPlatformTransactionManager {
 
     final List<String> events = new ArrayList<>();
@@ -248,14 +377,30 @@ class TransactionMiddlewareTest {
 
     @Override
     protected void doCommit(DefaultTransactionStatus status) {
-      active = false;
       events.add("commit");
     }
 
     @Override
     protected void doRollback(DefaultTransactionStatus status) {
-      active = false;
       events.add("rollback");
+    }
+
+    @Override
+    protected Object doSuspend(Object transaction) {
+      active = false;
+      events.add("suspend");
+      return Boolean.TRUE;
+    }
+
+    @Override
+    protected void doResume(Object transaction, Object suspendedResources) {
+      active = true;
+      events.add("resume");
+    }
+
+    @Override
+    protected void doCleanupAfterCompletion(Object transaction) {
+      active = false;
     }
   }
 }

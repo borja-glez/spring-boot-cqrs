@@ -3,6 +3,8 @@ package com.borjaglez.cqrs.jdbc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -12,9 +14,12 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -24,6 +29,11 @@ import org.springframework.transaction.TransactionDefinition;
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.command.spring.SpringCommandBus;
+import com.borjaglez.cqrs.event.Event;
+import com.borjaglez.cqrs.event.EventBus;
+import com.borjaglez.cqrs.event.registry.EventHandlerRegistry;
+import com.borjaglez.cqrs.event.spring.SpringEventBus;
+import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
 import com.borjaglez.cqrs.idempotency.IdempotentInvoker;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.retry.BackoffStrategy;
@@ -34,10 +44,14 @@ import com.borjaglez.cqrs.transaction.TransactionMiddleware;
 
 class TransactionMiddlewareJdbcTest {
 
+  private static final int COMMAND_ROW = 1;
+  private static final int EVENT_ROW = 2;
+
   private EmbeddedDatabase dataSource;
   private JdbcTemplate jdbc;
   private CountingTransactionManager transactionManager;
   private PlainHandler handler;
+  private PlainEventHandler eventHandler;
 
   @BeforeEach
   void setUp() {
@@ -83,6 +97,19 @@ class TransactionMiddlewareJdbcTest {
 
   private int count(String table) {
     return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+  }
+
+  /** Committed rows written by a handler, read on a connection of their own. */
+  private int rows(int id) {
+    return jdbc.queryForObject("SELECT COUNT(*) FROM effect WHERE id = ?", Integer.class, id);
+  }
+
+  /** Committed idempotency markers of a handler, read on a connection of their own. */
+  private int markers(String handlerId) {
+    return jdbc.queryForObject(
+        "SELECT COUNT(*) FROM cqrs_processed_message WHERE handler_id = ?",
+        Integer.class,
+        handlerId);
   }
 
   @Test
@@ -141,6 +168,95 @@ class TransactionMiddlewareJdbcTest {
     assertThat(count("cqrs_processed_message")).isOne();
   }
 
+  @ParameterizedTest(name = "{displayName} [auto-commit {0}]")
+  @ValueSource(booleans = {true, false})
+  void anEventDeliveredAfterCommitRunsInItsOwnTransaction(boolean autoCommit) throws Exception {
+    SpringCommandBus bus = publishingBus(autoCommit);
+
+    bus.dispatch(new PlainCommand());
+
+    assertThat(rows(COMMAND_ROW)).isOne();
+    assertThat(markers("command-handler")).isOne();
+    assertThat(rows(EVENT_ROW)).isOne();
+    assertThat(markers("event-handler")).isOne();
+    assertThat(transactionManager.begun).isEqualTo(2);
+  }
+
+  @ParameterizedTest(name = "{displayName} [auto-commit {0}]")
+  @ValueSource(booleans = {true, false})
+  void aFailingAfterCommitEventHandlerDoesNotAffectTheCommittedCommand(boolean autoCommit)
+      throws Exception {
+    SpringCommandBus bus = publishingBus(autoCommit);
+    eventHandler.fail = true;
+
+    // The event is delivered when the command's transaction commits, so its failure still
+    // reaches the caller of the command.
+    assertThatThrownBy(() -> bus.dispatch(new PlainCommand())).hasMessage("event boom");
+
+    assertThat(rows(COMMAND_ROW)).isOne();
+    assertThat(markers("command-handler")).isOne();
+    assertThat(rows(EVENT_ROW)).isZero();
+    assertThat(markers("event-handler")).isZero();
+    assertThat(transactionManager.begun).isEqualTo(2);
+  }
+
+  /**
+   * A command handler that writes a row and publishes an event on the default event bus, which
+   * delivers it after the command's transaction commits; the event handler writes another row. Both
+   * handlers are idempotent and carry no Spring annotations; the middleware is the only source of
+   * transactions.
+   *
+   * @param autoCommit whether the data source hands out connections in auto-commit mode (as a pool
+   *     does by default) or not (as a pool configured with {@code auto-commit=false} does)
+   */
+  private SpringCommandBus publishingBus(boolean autoCommit) throws Exception {
+    DataSource connections = autoCommit ? dataSource : withoutAutoCommit(dataSource);
+    transactionManager = new CountingTransactionManager(connections);
+    IdempotentInvoker idempotency =
+        new IdempotentInvoker(
+            new JdbcIdempotencyStore(
+                connections, transactionManager, JdbcIdempotencyStore.DEFAULT_TABLE_NAME));
+    List<BusMiddleware> middlewares =
+        List.of(new TransactionMiddleware(transactionManager, QueryTransactions.READ_ONLY));
+
+    EventHandlerRegistry eventHandlers = new EventHandlerRegistry();
+    eventHandlers.setIdempotentInvoker(idempotency);
+    eventHandler = new PlainEventHandler(connections);
+    eventHandlers.register(
+        PlainEvent.class,
+        eventHandler,
+        PlainEventHandler.class.getMethod("on", PlainEvent.class),
+        "plain-event",
+        null,
+        null,
+        true,
+        "event-handler");
+    EventBus events = new TransactionalEventBus(new SpringEventBus(eventHandlers, middlewares));
+
+    CommandHandlerRegistry commandHandlers = new CommandHandlerRegistry();
+    commandHandlers.setIdempotentInvoker(idempotency);
+    commandHandlers.register(
+        PlainCommand.class,
+        new PublishingHandler(connections, events),
+        PublishingHandler.class.getMethod("handle", PlainCommand.class),
+        "plain",
+        false,
+        true,
+        "command-handler");
+    return new SpringCommandBus(commandHandlers, middlewares);
+  }
+
+  private static DataSource withoutAutoCommit(DataSource dataSource) {
+    return new DelegatingDataSource(dataSource) {
+      @Override
+      public Connection getConnection() throws SQLException {
+        Connection connection = super.getConnection();
+        connection.setAutoCommit(false);
+        return connection;
+      }
+    };
+  }
+
   /** Counts the physical transactions that are begun. */
   private static class CountingTransactionManager extends DataSourceTransactionManager {
     private static final long serialVersionUID = 1L;
@@ -173,6 +289,41 @@ class TransactionMiddlewareJdbcTest {
       jdbc.update("INSERT INTO effect VALUES (1)");
       if (failuresLeft-- > 0) {
         throw new IllegalStateException("boom");
+      }
+    }
+  }
+
+  static class PlainEvent extends Event {}
+
+  /** Writes the command's row and publishes an event. */
+  public static class PublishingHandler {
+    private final JdbcTemplate jdbc;
+    private final EventBus events;
+
+    PublishingHandler(DataSource dataSource, EventBus events) {
+      this.jdbc = new JdbcTemplate(dataSource);
+      this.events = events;
+    }
+
+    public void handle(PlainCommand command) {
+      jdbc.update("INSERT INTO effect VALUES (?)", COMMAND_ROW);
+      events.publish(new PlainEvent());
+    }
+  }
+
+  /** Writes the event's row, then fails when told to. */
+  public static class PlainEventHandler {
+    private final JdbcTemplate jdbc;
+    boolean fail;
+
+    PlainEventHandler(DataSource dataSource) {
+      this.jdbc = new JdbcTemplate(dataSource);
+    }
+
+    public void on(PlainEvent event) {
+      jdbc.update("INSERT INTO effect VALUES (?)", EVENT_ROW);
+      if (fail) {
+        throw new IllegalStateException("event boom");
       }
     }
   }
