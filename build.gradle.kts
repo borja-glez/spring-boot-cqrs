@@ -40,6 +40,20 @@ tasks.register("quality") {
     )
 }
 
+tasks.register("mutationReport") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Generates PIT mutation testing reports (report only, not part of quality)."
+    dependsOn(
+        ":spring-boot-cqrs-api:pitest",
+        ":spring-boot-cqrs-core:pitest",
+        ":spring-boot-cqrs-jdbc:pitest",
+        ":spring-boot-cqrs-kafka:pitest",
+        ":spring-boot-cqrs-rabbitmq:pitest",
+        ":spring-boot-cqrs-test:pitest",
+        ":spring-boot-cqrs-asyncapi-test:pitest"
+    )
+}
+
 tasks.register("verifyBoot3Compatibility") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Verifies the Boot 3 example application path."

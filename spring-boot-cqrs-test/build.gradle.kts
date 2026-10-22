@@ -2,6 +2,7 @@ plugins {
     id("cqrs-boot3-library-conventions")
     id("cqrs-publish-conventions")
     id("cqrs-test-conventions")
+    id("cqrs-mutation-conventions")
 }
 
 description = "Test utilities (spy/in-memory buses, AssertJ assertions, @CqrsTest slice) for spring-boot-cqrs"

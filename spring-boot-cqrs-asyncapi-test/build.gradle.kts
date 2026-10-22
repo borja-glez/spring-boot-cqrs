@@ -2,6 +2,7 @@ plugins {
     id("cqrs-boot3-library-conventions")
     id("cqrs-publish-conventions")
     id("cqrs-test-conventions")
+    id("cqrs-mutation-conventions")
 }
 
 description = "Test support that verifies spring-boot-cqrs messages against an AsyncAPI 3.0 contract"

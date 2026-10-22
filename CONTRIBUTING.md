@@ -28,6 +28,19 @@ No additional installation is needed — the project uses the Gradle wrapper (`.
 ./gradlew :spring-boot-cqrs-api:test --tests "com.borjaglez.cqrs.command.CommandTest.commandIdIsGenerated"
 ```
 
+### Mutation testing report (PIT)
+
+```bash
+./gradlew mutationReport
+```
+
+Runs [PIT](https://pitest.org) on `api`, `core`, `jdbc`, `kafka`, `rabbitmq`, `test` and `asyncapi-test`
+and writes an HTML and an XML report to `<module>/build/reports/pitest/` (open `index.html`). It is
+report-only: there is no threshold, and it is not part of `quality` or CI. Integration tests
+(`*.integration.*` packages and `*IntegrationTest` classes, which use Testcontainers) are excluded, so it
+needs no Docker; the run takes several minutes. Surviving mutants point at behavior the tests do not pin
+down.
+
 ## Code Style
 
 - Formatting is managed by **Spotless** with Google Java Format.
