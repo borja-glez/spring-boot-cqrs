@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "occurredOn", "orderId", "customerId", "total"],
+  "properties": {
+    "eventId": { "type": "string" },
+    "occurredOn": { "type": "string", "format": "date-time" },
+    "orderId": { "type": "string" },
+    "customerId": { "type": "string" },
+    "total": { "$ref": "definitions.json#/definitions/money" }
+  }
+}

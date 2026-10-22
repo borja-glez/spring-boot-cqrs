@@ -1,0 +1,102 @@
+asyncapi: 3.0.0
+info:
+  title: Shop orders
+  version: 1.0.0
+  description: Messages the orders service sends and receives.
+channels:
+  orderCommands:
+    address: shop.orders.command
+    messages:
+      placeOrder:
+        $ref: '#/components/messages/placeOrder'
+  placeOrderReplies:
+    address: null
+    messages:
+      placeOrderResult:
+        name: place-order-result
+        payload:
+          type: string
+  orderEvents:
+    address: shop.orders.event
+    messages:
+      orderPlaced:
+        name: shop.orders.1.event.order.order-placed
+        payload:
+          $ref: 'schemas/order-placed.json'
+  orderQueries:
+    address: shop.orders.query
+    messages:
+      findOrder:
+        name: shop.orders.1.query.order.find-order
+        payload:
+          $ref: 'schemas/find-order.json'
+  orderQueryReplies:
+    address: null
+    messages:
+      orderView:
+        name: order-view
+        payload:
+          $ref: 'schemas/order-view.json'
+  stockQueries:
+    address: shop.inventory.query
+    messages:
+      checkStock:
+        name: shop.inventory.1.query.stock.check-stock
+        payload:
+          $ref: 'schemas/check-stock.json'
+  stockReplies:
+    address: null
+    messages:
+      stockLevel:
+        name: stock-level
+        payload:
+          $ref: '#/components/schemas/stockLevel'
+operations:
+  placeOrder:
+    action: receive
+    channel:
+      $ref: '#/channels/orderCommands'
+    reply:
+      channel:
+        $ref: '#/channels/placeOrderReplies'
+  publishOrderPlaced:
+    action: send
+    channel:
+      $ref: '#/channels/orderEvents'
+    messages:
+      - $ref: '#/channels/orderEvents/messages/orderPlaced'
+  findOrder:
+    action: receive
+    channel:
+      $ref: '#/channels/orderQueries'
+    messages:
+      - $ref: '#/channels/orderQueries/messages/findOrder'
+    reply:
+      channel:
+        $ref: '#/channels/orderQueryReplies'
+      messages:
+        - $ref: '#/channels/orderQueryReplies/messages/orderView'
+  checkStock:
+    action: send
+    channel:
+      $ref: '#/channels/stockQueries'
+    reply:
+      messages:
+        - $ref: '#/channels/stockReplies/messages/stockLevel'
+components:
+  messages:
+    placeOrder:
+      name: shop.orders.1.command.order.place-order
+      payload:
+        $ref: 'schemas/place-order.json'
+  schemas:
+    stockLevel:
+      type: object
+      additionalProperties: false
+      required: [sku, available]
+      properties:
+        sku:
+          type: string
+        available:
+          type: integer
+          minimum: 0

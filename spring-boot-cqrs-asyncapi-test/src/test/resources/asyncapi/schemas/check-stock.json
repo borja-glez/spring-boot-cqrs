@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["queryId", "sku"],
+  "properties": {
+    "queryId": { "type": "string" },
+    "sku": { "type": "string" }
+  }
+}

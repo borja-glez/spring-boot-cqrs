@@ -12,6 +12,7 @@ having to boot a full Spring application or mock the bus interfaces by hand.
 - [`@CqrsTest` Slice](#cqrstest-slice)
 - [Middleware Test Harness](#middleware-test-harness)
 - [Architecture rules](#architecture-rules)
+- [AsyncAPI contracts](#asyncapi-contracts)
 - [When to use which](#when-to-use-which)
 
 ## Installation
@@ -226,6 +227,20 @@ class CqrsArchitectureTest {
 }
 ```
 
+## AsyncAPI contracts
+
+The separate `spring-boot-cqrs-asyncapi-test` module checks the messages of a
+service against its AsyncAPI 3.0 document: serialized samples against the
+payload schemas, contract messages against samples, closed payload schemas, and
+a handler for every received message. See [AsyncAPI Contracts](asyncapi.md).
+
+```java
+AsyncApiVerifier.of(AsyncApiContract.fromClasspath("asyncapi/orders.yaml"), serializer, naming)
+    .sample(new PlaceOrder("customer-1", total))
+    .sample("order-view", new OrderView("order-1", "PLACED", total))
+    .verifyPayloads();
+```
+
 ## When to use which
 
 | Need | Use |
@@ -234,3 +249,4 @@ class CqrsArchitectureTest {
 | Unit test a middleware in isolation, no bus | `Handlers.invoke(...)` |
 | Verify that code under test dispatched/published certain messages | `SpyXxxBus` wrapping a fake or real bus |
 | End-to-end test of a handler with the full registry + middleware | `@CqrsTest` + `@Import(MyHandler.class)` |
+| Check sent and received messages against an AsyncAPI document | `AsyncApiVerifier` ([spring-boot-cqrs-asyncapi-test](asyncapi.md)) |

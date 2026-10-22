@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commandId", "customerId", "total"],
+  "properties": {
+    "commandId": { "type": "string" },
+    "customerId": { "type": "string", "minLength": 1 },
+    "total": { "$ref": "definitions.json#/definitions/money" }
+  }
+}

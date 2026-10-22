@@ -24,6 +24,7 @@ include(
     ":spring-boot-cqrs-rabbitmq",
     ":spring-boot-cqrs-jdbc",
     ":spring-boot-cqrs-test",
+    ":spring-boot-cqrs-asyncapi-test",
     ":spring-boot-cqrs-boot3-starter",
     ":spring-boot-cqrs-boot4-starter",
     ":examples:example-basic",
