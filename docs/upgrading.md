@@ -16,6 +16,9 @@ application whose handlers live under its own packages usually only has to repla
    ([ResultType](#resulttype-replaces-parameterizedtypereference)).
 3. `@CommandHandler`, `@QueryHandler` and `@EventHandler` are no longer `@Service` stereotypes
    ([handler registration](#handler-annotations-are-no-longer-service)).
+4. Three behaviour changes may need action: the PostgreSQL outbox index, `@Idempotent` event
+   handlers delivered after commit, and a `@Bean` that clashes with a scanned handler
+   ([Behaviour changes](#behaviour-changes)).
 
 ### The public API moves to `spring-boot-cqrs-api`
 
@@ -93,6 +96,31 @@ To check after upgrading that every handler is registered, set
 `CQRS handlers registered: N commands, N events, N queries, ...` with the one of the previous version.
 At `DEBUG` level the `com.borjaglez.cqrs.introspection.CqrsIntrospectionLogger` logger also lists
 each handler.
+
+### Behaviour changes
+
+- **PostgreSQL outbox index.** The outbox metrics read the unpublished rows with a query that a new
+  partial index serves. If you manage the outbox schema yourself (Flyway, Liquibase) and did not
+  take the DDL from the library, add it, replacing `<table>` with your outbox table name (the
+  default is `cqrs_outbox`):
+
+  ```sql
+  CREATE INDEX IF NOT EXISTS <table>_unpublished ON <table> (created_at) WHERE published_at IS NULL;
+  ```
+
+  The metrics are on whenever Micrometer is present; set `cqrs.outbox.metrics.enabled=false` to turn
+  them off. H2 needs nothing extra.
+- **`@Idempotent` event handlers delivered after commit** run in their own transaction (`REQUIRES_NEW`)
+  with the JDBC store, also when `TransactionMiddleware` is off. While the event is delivered, that
+  transaction holds one more pooled connection than before per nesting level (the transaction that
+  published the event keeps its connection, now suspended). Size the connection pool accordingly,
+  or set `cqrs.events.transactional=false` to deliver the event in the publishing transaction.
+  See [Idempotency](idempotency.md#handlers-without-transactional).
+- **A `@Bean` that clashes with a scanned handler fails startup.** A `@Bean` whose name equals the
+  default bean name of a scanned handler, but whose declared return type is a supertype or an
+  interface of the handler, now fails startup with an `IllegalStateException` that names the bean
+  and the handler class. In 0.5 it silently replaced the component. Rename the `@Bean`, or register
+  the handler yourself under another name.
 
 ## Upgrading to 0.4.0
 

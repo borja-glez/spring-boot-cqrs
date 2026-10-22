@@ -234,5 +234,10 @@ reported as a violation by `verifyPayloads()` and `verifyClosedSchemas()`.
   An operation's `channel` must be `#/channels/<channel>` and its `messages` (and those of its
   `reply`) `#/channels/<channel>/messages/<message>`, as the specification requires. Only payload
   schemas may reference other files.
+- An absolute `$id`, an absolute `$ref` or a custom `$schema` IRI in a payload schema is fetched
+  over the network, so the check needs access to it and can drift from your local files. Prefer
+  relative references.
+- A Multi Format Schema Object (`schemaFormat`) is recognised in the document, or in
+  `components` of it, not in a separate file referenced by `$ref`.
 - `verifyClosedSchemas()` checks the top-level object of each payload, not nested objects or
   `allOf` compositions.
