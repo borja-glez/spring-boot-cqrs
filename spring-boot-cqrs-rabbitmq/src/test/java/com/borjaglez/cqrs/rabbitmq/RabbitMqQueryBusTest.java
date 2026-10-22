@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
@@ -100,47 +101,62 @@ class RabbitMqQueryBusTest {
   }
 
   @Test
-  void askWithTypeShouldPassTypeToPublisher() {
+  void askWithResultTypeShouldPassTypeToPublisher() {
     TestQuery query = new TestQuery("test-data");
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(rabbitNaming.exchange("queries")).thenReturn("cqrs.queries");
     when(messageNaming.queryName(TestQuery.class)).thenReturn("test.order.get");
-    when(publisher.publishAndReceive("cqrs.queries", "test.order.get", query, "query", typeRef))
+    when(publisher.publishAndReceive(
+            "cqrs.queries",
+            "test.order.get",
+            query,
+            "query",
+            ParameterizedTypeReference.forType(String.class)))
         .thenReturn("typed-result");
 
-    String result = queryBus.ask(query, typeRef);
+    String result = queryBus.ask(query, resultType);
 
     assertThat(result).isEqualTo("typed-result");
   }
 
   @Test
-  void askWithTypeShouldRethrowRuntimeException() {
+  void askWithResultTypeShouldRethrowRuntimeException() {
     TestQuery query = new TestQuery("test-data");
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(rabbitNaming.exchange("queries")).thenReturn("cqrs.queries");
     when(messageNaming.queryName(TestQuery.class)).thenReturn("test.order.get");
-    when(publisher.publishAndReceive("cqrs.queries", "test.order.get", query, "query", typeRef))
+    when(publisher.publishAndReceive(
+            "cqrs.queries",
+            "test.order.get",
+            query,
+            "query",
+            ParameterizedTypeReference.forType(String.class)))
         .thenThrow(new RuntimeException("remote error"));
 
-    assertThatThrownBy(() -> queryBus.ask(query, typeRef))
+    assertThatThrownBy(() -> queryBus.ask(query, resultType))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("remote error");
   }
 
   @Test
-  void askWithTypeShouldWrapCheckedException() {
+  void askWithResultTypeShouldWrapCheckedException() {
     TestQuery query = new TestQuery("test-data");
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(rabbitNaming.exchange("queries")).thenReturn("cqrs.queries");
     when(messageNaming.queryName(TestQuery.class)).thenReturn("test.order.get");
     Exception checkedException = new Exception("checked error");
-    when(publisher.publishAndReceive("cqrs.queries", "test.order.get", query, "query", typeRef))
+    when(publisher.publishAndReceive(
+            "cqrs.queries",
+            "test.order.get",
+            query,
+            "query",
+            ParameterizedTypeReference.forType(String.class)))
         .thenAnswer(
             invocation -> {
               throw checkedException;
             });
 
-    assertThatThrownBy(() -> queryBus.ask(query, typeRef))
+    assertThatThrownBy(() -> queryBus.ask(query, resultType))
         .isInstanceOf(QueryHandlerExecutionException.class)
         .hasCause(checkedException);
   }
@@ -180,7 +196,7 @@ class RabbitMqQueryBusTest {
                 new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND)));
 
     String result = bus.ask(query);
-    String typed = bus.ask(query, new ParameterizedTypeReference<String>() {});
+    String typed = bus.ask(query, new ResultType<String>() {});
 
     assertThat(result).isEqualTo("result");
     assertThat(typed).isEqualTo("typed-result");

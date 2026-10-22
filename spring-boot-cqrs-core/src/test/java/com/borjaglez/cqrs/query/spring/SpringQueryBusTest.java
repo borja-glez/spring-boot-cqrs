@@ -10,8 +10,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.fixtures.RecordingMiddleware;
 import com.borjaglez.cqrs.fixtures.TestQuery;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
@@ -80,13 +80,13 @@ class SpringQueryBusTest {
   }
 
   @Test
-  void askWithTypeReferenceDelegatesToUntyped() {
+  void askWithResultTypeDelegatesToUntyped() {
     QueryHandlerRegistry registry = mock(QueryHandlerRegistry.class);
     TestQuery query = new TestQuery("data");
     when(registry.handle(query)).thenReturn("answer");
 
     SpringQueryBus bus = new SpringQueryBus(registry, List.of());
-    String result = bus.ask(query, new ParameterizedTypeReference<String>() {});
+    String result = bus.ask(query, new ResultType<String>() {});
 
     assertThat(result).isEqualTo("answer");
   }

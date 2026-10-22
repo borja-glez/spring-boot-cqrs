@@ -4,6 +4,96 @@ This guide lists the changes that need action when moving from one minor version
 full list of changes of each release is in [CHANGELOG.md](../CHANGELOG.md), where breaking entries
 are marked with **BREAKING:**.
 
+## Upgrading to 0.6.0
+
+0.6.0 moves the public API to a new module and has two breaking changes in it. A Spring Boot
+application whose handlers live under its own packages usually only has to replace its
+`ParameterizedTypeReference` arguments.
+
+1. A new artifact, `spring-boot-cqrs-api`, holds the public API
+   ([framework-free API](#the-public-api-moves-to-spring-boot-cqrs-api)).
+2. `CommandBus` and `QueryBus` take a `ResultType` instead of a `ParameterizedTypeReference`
+   ([ResultType](#resulttype-replaces-parameterizedtypereference)).
+3. `@CommandHandler`, `@QueryHandler` and `@EventHandler` are no longer `@Service` stereotypes
+   ([handler registration](#handler-annotations-are-no-longer-service)).
+
+### The public API moves to `spring-boot-cqrs-api`
+
+Issue #125.
+
+The messages (`Command`, `Event`, `Query`, `AggregateRoot`, `KeyedMessage`), the bus interfaces
+(`CommandBus`, `QueryBus`, `EventBus`), the new `ResultType` and the annotations (`@CommandHandler`,
+`@HandleCommand`, `@QueryHandler`, `@HandleQuery`, `@EventHandler`, `@HandleEvent`, `@CqrsMessage`,
+`@Idempotent`) now live in `com.borjaglez.cqrs:spring-boot-cqrs-api`, a module without dependencies.
+Their packages do not change, so no import changes, and `spring-boot-cqrs-core` (and therefore every
+starter and adapter) brings the module in.
+
+Migration:
+
+- Nothing, unless you want a module free of Spring: a domain or application module can now depend on
+  `spring-boot-cqrs-api` alone.
+- The API and the core share packages, which works on the classpath but not as named JPMS modules.
+
+### `ResultType` replaces `ParameterizedTypeReference`
+
+Issue #125.
+
+`CommandBus.dispatchAndReceive(Command, ParameterizedTypeReference<R>)` and
+`QueryBus.ask(Query, ParameterizedTypeReference<R>)` are replaced by overloads that take a
+`com.borjaglez.cqrs.ResultType<R>`, so the bus interfaces no longer depend on Spring. It is captured
+the same way, and the RabbitMQ and Kafka buses still rebuild a generic result such as a
+`List<OrderDto>` with typed elements.
+
+Before (0.5.x):
+
+```java
+List<OrderDto> orders = queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+```
+
+After (0.6.0):
+
+```java
+List<OrderDto> orders = queryBus.ask(new ListOrders(), new ResultType<List<OrderDto>>() {});
+```
+
+Migration:
+
+- Replace `new ParameterizedTypeReference<...>() {}` with `new ResultType<...>() {}` in the calls to
+  `dispatchAndReceive` and `ask`, and `ParameterizedTypeReference.forType(type)` with
+  `ResultType.of(type)`.
+- A `CommandBus` or `QueryBus` of your own that overrides the typed overload must change its
+  signature to take a `ResultType<R>`; `ParameterizedTypeReference.forType(resultType.type())`
+  converts it for Spring APIs.
+- `MessageSerializer.deserialize(byte[], ParameterizedTypeReference<T>)` does not change.
+
+### Handler annotations are no longer `@Service`
+
+Issue #125.
+
+`@CommandHandler`, `@QueryHandler` and `@EventHandler` used to be meta-annotated with `@Service`, so
+the application's component scan registered handler classes as beans. They are now plain
+annotations. Since 0.6.0 the starters register the handler classes found in the application packages
+themselves (see [Handler registration](core.md#handler-registration)), so most applications are not
+affected:
+
+| Your application | What to do |
+|------------------|------------|
+| Spring Boot, handlers under the package of the `@SpringBootApplication` class or of any `@ComponentScan` | Nothing: the starter registers them. |
+| Spring Boot, handlers outside those packages, or `cqrs.handlers.scan-enabled=false` | Declare each handler with `@Component`, a `@Bean` method or `@Import`. |
+| Spring Boot, handlers left out with `@ComponentScan(excludeFilters = ...)` | The handler scan ignores `excludeFilters` (it applies only Spring Boot's `TypeExcludeFilter`), so they are now registered. Use a condition on the handler (`@Profile`, `@ConditionalOnProperty`, ...), or set `cqrs.handlers.scan-enabled=false` and register the handlers you want. |
+| Spring Boot, `scanBasePackages` narrower than the package of the `@SpringBootApplication` class | The handler scan also covers that package (it is the auto-configuration package), so its handlers are now registered. Move them, use a condition, or set `cqrs.handlers.scan-enabled=false`. |
+| Without Spring Boot (only `spring-boot-cqrs-core`) | Add `@EnableCqrsHandlers` to a configuration class, or declare the handlers as beans. |
+
+Code that found handlers through the stereotype, such as `getBeansWithAnnotation(Service.class)` or an
+AOP pointcut on `@within(org.springframework.stereotype.Service)`, no longer matches them; match the
+handler annotation instead.
+
+To check after upgrading that every handler is registered, set
+`cqrs.introspection.log-handlers-on-startup=true` and compare the startup line
+`CQRS handlers registered: N commands, N events, N queries, ...` with the one of the previous version.
+At `DEBUG` level the `com.borjaglez.cqrs.introspection.CqrsIntrospectionLogger` logger also lists
+each handler.
+
 ## Upgrading to 0.4.0
 
 0.4.0 has five breaking changes, all in the RabbitMQ and Kafka adapters. Applications that only use

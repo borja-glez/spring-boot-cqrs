@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.assertj.core.api.AssertProvider;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.query.Query;
 import com.borjaglez.cqrs.query.QueryBus;
 import com.borjaglez.cqrs.test.assertion.QueryBusAssert;
@@ -39,8 +39,8 @@ public final class SpyQueryBus implements QueryBus, AssertProvider<QueryBusAsser
   }
 
   @Override
-  public <R> R ask(Query query, ParameterizedTypeReference<R> responseType) {
+  public <R> R ask(Query query, ResultType<R> resultType) {
     recorded.add(query);
-    return delegate.ask(query, responseType);
+    return delegate.ask(query, resultType);
   }
 }

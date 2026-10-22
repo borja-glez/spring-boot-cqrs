@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestMode;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaRequestReplyClient;
 import com.borjaglez.cqrs.kafka.infrastructure.KafkaTopicNamingStrategy;
@@ -58,8 +59,8 @@ public class KafkaQueryBus implements QueryBus {
 
   @Override
   @SuppressWarnings("unchecked")
-  public <R> R ask(Query query, ParameterizedTypeReference<R> responseType) {
-    return (R) send(query, responseType);
+  public <R> R ask(Query query, ResultType<R> resultType) {
+    return (R) send(query, ParameterizedTypeReference.forType(resultType.type()));
   }
 
   /** Runs the outbound middlewares with the request-reply send as the end of the chain. */

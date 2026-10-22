@@ -22,10 +22,10 @@ No additional installation is needed — the project uses the Gradle wrapper (`.
 ./gradlew :spring-boot-cqrs-rabbitmq:test
 
 # Run a single test class
-./gradlew :spring-boot-cqrs-core:test --tests "com.borjaglez.cqrs.command.CommandTest"
+./gradlew :spring-boot-cqrs-api:test --tests "com.borjaglez.cqrs.command.CommandTest"
 
 # Run a single test method
-./gradlew :spring-boot-cqrs-core:test --tests "com.borjaglez.cqrs.command.CommandTest.commandIdIsGenerated"
+./gradlew :spring-boot-cqrs-api:test --tests "com.borjaglez.cqrs.command.CommandTest.commandIdIsGenerated"
 ```
 
 ## Code Style

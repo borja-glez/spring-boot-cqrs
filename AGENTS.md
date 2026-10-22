@@ -7,7 +7,8 @@
 A production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring Boot 4. Multi-module Gradle project with Java 21.
 
 **Modules:**
-- `spring-boot-cqrs-core` — Bus interfaces, base types, annotations, middleware, serialization SPI
+- `spring-boot-cqrs-api` — Framework-free API: messages, bus interfaces, `ResultType`, handler annotations (no dependencies)
+- `spring-boot-cqrs-core` — Spring bus implementations, handler discovery, middleware, serialization SPI
 - `spring-boot-cqrs-boot3-starter` — Spring Boot 3.5.x auto-configuration
 - `spring-boot-cqrs-boot4-starter` — Spring Boot 4.0.x auto-configuration
 - `spring-boot-cqrs-rabbitmq` — RabbitMQ distributed messaging adapter
@@ -29,10 +30,10 @@ A production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring
 ./gradlew :spring-boot-cqrs-core:test
 
 # Run a SINGLE test class
-./gradlew :spring-boot-cqrs-core:test --tests "CommandTest"
+./gradlew :spring-boot-cqrs-api:test --tests "CommandTest"
 
 # Run a SINGLE test method
-./gradlew :spring-boot-cqrs-core:test --tests "CommandTest.commandIdIsGenerated"
+./gradlew :spring-boot-cqrs-api:test --tests "CommandTest.commandIdIsGenerated"
 
 # Auto-format code (run BEFORE committing)
 ./gradlew spotlessApply

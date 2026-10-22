@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.assertj.core.api.AssertProvider;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.CommandBus;
 import com.borjaglez.cqrs.test.assertion.CommandBusAssert;
@@ -51,8 +51,8 @@ public final class SpyCommandBus implements CommandBus, AssertProvider<CommandBu
   }
 
   @Override
-  public <R> R dispatchAndReceive(Command command, ParameterizedTypeReference<R> responseType) {
+  public <R> R dispatchAndReceive(Command command, ResultType<R> resultType) {
     recorded.add(command);
-    return delegate.dispatchAndReceive(command, responseType);
+    return delegate.dispatchAndReceive(command, resultType);
   }
 }

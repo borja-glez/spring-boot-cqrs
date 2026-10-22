@@ -17,9 +17,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.kafka.consumer.KafkaCommandConsumer;
 import com.borjaglez.cqrs.kafka.consumer.KafkaQueryConsumer;
@@ -45,7 +45,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * by handing each record to the consumer of its topic.
  *
  * <p>A reply carries only the runtime class of the result, so a generic result keeps its element
- * types only when the caller passes a {@link ParameterizedTypeReference} (finding C16).
+ * types only when the caller passes a {@link ResultType} (finding C16).
  */
 class KafkaGenericResultRoundTripTest {
 
@@ -84,16 +84,15 @@ class KafkaGenericResultRoundTripTest {
   }
 
   @Test
-  void askReturnsTypedElementsWithATypeReference() {
+  void askDeserializesGenericResultWithResultType() {
     List<TestOrder> orders =
-        queryBus.ask(
-            new TestOrderListQuery(false), new ParameterizedTypeReference<List<TestOrder>>() {});
+        queryBus.ask(new TestOrderListQuery(false), new ResultType<List<TestOrder>>() {});
 
     assertThat(orders).containsExactly(new TestOrder("o-1"), new TestOrder("o-2"));
   }
 
   @Test
-  void askReturnsMapsWithoutATypeReference() {
+  void askReturnsMapsWithoutAResultType() {
     List<Object> orders = queryBus.ask(new TestOrderListQuery(false));
 
     assertThat(orders).containsExactly(Map.of("id", "o-1"), Map.of("id", "o-2"));
@@ -103,8 +102,7 @@ class KafkaGenericResultRoundTripTest {
   void askRoundTripsAStreamToListResult() {
     // Stream.toList() answers a JDK-internal list class, which the reply names as its type.
     List<TestOrder> typed =
-        queryBus.ask(
-            new TestOrderListQuery(true), new ParameterizedTypeReference<List<TestOrder>>() {});
+        queryBus.ask(new TestOrderListQuery(true), new ResultType<List<TestOrder>>() {});
     List<Object> untyped = queryBus.ask(new TestOrderListQuery(true));
 
     assertThat(lastReplyPayloadType).startsWith("java.util.ImmutableCollections$");
@@ -113,24 +111,23 @@ class KafkaGenericResultRoundTripTest {
   }
 
   @Test
-  void dispatchAndReceiveReturnsTheTypedWrapperWithATypeReference() {
+  void dispatchAndReceiveDeserializesGenericResultWithResultType() {
     TestResult<TestOrder> result =
         commandBus.dispatchAndReceive(
-            new TestOrderResultCommand("o-7"),
-            new ParameterizedTypeReference<TestResult<TestOrder>>() {});
+            new TestOrderResultCommand("o-7"), new ResultType<TestResult<TestOrder>>() {});
 
     assertThat(result.value()).isEqualTo(new TestOrder("o-7"));
   }
 
   @Test
-  void dispatchAndReceiveReturnsTheWrapperWithMapContentWithoutATypeReference() {
+  void dispatchAndReceiveReturnsTheWrapperWithMapContentWithoutAResultType() {
     TestResult<?> result = commandBus.dispatchAndReceive(new TestOrderResultCommand("o-7"));
 
     assertThat(result.value()).isEqualTo(Map.of("id", "o-7"));
   }
 
   @Test
-  void aResultDescribedByItsRuntimeClassNeedsNoTypeReference() {
+  void aResultDescribedByItsRuntimeClassNeedsNoResultType() {
     TestOrder order = commandBus.dispatchAndReceive(new TestOrderResultCommand("single"));
 
     assertThat(order).isEqualTo(new TestOrder("single"));

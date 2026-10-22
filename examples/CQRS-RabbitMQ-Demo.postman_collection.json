@@ -153,8 +153,8 @@
       ]
     },
     {
-      "name": "Typed query (ParameterizedTypeReference)",
-      "description": "Demonstrates typed query using ParameterizedTypeReference to preserve generic type info during RabbitMQ deserialization.",
+      "name": "Typed query (ResultType)",
+      "description": "Demonstrates typed query using ResultType to preserve generic type info during RabbitMQ deserialization.",
       "item": [
         {
           "name": "Get all orders (typed)",

@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.test.fixtures.TestCommand;
 
 class InMemoryCommandBusTest {
@@ -21,12 +21,11 @@ class InMemoryCommandBusTest {
   }
 
   @Test
-  void dispatchAndReceiveWithTypeReferenceReturnsHandlerResult() {
+  void dispatchAndReceiveWithResultTypeReturnsHandlerResult() {
     InMemoryCommandBus bus = new InMemoryCommandBus();
     bus.register(TestCommand.class, cmd -> "v");
 
-    String result =
-        bus.dispatchAndReceive(new TestCommand("a"), new ParameterizedTypeReference<String>() {});
+    String result = bus.dispatchAndReceive(new TestCommand("a"), new ResultType<String>() {});
 
     assertThat(result).isEqualTo("v");
   }

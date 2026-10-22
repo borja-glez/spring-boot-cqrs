@@ -2,7 +2,6 @@ package com.borjaglez.cqrs.example.multiservice.order.controller;
 
 import java.util.List;
 
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.CommandBus;
 import com.borjaglez.cqrs.example.multiservice.order.command.PlaceOrderCommand;
 import com.borjaglez.cqrs.example.multiservice.order.domain.Order;
@@ -98,33 +98,29 @@ public class OrderController {
 
   @GetMapping("/typed")
   public ResponseEntity<List<Order>> getAllOrdersTyped() {
-    // Typed query: ParameterizedTypeReference preserves generic type for deserialization
+    // Typed query: ResultType preserves the generic type for deserialization
     List<Order> orders =
-        localQueryBus.ask(
-            new GetAllOrdersQuery(), new ParameterizedTypeReference<List<Order>>() {});
+        localQueryBus.ask(new GetAllOrdersQuery(), new ResultType<List<Order>>() {});
     return ResponseEntity.ok(orders);
   }
 
   @GetMapping("/stock/{productId}/typed")
   public ResponseEntity<ProductStockDto> checkStockTyped(@PathVariable String productId) {
-    // Cross-service typed query: ParameterizedTypeReference ensures correct deserialization over
-    // RabbitMQ
+    // Cross-service typed query: ResultType ensures correct deserialization over RabbitMQ
     ProductStockDto stock =
         remoteQueryBus.ask(
-            new GetProductStockQuery(productId),
-            new ParameterizedTypeReference<ProductStockDto>() {});
+            new GetProductStockQuery(productId), new ResultType<ProductStockDto>() {});
     return ResponseEntity.ok(stock);
   }
 
   @PostMapping("/{id}/reserve/typed")
   public ResponseEntity<String> reserveInventoryTyped(
       @PathVariable String id, @RequestBody ReserveRequest request) {
-    // Cross-service typed command: ParameterizedTypeReference ensures correct deserialization over
-    // RabbitMQ
+    // Cross-service typed command: ResultType ensures correct deserialization over RabbitMQ
     String result =
         remoteCommandBus.dispatchAndReceive(
             new ReserveInventoryCommand(id, request.productId(), request.quantity()),
-            new ParameterizedTypeReference<String>() {});
+            new ResultType<String>() {});
     return ResponseEntity.ok(result);
   }
 

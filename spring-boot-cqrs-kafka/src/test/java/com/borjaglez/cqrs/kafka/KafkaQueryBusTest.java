@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.kafka.fixtures.RecordingMiddleware;
@@ -82,43 +83,55 @@ class KafkaQueryBusTest {
   }
 
   @Test
-  void askWithTypeShouldPassTypeReference() throws Exception {
+  void askWithResultTypeShouldPassTypeReference() throws Exception {
     TestQuery query = new TestQuery("test");
-    ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(requestReplyClient.sendAndReceive(
-            null, "cqrs.queries", query, responseType, KafkaRequestMode.REPLY))
+            null,
+            "cqrs.queries",
+            query,
+            ParameterizedTypeReference.forType(String.class),
+            KafkaRequestMode.REPLY))
         .thenReturn("typed");
 
-    String result = queryBus.ask(query, responseType);
+    String result = queryBus.ask(query, resultType);
 
     assertThat(result).isEqualTo("typed");
   }
 
   @Test
-  void askWithTypeShouldWrapCheckedExceptions() throws Exception {
+  void askWithResultTypeShouldWrapCheckedExceptions() throws Exception {
     TestQuery query = new TestQuery("test");
-    ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(requestReplyClient.sendAndReceive(
-            null, "cqrs.queries", query, responseType, KafkaRequestMode.REPLY))
+            null,
+            "cqrs.queries",
+            query,
+            ParameterizedTypeReference.forType(String.class),
+            KafkaRequestMode.REPLY))
         .thenAnswer(
             invocation -> {
               throw new Exception("boom");
             });
 
-    assertThatThrownBy(() -> queryBus.ask(query, responseType))
+    assertThatThrownBy(() -> queryBus.ask(query, resultType))
         .isInstanceOf(QueryHandlerExecutionException.class)
         .hasRootCauseMessage("boom");
   }
 
   @Test
-  void askWithTypeShouldRethrowRuntimeExceptions() throws Exception {
+  void askWithResultTypeShouldRethrowRuntimeExceptions() throws Exception {
     TestQuery query = new TestQuery("test");
-    ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(requestReplyClient.sendAndReceive(
-            null, "cqrs.queries", query, responseType, KafkaRequestMode.REPLY))
+            null,
+            "cqrs.queries",
+            query,
+            ParameterizedTypeReference.forType(String.class),
+            KafkaRequestMode.REPLY))
         .thenThrow(new IllegalStateException("boom"));
 
-    assertThatThrownBy(() -> queryBus.ask(query, responseType))
+    assertThatThrownBy(() -> queryBus.ask(query, resultType))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("boom");
   }
@@ -147,7 +160,7 @@ class KafkaQueryBusTest {
                 new RecordingMiddleware(calls, "inbound", DispatchPhase.INBOUND)));
 
     String answer = bus.ask(query);
-    String typed = bus.ask(query, new ParameterizedTypeReference<String>() {});
+    String typed = bus.ask(query, new ResultType<String>() {});
 
     assertThat(answer).isEqualTo("answer");
     assertThat(typed).isEqualTo("answer");

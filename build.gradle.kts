@@ -12,6 +12,7 @@ tasks.register("coverage") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Runs coverage verification for library modules."
     dependsOn(
+        ":spring-boot-cqrs-api:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-core:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-kafka:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-rabbitmq:jacocoTestCoverageVerification",
@@ -25,6 +26,7 @@ tasks.register("quality") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Runs tests, coverage verification, and formatting checks."
     dependsOn(
+        ":spring-boot-cqrs-api:test",
         ":spring-boot-cqrs-core:test",
         ":spring-boot-cqrs-kafka:test",
         ":spring-boot-cqrs-rabbitmq:test",
@@ -58,6 +60,7 @@ tasks.register("spotlessCheckAll") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Runs Spotless check on all modules that have the plugin applied."
     dependsOn(
+        ":spring-boot-cqrs-api:spotlessCheck",
         ":spring-boot-cqrs-core:spotlessCheck",
         ":spring-boot-cqrs-kafka:spotlessCheck",
         ":spring-boot-cqrs-rabbitmq:spotlessCheck",
@@ -80,6 +83,7 @@ tasks.register("spotlessApplyAll") {
     group = "formatting"
     description = "Runs Spotless apply on all modules that have the plugin applied."
     dependsOn(
+        ":spring-boot-cqrs-api:spotlessApply",
         ":spring-boot-cqrs-core:spotlessApply",
         ":spring-boot-cqrs-kafka:spotlessApply",
         ":spring-boot-cqrs-rabbitmq:spotlessApply",

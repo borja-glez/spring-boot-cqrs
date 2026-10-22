@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.middleware.DefaultMiddlewareChain;
 import com.borjaglez.cqrs.middleware.DispatchPhase;
@@ -62,8 +63,8 @@ public class RabbitMqQueryBus implements QueryBus {
 
   @Override
   @SuppressWarnings("unchecked")
-  public <R> R ask(Query query, ParameterizedTypeReference<R> responseType) {
-    return (R) send(query, responseType);
+  public <R> R ask(Query query, ResultType<R> resultType) {
+    return (R) send(query, ParameterizedTypeReference.forType(resultType.type()));
   }
 
   /** Runs the outbound middlewares with the request-reply send as the end of the chain. */
