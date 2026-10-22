@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.jdbc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,11 +19,16 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.transaction.TransactionDefinition;
 
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.command.spring.SpringCommandBus;
 import com.borjaglez.cqrs.idempotency.IdempotentInvoker;
+import com.borjaglez.cqrs.middleware.BusMiddleware;
+import com.borjaglez.cqrs.retry.BackoffStrategy;
+import com.borjaglez.cqrs.retry.RetryMiddleware;
+import com.borjaglez.cqrs.retry.RetryPolicy;
 import com.borjaglez.cqrs.transaction.QueryTransactions;
 import com.borjaglez.cqrs.transaction.TransactionMiddleware;
 
@@ -30,11 +36,11 @@ class TransactionMiddlewareJdbcTest {
 
   private EmbeddedDatabase dataSource;
   private JdbcTemplate jdbc;
-  private SpringCommandBus bus;
+  private CountingTransactionManager transactionManager;
   private PlainHandler handler;
 
   @BeforeEach
-  void setUp() throws Exception {
+  void setUp() {
     dataSource =
         new EmbeddedDatabaseBuilder()
             .setType(EmbeddedDatabaseType.H2)
@@ -45,8 +51,11 @@ class TransactionMiddlewareJdbcTest {
         .execute(dataSource);
     jdbc = new JdbcTemplate(dataSource);
     jdbc.execute("CREATE TABLE effect (id INT)");
-    DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+    transactionManager = new CountingTransactionManager(dataSource);
     handler = new PlainHandler(dataSource);
+  }
+
+  private SpringCommandBus bus(String handlerId, BusMiddleware... middlewares) throws Exception {
     CommandHandlerRegistry registry = new CommandHandlerRegistry();
     registry.setIdempotentInvoker(
         new IdempotentInvoker(
@@ -59,11 +68,12 @@ class TransactionMiddlewareJdbcTest {
         "plain",
         false,
         true,
-        "plain-handler");
-    bus =
-        new SpringCommandBus(
-            registry,
-            List.of(new TransactionMiddleware(transactionManager, QueryTransactions.READ_ONLY)));
+        handlerId);
+    return new SpringCommandBus(registry, List.of(middlewares));
+  }
+
+  private TransactionMiddleware transactions() {
+    return new TransactionMiddleware(transactionManager, QueryTransactions.READ_ONLY);
   }
 
   @AfterEach
@@ -76,19 +86,76 @@ class TransactionMiddlewareJdbcTest {
   }
 
   @Test
-  void idempotencyMarkerCommitsWithTheHandlerTransaction() {
-    handler.fail = true;
+  void idempotencyMarkerCommitsWithTheHandlerTransaction() throws Exception {
+    SpringCommandBus bus = bus("plain-handler", transactions());
+    handler.failuresLeft = 1;
 
     assertThatThrownBy(() -> bus.dispatch(new PlainCommand())).hasMessageContaining("boom");
 
     assertThat(count("effect")).isZero();
     assertThat(count("cqrs_processed_message")).isZero();
 
-    handler.fail = false;
     bus.dispatch(new PlainCommand());
 
     assertThat(count("effect")).isOne();
     assertThat(count("cqrs_processed_message")).isOne();
+  }
+
+  @Test
+  void aFailingHandlerWithoutIdempotencyRollsBackItsWorkOnlyWithTheMiddleware() throws Exception {
+    handler.failuresLeft = 1;
+    assertThatThrownBy(() -> bus(null, transactions()).dispatch(new PlainCommand()))
+        .hasMessageContaining("boom");
+    assertThat(count("effect")).isZero();
+
+    handler.failuresLeft = 1;
+    assertThatThrownBy(() -> bus(null).dispatch(new PlainCommand())).hasMessageContaining("boom");
+    assertThat(count("effect")).isOne();
+  }
+
+  @Test
+  void theStoreJoinsTheMiddlewareTransactionInsteadOfOpeningItsOwn() throws Exception {
+    bus("plain-handler", transactions()).dispatch(new PlainCommand());
+
+    assertThat(transactionManager.begun).isEqualTo(1);
+    assertThat(count("cqrs_processed_message")).isOne();
+  }
+
+  @Test
+  void eachRetryAttemptOfAnIdempotentHandlerRunsInOneTransaction() throws Exception {
+    RetryMiddleware retry =
+        RetryMiddleware.builder()
+            .defaultPolicy(
+                RetryPolicy.builder()
+                    .maxAttempts(2)
+                    .backoff(BackoffStrategy.fixed(Duration.ZERO))
+                    .build())
+            .build();
+    SpringCommandBus bus = bus("plain-handler", retry, transactions());
+    handler.failuresLeft = 1;
+
+    bus.dispatch(new PlainCommand());
+
+    assertThat(transactionManager.begun).isEqualTo(2);
+    assertThat(count("effect")).isOne();
+    assertThat(count("cqrs_processed_message")).isOne();
+  }
+
+  /** Counts the physical transactions that are begun. */
+  private static class CountingTransactionManager extends DataSourceTransactionManager {
+    private static final long serialVersionUID = 1L;
+
+    int begun;
+
+    CountingTransactionManager(DataSource dataSource) {
+      super(dataSource);
+    }
+
+    @Override
+    protected void doBegin(Object transaction, TransactionDefinition definition) {
+      begun++;
+      super.doBegin(transaction, definition);
+    }
   }
 
   static class PlainCommand extends Command {}
@@ -96,7 +163,7 @@ class TransactionMiddlewareJdbcTest {
   /** A handler with no Spring annotations, as in a hexagonal application. */
   public static class PlainHandler {
     private final JdbcTemplate jdbc;
-    boolean fail;
+    int failuresLeft;
 
     PlainHandler(DataSource dataSource) {
       this.jdbc = new JdbcTemplate(dataSource);
@@ -104,7 +171,7 @@ class TransactionMiddlewareJdbcTest {
 
     public void handle(PlainCommand command) {
       jdbc.update("INSERT INTO effect VALUES (1)");
-      if (fail) {
+      if (failuresLeft-- > 0) {
         throw new IllegalStateException("boom");
       }
     }

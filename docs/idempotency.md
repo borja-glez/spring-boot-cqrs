@@ -59,11 +59,13 @@ implementation("com.borjaglez:spring-boot-cqrs-jdbc:<version>")
 
 ### Handlers without `@Transactional`
 
-A handler with no Spring annotations (as in a hexagonal application) can still be `@Idempotent`
-and transactional: enable `cqrs.transactions.enabled=true` and the
-[`TransactionMiddleware`](middleware.md#transactionmiddleware) opens the transaction around the
-whole dispatch. The idempotency marker is written inside that transaction, so it commits with the
-handler's database work and rolls back with it.
+The JDBC store already opens a transaction around the marker and the handler, so an `@Idempotent`
+handler needs no `@Transactional` for the marker to commit or roll back with its database work.
+What `cqrs.transactions.enabled=true` adds is the
+[`TransactionMiddleware`](middleware.md#transactionmiddleware): it opens the transaction around the
+whole dispatch, and the marker joins it. That transaction also covers inner middleware, the work of
+handlers that are not `@Idempotent` (a hexagonal handler with no Spring annotations is transactional
+too), and every handler of an event.
 
 ## Stores and guarantees
 

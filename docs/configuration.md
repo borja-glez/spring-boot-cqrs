@@ -33,7 +33,7 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | `cqrs.tracing.enabled` | `boolean` | `true` | Enables the `TracingMiddleware` (wraps each dispatch in a Micrometer `Observation`). Requires an `ObservationRegistry` bean (provided by Spring Boot Actuator). |
 | `cqrs.tracing.observation-name` | `String` | `"cqrs.bus.handle"` | Name of the observation/span created around each bus dispatch. |
 | `cqrs.transactions.enabled` | `boolean` | `false` | Registers the `TransactionMiddleware`, which runs handlers in a transaction. Opt-in; needs a single `PlatformTransactionManager`. |
-| `cqrs.transactions.queries` | `read-only` \| `read-write` \| `none` | `read-only` | How queries run: in a read-only transaction, in a read-write one, or without a transaction. Commands and events always run in a transaction. |
+| `cqrs.transactions.queries` | `read-only` \| `read-write` \| `none` | `read-only` | How queries run: in a read-only transaction, in a read-write one, or with no transaction opened by the middleware (a query asked inside an outer transaction still takes part in it). Commands and events always run in a transaction. |
 | `cqrs.retry.enabled` | `boolean` | `false` | Registers the `RetryMiddleware` for commands and queries. Opt-in. |
 | `cqrs.retry.max-attempts` | `int` | `3` | Total attempts, the first one included; `1` disables retries. |
 | `cqrs.retry.backoff.strategy` | `fixed` \| `exponential` \| `exponential-jitter` | `exponential-jitter` | Delay between attempts. |
@@ -366,6 +366,9 @@ cqrs:
       strategy: exponential-jitter
       initial-delay: 100ms
       max-delay: 2s
+  transactions:
+    enabled: false
+    queries: read-only               # read-only | read-write | none
   idempotency:
     store: jdbc                      # jdbc | in-memory; unset = jdbc when available
     retention: 7d

@@ -297,7 +297,7 @@ Retrying an `@Idempotent` command is safe: a failed attempt leaves no marker onc
 rolls back, so the next attempt runs the handler. When the command is dispatched locally inside the
 caller's transaction, the attempts share it and the marker of the failed attempt is still there: the
 next attempt skips the handler. Start the transaction inside the retry, as above. Events are still not retried in-process; with `@Idempotent` handlers a transport
-redelivery only re-runs the handlers that failed. See [Idempotent Handlers](idempotency.md).
+redelivery only re-runs the handlers that failed (unless the [`TransactionMiddleware`](#transactionmiddleware) is on: all handlers of an event then share one transaction and every handler re-runs). See [Idempotent Handlers](idempotency.md).
 
 ### TransactionMiddleware
 
@@ -307,9 +307,10 @@ redelivery only re-runs the handlers that failed. See [Idempotent Handlers](idem
 Runs the rest of the chain, and so the handler, in a transaction, so handlers need no `@Transactional` (for instance in hexagonal applications whose handlers carry no Spring annotations). It needs a single `PlatformTransactionManager` (or a `@Primary` one) and registers nothing otherwise.
 
 - **Commands and events** run with `PROPAGATION_REQUIRED`: they join a transaction in progress or start one.
-- **Queries** follow `cqrs.transactions.queries`: `read-only` (the default) uses a read-only transaction, `read-write` a regular one, and `none` runs the query without a transaction, which suits a handler that calls another service and must not hold a connection.
+- **Queries** follow `cqrs.transactions.queries`: `read-only` (the default) uses a read-only transaction, `read-write` a regular one, and `none` makes the middleware open no transaction for the query, which suits a handler that calls another service and must not hold a connection (a query asked inside an outer transaction still takes part in it).
 - **Failures** roll the transaction back and are rethrown as they are. A checked exception also rolls back and is not wrapped further than the bus already does.
-- **Order.** `TransactionMiddleware.ORDER` is `Ordered.LOWEST_PRECEDENCE - 50`, inside `RetryMiddleware` (`LOWEST_PRECEDENCE - 100`): each retry attempt runs in its own transaction. The chain includes the `@Idempotent` invoker, so the idempotency marker is written in the same transaction as the handler's work.
+- **Order.** `TransactionMiddleware.ORDER` is `Ordered.LOWEST_PRECEDENCE - 50`, inside `RetryMiddleware` (`LOWEST_PRECEDENCE - 100`): each retry attempt runs in its own transaction. The chain includes the `@Idempotent` invoker, so with the JDBC store the idempotency marker is written in the same transaction as the handler's work (the in-memory marker is never transactional). `CommandValidationInterceptor` and `MicrometerBusObservability` have no `@Order` (`LOWEST_PRECEDENCE`), so they run inside the transaction: validation already holds a connection, and a failure at commit time is not recorded by the metrics middleware.
+- **Events.** All handlers of one event share one transaction: a failing later handler rolls back the work and the idempotency markers of the earlier ones. An event published from inside a command handler joins the command's transaction. With the middleware on, a transport redelivery of an event therefore re-runs every handler, not only the ones that failed (still safe, because the markers roll back together with the failed run).
 - **Phases.** The default ones, `LOCAL` and `INBOUND`: it runs on local dispatches and in the consumer of a remote bus, not on the sender.
 
 ```java

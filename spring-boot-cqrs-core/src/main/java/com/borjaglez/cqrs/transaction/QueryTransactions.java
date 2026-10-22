@@ -6,6 +6,9 @@ public enum QueryTransactions {
   READ_ONLY,
   /** In a regular read-write transaction. */
   READ_WRITE,
-  /** Without a transaction: the query is passed on as is. */
+  /**
+   * The middleware opens no transaction: the query is passed on as is (it still takes part in a
+   * transaction already in progress).
+   */
   NONE
 }
