@@ -17,6 +17,7 @@ tasks.register("coverage") {
         ":spring-boot-cqrs-kafka:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-rabbitmq:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-jdbc:jacocoTestCoverageVerification",
+        ":spring-boot-cqrs-test:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-asyncapi-test:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-boot3-starter:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-boot4-starter:jacocoTestCoverageVerification"
@@ -32,6 +33,7 @@ tasks.register("quality") {
         ":spring-boot-cqrs-kafka:test",
         ":spring-boot-cqrs-rabbitmq:test",
         ":spring-boot-cqrs-jdbc:test",
+        ":spring-boot-cqrs-test:test",
         ":spring-boot-cqrs-asyncapi-test:test",
         ":spring-boot-cqrs-boot3-starter:test",
         ":spring-boot-cqrs-boot4-starter:test",
