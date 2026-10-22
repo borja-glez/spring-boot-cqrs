@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="850" height="664" viewBox="0 0 850 664" role="img" aria-labelledby="ob-title ob-desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="680" viewBox="0 0 850 680" role="img" aria-labelledby="ob-title ob-desc">
 <title id="ob-title">Transactional outbox</title>
-<desc id="ob-desc">The transactional outbox of spring-boot-cqrs-jdbc. In one business transaction a command handler saves its changes and calls OutboxEventBus.publish(event), which inserts a row into the cqrs_outbox table (event id, logical name, class name, payload and message context); both commit or both roll back, and publishing without an active transaction throws IllegalStateException. OutboxRelay runs every cqrs.outbox.relay.interval (1 second). Each run is one batch transaction that locks the oldest pending rows, those whose published_at and failed_at are null, with SELECT ... ORDER BY id FETCH FIRST batch-size (100) ROWS ONLY FOR UPDATE SKIP LOCKED, so several instances never relay the same row. For each row in order it decodes the row, publishes the event through the target EventBus (KafkaEventBus or RabbitMqEventBus, chosen with cqrs.outbox.relay.event-bus), whose outbound middleware and headers apply, and sets published_at once the bus returned. The batch stops at the first failure. When the target bus fails (broker down, timeout, rejection) the row gets attempts + 1 and last_error and is retried at every later run, forever; it is never set aside. When a row cannot be read (unknown class, payload or context that does not deserialize) it gets read_failures + 1 and the batch stops; once read_failures reaches cqrs.outbox.relay.max-attempts (10) failed_at is set, an ERROR is logged and later rows continue. After the batch transaction commits, OutboxRelayListener beans hear the outcome: OutboxMetrics counts cqrs.outbox.published and cqrs.outbox.publish.failures for this instance, and its gauges cqrs.outbox.pending, cqrs.outbox.set.aside and cqrs.outbox.oldest.pending.age read the whole table. Published rows are deleted after cqrs.outbox.retention (7 days). Delivery is at least once, so consumers should be @Idempotent. The animation inserts row 43, relays row 41, fails on row 42 and stops the batch, then relays rows 42 and 43 in the next run.</desc>
+<desc id="ob-desc">The transactional outbox of spring-boot-cqrs-jdbc. In one business transaction a command handler saves its changes and calls OutboxEventBus.publish(event), which inserts a row into the cqrs_outbox table (event id, logical name, class name, payload and message context); both commit or both roll back, and publishing without an active transaction throws IllegalStateException. OutboxRelay runs every cqrs.outbox.relay.interval (1 second). Each run is one batch transaction that locks the oldest pending rows, those whose published_at and failed_at are null, with SELECT ... ORDER BY id FETCH FIRST batch-size (100) ROWS ONLY FOR UPDATE SKIP LOCKED, so several instances never relay the same row. For each row in order it decodes the row, publishes the event through the target EventBus (KafkaEventBus or RabbitMqEventBus, chosen with cqrs.outbox.relay.event-bus), whose outbound middleware and headers apply, and sets published_at once the bus returned: with Kafka after the broker acknowledged the record, with RabbitMQ after the broker confirmed it only when publisher confirms are enabled (cqrs.rabbitmq.events.confirms.enabled), otherwise as soon as the message is written to the channel. The batch stops at the first failure. When the target bus fails (broker down, timeout, rejection) the row gets attempts + 1 and last_error and is retried at every later run, forever; it is never set aside. When a row cannot be read (unknown class, payload or context that does not deserialize) it gets read_failures + 1 and the batch stops; once read_failures reaches cqrs.outbox.relay.max-attempts (10) failed_at is set, an ERROR is logged and later rows continue. After the batch transaction commits, OutboxRelayListener beans hear the outcome: OutboxMetrics counts cqrs.outbox.published and cqrs.outbox.publish.failures for this instance, and its gauges cqrs.outbox.pending, cqrs.outbox.set.aside and cqrs.outbox.oldest.pending.age read the whole table. Published rows are deleted after cqrs.outbox.retention (7 days). Delivery is at least once, so consumers should be @Idempotent. The animation inserts row 43, relays row 41, fails on row 42 and stops the batch, then relays rows 42 and 43 in the next run.</desc>
 <defs>
 <filter id="ob-sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.45"/></filter>
 <filter id="ob-gl" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -90,7 +90,7 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 .k38{animation:k38 16s linear infinite}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}.tok{display:none}}
 </style>
-<rect x="0.5" y="0.5" width="849" height="663" rx="16" fill="url(#ob-panel)" stroke="#30363d"/>
+<rect x="0.5" y="0.5" width="849" height="679" rx="16" fill="url(#ob-panel)" stroke="#30363d"/>
 <text x="24" y="38" font-size="20" fill="#e6edf3" font-weight="600">Transactional outbox</text>
 <text x="24" y="60" font-size="13" fill="#8b949e">the row commits with the business change; the relay publishes it after commit, at least once</text>
 <rect class="bx" x="16" y="86" width="246" height="270" rx="14" fill="#39c5bb" fill-opacity="0.05" stroke="#39c5bb" stroke-width="1.2" stroke-dasharray="5 4"/>
@@ -160,13 +160,14 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <text class="m" x="626" y="428" font-size="12" fill="#e6edf3">RabbitMqEventBus</text>
 <text class="m" x="626" y="446" font-size="12" fill="#8b949e">cqrs.outbox.relay.event-bus</text>
 <path d="M724,356 L724,370" fill="none" stroke="#f0883e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ob-m-orange)"/>
-<rect class="bx" x="614" y="478" width="220" height="70" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#ob-sh)"/>
+<rect class="bx" x="614" y="478" width="220" height="88" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#ob-sh)"/>
 <text x="626" y="498" font-size="13" fill="#e6edf3" font-weight="600">broker</text>
-<text x="626" y="516" font-size="12" fill="#8b949e">Kafka ack, RabbitMQ confirm</text>
-<text x="626" y="534" font-size="12" fill="#8b949e">context and name headers</text>
+<text x="626" y="516" font-size="12" fill="#8b949e">Kafka: acknowledged</text>
+<text x="626" y="534" font-size="12" fill="#8b949e">RabbitMQ: confirms, if enabled</text>
+<text x="626" y="552" font-size="12" fill="#8b949e">context and name headers</text>
 <path d="M724,460 L724,476" fill="none" stroke="#f0883e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ob-m-orange)"/>
-<text x="614" y="584" font-size="12.5" fill="#e6edf3" font-weight="600">delivered at least once</text>
-<text x="614" y="602" font-size="12" fill="#e6edf3"><tspan fill="#8b949e">make consumers </tspan><tspan class="m">@Idempotent</tspan></text>
+<text x="614" y="592" font-size="12.5" fill="#e6edf3" font-weight="600">delivered at least once</text>
+<text x="614" y="610" font-size="12" fill="#e6edf3"><tspan fill="#8b949e">make consumers </tspan><tspan class="m">@Idempotent</tspan></text>
 <rect class="bx" x="16" y="372" width="284" height="108" rx="10" fill="#161b22" stroke="#d29922" stroke-width="1.2" filter="url(#ob-sh)"/>
 <text x="28" y="392" font-size="12.5" fill="#d29922" font-weight="600">the target bus fails</text>
 <text x="28" y="412" font-size="12" fill="#8b949e">broker down, timeout, rejection</text>
@@ -188,7 +189,7 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <text class="m" x="312" y="560" font-size="12" fill="#e6edf3">cqrs.outbox.pending</text>
 <text class="m" x="312" y="578" font-size="12" fill="#e6edf3">cqrs.outbox.set.aside</text>
 <text class="m" x="312" y="596" font-size="12" fill="#e6edf3">cqrs.outbox.oldest.pending.age</text>
-<text x="425" y="642" font-size="12" fill="#8b949e" text-anchor="middle">several instances can relay: SKIP LOCKED hands every locked batch to one of them</text>
+<text x="425" y="656" font-size="12" fill="#8b949e" text-anchor="middle">several instances can relay: SKIP LOCKED hands every locked batch to one of them</text>
 <circle class="tok k9" r="4.5" fill="#39c5bb" filter="url(#ob-gl)" opacity="0"/>
 <text class="k10" x="250" y="108" font-size="12" fill="#3fb950" text-anchor="end" opacity="0">committed</text>
 <rect class="k11" x="13" y="83" width="252" height="276" rx="16" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>
@@ -202,7 +203,7 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <circle class="tok k19" r="4.5" fill="#39c5bb" filter="url(#ob-gl)" opacity="0"/>
 <circle class="tok k20" r="4.5" fill="#f85149" filter="url(#ob-gl)" opacity="0"/>
 <text class="k21" x="822" y="498" font-size="12" fill="#f85149" font-weight="600" text-anchor="end" opacity="0">unreachable</text>
-<rect class="k22" x="611" y="475" width="226" height="76" rx="13" stroke="#f85149" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k22" x="611" y="475" width="226" height="94" rx="13" stroke="#f85149" stroke-width="2.2" opacity="0" fill="none"/>
 <rect class="k23" x="13" y="369" width="290" height="114" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
 <rect class="k24" x="628" y="288" width="192" height="40" rx="8" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
 <rect class="k25" x="13" y="493" width="586" height="122" rx="13" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>

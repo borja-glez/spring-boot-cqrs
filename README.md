@@ -156,7 +156,7 @@ implementation("com.borjaglez.cqrs:spring-boot-cqrs-api:0.6.0")
 
 <p align="center"><img src="docs/assets/diagrams/hexagonal.svg" alt="Three nested rings. The domain in the centre does not use the library. The application around it depends on spring-boot-cqrs-api: commands and queries are its input ports, handlers its use cases. The infrastructure outside holds the adapters, SpringCommandBus and SpringQueryBus from spring-boot-cqrs-core, OutboxEventBus from spring-boot-cqrs-jdbc and the composition root configured by the starter. Every source dependency points inwards." width="100%"></p>
 
-In a ports-and-adapters application, commands and queries are the input ports and handlers are the use cases, with no Spring annotation: the starter registers them, `cqrs.transactions.enabled=true` runs them in a transaction, and an adapter translates domain events into integration events published through the outbox. [docs/hexagonal.md](docs/hexagonal.md) walks through a `domain` / `application` / `infrastructure` layout, the architecture rules that guard it and the AsyncAPI contract of its messages.
+In a ports-and-adapters application, commands and queries are the input ports and handlers are the use cases, with no Spring annotation: the starter registers them, `cqrs.transactions.enabled=true` opens their transactions (for queries as `cqrs.transactions.queries` says), and an adapter translates domain events into integration events published through the outbox. [docs/hexagonal.md](docs/hexagonal.md) walks through a `domain` / `application` / `infrastructure` layout, the architecture rules that guard it and the AsyncAPI contract of its messages.
 
 ## Usage
 

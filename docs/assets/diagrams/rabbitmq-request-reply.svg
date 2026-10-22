@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="850" height="746" viewBox="0 0 850 746" role="img" aria-labelledby="rr-title rr-desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="762" viewBox="0 0 850 762" role="img" aria-labelledby="rr-title rr-desc">
 <title id="rr-title">RabbitMQ request and reply</title>
 <desc id="rr-desc">A sequence diagram of a command sent over RabbitMQ with a reply. The caller calls RabbitMqCommandBus.dispatchAndReceive (RabbitMqQueryBus.ask and dispatchAndWait work the same way). The OUTBOUND middleware runs in the sending process, then RabbitMqPublisher sends the request through RabbitTemplate.sendAndReceive to the cqrs.commands topic exchange, with the message name as routing key, the cqrs.message.type and cqrs.context headers, a reply-to address (Spring AMQP&#x27;s direct reply-to, amq.rabbitmq.reply-to, by default) and a correlation id. The exchange routes it to the queue of the responding service, cqrs.stock.commands. RabbitMqCommandConsumer checks that the message is exposed, rehydrates the MessageContext from the headers, runs the INBOUND middleware and calls the handler. The result goes back to the reply-to address with the same correlation id, the requester matches it and converts it, with the ResultType when one was passed, and the caller receives it. The requester waits up to the reply timeout, spring.rabbitmq.template.reply-timeout (5 seconds by default) or cqrs.rabbitmq.commands.reply-timeout and cqrs.rabbitmq.queries.reply-timeout. Three outcomes: the handler returns, and a business refusal is returned as a result record such as Reservation(false, &quot;no stock&quot;); the handler throws, the error reply carries the cqrs.error and cqrs.error.type headers and the caller gets a RemoteHandlerException with the remote exception&#x27;s type name and message only; or no reply arrives in time and the caller gets a RemoteReplyTimeoutException while the handler may still run or may have run, so it must be idempotent by business key. The animation plays the three outcomes in turn.</desc>
 <defs>
@@ -38,7 +38,7 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 .k12{animation:k12 24s linear infinite}
 @keyframes k13{0.00%{opacity:0}25.42%{opacity:0}26.17%{opacity:1.0}27.50%{opacity:1.0}28.25%{opacity:0}100.00%{opacity:0}}
 .k13{animation:k13 24s linear infinite}
-@keyframes k14{0.00%{opacity:0;transform:translate(250px,600px)}27.50%{opacity:0;transform:translate(250px,600px)}28.00%{opacity:1;transform:translate(214px,600px)}29.50%{opacity:1;transform:translate(106px,600px)}30.00%{opacity:0;transform:translate(70px,600px)}100.00%{opacity:0;transform:translate(70px,600px)}}
+@keyframes k14{0.00%{opacity:0;transform:translate(250px,616px)}27.50%{opacity:0;transform:translate(250px,616px)}28.00%{opacity:1;transform:translate(214px,616px)}29.50%{opacity:1;transform:translate(106px,616px)}30.00%{opacity:0;transform:translate(70px,616px)}100.00%{opacity:0;transform:translate(70px,616px)}}
 .k14{animation:k14 24s linear infinite}
 @keyframes k15{0.00%{opacity:0}30.00%{opacity:0}30.75%{opacity:1.0}33.33%{opacity:1.0}34.08%{opacity:0}100.00%{opacity:0}}
 .k15{animation:k15 24s linear infinite}
@@ -62,7 +62,7 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 .k24{animation:k24 24s linear infinite}
 @keyframes k25{0.00%{opacity:0;transform:translate(427px,524px)}54.17%{opacity:0;transform:translate(427px,524px)}54.67%{opacity:1;transform:translate(391.6px,524px)}56.17%{opacity:1;transform:translate(285.4px,524px)}56.67%{opacity:0;transform:translate(250px,524px)}100.00%{opacity:0;transform:translate(250px,524px)}}
 .k25{animation:k25 24s linear infinite}
-@keyframes k26{0.00%{opacity:0;transform:translate(250px,600px)}58.33%{opacity:0;transform:translate(250px,600px)}58.83%{opacity:1;transform:translate(214px,600px)}60.33%{opacity:1;transform:translate(106px,600px)}60.83%{opacity:0;transform:translate(70px,600px)}100.00%{opacity:0;transform:translate(70px,600px)}}
+@keyframes k26{0.00%{opacity:0;transform:translate(250px,616px)}58.33%{opacity:0;transform:translate(250px,616px)}58.83%{opacity:1;transform:translate(214px,616px)}60.33%{opacity:1;transform:translate(106px,616px)}60.83%{opacity:0;transform:translate(70px,616px)}100.00%{opacity:0;transform:translate(70px,616px)}}
 .k26{animation:k26 24s linear infinite}
 @keyframes k27{0.00%{opacity:0}60.83%{opacity:0}61.58%{opacity:1.0}65.00%{opacity:1.0}65.75%{opacity:0}100.00%{opacity:0}}
 .k27{animation:k27 24s linear infinite}
@@ -82,13 +82,13 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 .k34{animation:k34 24s linear infinite}
 @keyframes k35{0.00%{opacity:0}90.00%{opacity:0}90.75%{opacity:1.0}95.83%{opacity:1.0}96.58%{opacity:0}100.00%{opacity:0}}
 .k35{animation:k35 24s linear infinite}
-@keyframes k36{0.00%{opacity:0;transform:translate(250px,600px)}91.67%{opacity:0;transform:translate(250px,600px)}92.17%{opacity:1;transform:translate(214px,600px)}93.67%{opacity:1;transform:translate(106px,600px)}94.17%{opacity:0;transform:translate(70px,600px)}100.00%{opacity:0;transform:translate(70px,600px)}}
+@keyframes k36{0.00%{opacity:0;transform:translate(250px,616px)}91.67%{opacity:0;transform:translate(250px,616px)}92.17%{opacity:1;transform:translate(214px,616px)}93.67%{opacity:1;transform:translate(106px,616px)}94.17%{opacity:0;transform:translate(70px,616px)}100.00%{opacity:0;transform:translate(70px,616px)}}
 .k36{animation:k36 24s linear infinite}
 @keyframes k37{0.00%{opacity:0}94.17%{opacity:0}94.92%{opacity:1.0}98.33%{opacity:1.0}99.08%{opacity:0}100.00%{opacity:0}}
 .k37{animation:k37 24s linear infinite}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}.tok{display:none}}
 </style>
-<rect x="0.5" y="0.5" width="849" height="745" rx="16" fill="url(#rr-panel)" stroke="#30363d"/>
+<rect x="0.5" y="0.5" width="849" height="761" rx="16" fill="url(#rr-panel)" stroke="#30363d"/>
 <text x="24" y="38" font-size="20" fill="#e6edf3" font-weight="600">RabbitMQ request/reply</text>
 <text x="24" y="60" font-size="13" fill="#8b949e">dispatchAndReceive, dispatchAndWait and ask wait for the reply with their correlation id, up to the reply timeout</text>
 <text x="174" y="88" font-size="12" fill="#f0883e" font-weight="600" text-anchor="middle">requesting service</text>
@@ -100,25 +100,25 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <rect class="bx" x="14" y="104" width="112" height="60" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.2" filter="url(#rr-sh)"/>
 <text x="70" y="130" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">caller</text>
 <text x="70" y="148" font-size="12" fill="#8b949e" text-anchor="middle">your code</text>
-<path d="M70,164 L70,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<path d="M70,164 L70,640" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
 <rect class="bx" x="166" y="104" width="168" height="60" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
 <text class="m" x="250" y="124" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMqCommandBus</text>
 <text class="m" x="250" y="142" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMqPublisher</text>
 <text class="m" x="250" y="160" font-size="12" fill="#8b949e" text-anchor="middle">RabbitTemplate</text>
-<path d="M250,164 L250,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<path d="M250,164 L250,640" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
 <rect class="bx" x="342" y="104" width="170" height="60" rx="10" fill="#161b22" stroke="#8b949e" stroke-width="1.2" filter="url(#rr-sh)"/>
 <text x="427" y="124" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">RabbitMQ</text>
 <text class="m" x="427" y="142" font-size="12" fill="#e6edf3" text-anchor="middle">cqrs.commands</text>
 <text x="427" y="160" font-size="12" fill="#8b949e" text-anchor="middle">topic exchange</text>
-<path d="M427,164 L427,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<path d="M427,164 L427,640" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
 <rect class="bx" x="520" y="104" width="180" height="60" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#rr-sh)"/>
 <text class="m" x="610" y="130" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMqCommandConsumer</text>
 <text x="610" y="148" font-size="12" fill="#8b949e" text-anchor="middle">listener container</text>
-<path d="M610,164 L610,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<path d="M610,164 L610,640" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
 <rect class="bx" x="716" y="104" width="118" height="60" rx="10" fill="#161b22" stroke="#39c5bb" stroke-width="1.2" filter="url(#rr-sh)"/>
 <text x="775" y="130" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">handler</text>
 <text class="m" x="775" y="148" font-size="12" fill="#e6edf3" text-anchor="middle">@HandleCommand</text>
-<path d="M775,164 L775,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<path d="M775,164 L775,640" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
 <path d="M70,190 L247,190" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
 <text x="160" y="183" font-size="12" fill="#e6edf3" text-anchor="middle">dispatchAndReceive · ask</text>
 <rect class="bx" x="257" y="200" width="152" height="26" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
@@ -143,30 +143,31 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <text x="518.5" y="485" font-size="12" fill="#e6edf3" text-anchor="middle">reply, same correlation id</text>
 <path d="M427,524 L253,524" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
 <text class="m" x="338.5" y="517" font-size="12" fill="#e6edf3" text-anchor="middle">amq.rabbitmq.reply-to</text>
-<rect class="bx" x="168" y="536" width="164" height="42" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
+<rect class="bx" x="168" y="536" width="164" height="58" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
 <text x="250" y="554" font-size="12" fill="#e6edf3" text-anchor="middle">matches correlation id</text>
-<text x="250" y="570" font-size="12" fill="#e6edf3" text-anchor="middle">reads it as ResultType</text>
-<path d="M250,600 L73,600" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
-<text x="160" y="593" font-size="12" fill="#e6edf3" text-anchor="middle">result</text>
+<text x="250" y="570" font-size="12" fill="#e6edf3" text-anchor="middle">converts the reply,</text>
+<text x="250" y="586" font-size="12" fill="#e6edf3" text-anchor="middle">with ResultType if given</text>
+<path d="M250,616 L73,616" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text x="160" y="609" font-size="12" fill="#e6edf3" text-anchor="middle">result</text>
 <path d="M242,252 H236 V524 H242" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="228" y="374" font-size="12" fill="#d29922" text-anchor="end">waits up to the</text>
 <text class="m" x="228" y="390" font-size="12" fill="#d29922" text-anchor="end">reply-timeout</text>
 <text x="228" y="406" font-size="12" fill="#8b949e" text-anchor="end">5s by default</text>
-<rect class="bx" x="14" y="642" width="264" height="92" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#rr-sh)"/>
-<text x="26" y="664" font-size="12.5" fill="#3fb950" font-weight="600">the handler returns</text>
-<text x="26" y="684" font-size="12" fill="#8b949e">a business &quot;no&quot; is a result:</text>
-<text class="m" x="26" y="702" font-size="12" fill="#e6edf3">Reservation(false, &quot;no stock&quot;)</text>
-<text x="26" y="720" font-size="12" fill="#8b949e">ResultType for generic results</text>
-<rect class="bx" x="290" y="642" width="264" height="92" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.2" filter="url(#rr-sh)"/>
-<text x="302" y="664" font-size="12.5" fill="#f85149" font-weight="600">the handler throws</text>
-<text class="m" x="302" y="684" font-size="12" fill="#e6edf3">cqrs.error, cqrs.error.type</text>
-<text class="m" x="302" y="702" font-size="12" fill="#f85149">RemoteHandlerException</text>
-<text x="302" y="720" font-size="12" fill="#8b949e">only type name and message</text>
-<rect class="bx" x="566" y="642" width="268" height="92" rx="10" fill="#161b22" stroke="#d29922" stroke-width="1.2" filter="url(#rr-sh)"/>
-<text x="578" y="664" font-size="12.5" fill="#d29922" font-weight="600">no reply in time</text>
-<text class="m" x="578" y="684" font-size="12" fill="#d29922">RemoteReplyTimeoutException</text>
-<text x="578" y="702" font-size="12" fill="#8b949e">the handler may still run:</text>
-<text x="578" y="720" font-size="12" fill="#8b949e">make it idempotent by key</text>
+<rect class="bx" x="14" y="658" width="264" height="92" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="26" y="680" font-size="12.5" fill="#3fb950" font-weight="600">the handler returns</text>
+<text x="26" y="700" font-size="12" fill="#8b949e">a business &quot;no&quot; is a result:</text>
+<text class="m" x="26" y="718" font-size="12" fill="#e6edf3">Reservation(false, &quot;no stock&quot;)</text>
+<text x="26" y="736" font-size="12" fill="#8b949e">ResultType for generic results</text>
+<rect class="bx" x="290" y="658" width="264" height="92" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="302" y="680" font-size="12.5" fill="#f85149" font-weight="600">the handler throws</text>
+<text class="m" x="302" y="700" font-size="12" fill="#e6edf3">cqrs.error, cqrs.error.type</text>
+<text class="m" x="302" y="718" font-size="12" fill="#f85149">RemoteHandlerException</text>
+<text x="302" y="736" font-size="12" fill="#8b949e">only type name and message</text>
+<rect class="bx" x="566" y="658" width="268" height="92" rx="10" fill="#161b22" stroke="#d29922" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="578" y="680" font-size="12.5" fill="#d29922" font-weight="600">no reply in time</text>
+<text class="m" x="578" y="700" font-size="12" fill="#d29922">RemoteReplyTimeoutException</text>
+<text x="578" y="718" font-size="12" fill="#8b949e">the handler may still run:</text>
+<text x="578" y="736" font-size="12" fill="#8b949e">make it idempotent by key</text>
 <circle class="tok k1" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
 <rect class="k2" x="254" y="197" width="158" height="32" rx="10" stroke="#f0883e" stroke-width="2.2" opacity="0" fill="none"/>
 <circle class="tok k3" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
@@ -179,9 +180,9 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <circle class="tok k10" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k11" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k12" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
-<rect class="k13" x="165" y="533" width="170" height="48" rx="10" stroke="#f0883e" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k13" x="165" y="533" width="170" height="64" rx="10" stroke="#f0883e" stroke-width="2.2" opacity="0" fill="none"/>
 <circle class="tok k14" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
-<rect class="k15" x="11" y="639" width="270" height="98" rx="13" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k15" x="11" y="655" width="270" height="98" rx="13" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>
 <circle class="tok k16" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k17" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k18" r="3.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
@@ -193,7 +194,7 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <text class="m k24" x="518" y="509" font-size="12" fill="#f85149" text-anchor="middle" opacity="0">cqrs.error</text>
 <circle class="tok k25" r="4.5" fill="#f85149" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k26" r="4.5" fill="#f85149" filter="url(#rr-gl)" opacity="0"/>
-<rect class="k27" x="287" y="639" width="270" height="98" rx="13" stroke="#f85149" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k27" x="287" y="655" width="270" height="98" rx="13" stroke="#f85149" stroke-width="2.2" opacity="0" fill="none"/>
 <circle class="tok k28" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k29" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
 <circle class="tok k30" r="3.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
@@ -203,5 +204,5 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <rect class="k34" x="713" y="101" width="124" height="66" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
 <text class="k35" x="228" y="424" font-size="12" fill="#d29922" font-weight="600" text-anchor="end" opacity="0">timed out</text>
 <circle class="tok k36" r="4.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
-<rect class="k37" x="563" y="639" width="274" height="98" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k37" x="563" y="655" width="274" height="98" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
 </svg>

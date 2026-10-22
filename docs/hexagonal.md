@@ -307,8 +307,8 @@ Spring Data JPA and `JpaOrderViews` implements `OrderViews`; `OutboxOrderEvents`
 
 ## Composition root
 
-The composition root is where Spring meets the core: the auto-configuration of the starter, the
-configuration classes of `infrastructure/config` and `application.yml`.
+The composition root is where the application is assembled: the auto-configuration of the starter,
+the configuration classes of `infrastructure/config` and `application.yml`.
 
 **Registration by scanning.** By default (`cqrs.handlers.scan-enabled=true`) the starter registers as
 beans the classes annotated with `@CommandHandler`, `@QueryHandler` or `@EventHandler` found in the
@@ -386,13 +386,16 @@ It needs a single `PlatformTransactionManager`, or a `@Primary` one, and runs th
 so the handler, in a transaction:
 
 - Commands and events run with `PROPAGATION_REQUIRED`: they join a transaction in progress or start one.
+  An event delivered after the transaction that published it has committed gets a new transaction
+  instead (see [Domain events and integration events](#domain-events-and-integration-events)).
 - Queries follow `cqrs.transactions.queries`: a read-only transaction (the default), a read-write one,
   or none at all for a query handler that calls another service and must not hold a connection.
 - What the handler does through its ports joins that transaction: the repository writes, the row that
   `OutboxEventBus` inserts and, with `spring-boot-cqrs-jdbc`, the marker of an `@Idempotent` handler.
   A failure rolls all of them back and is rethrown as it is.
 - `TransactionMiddleware.ORDER` is `Ordered.LOWEST_PRECEDENCE - 50`, inside the opt-in
-  `RetryMiddleware` (`LOWEST_PRECEDENCE - 100`): every retry attempt gets a new transaction.
+  `RetryMiddleware` (`LOWEST_PRECEDENCE - 100`): every retry attempt runs in its own transaction,
+  unless the dispatch joins an outer transaction that is already in progress.
 - It runs in local dispatches and in the consumers of RabbitMQ and Kafka, not on the sending side of a
   remote bus. All the handlers of one event share one transaction.
 
@@ -471,8 +474,25 @@ reads pending rows by their logical name, so a contract class can be renamed or 
 See [Transactional Outbox](outbox.md).
 
 The domain events do not leave the service. When another use case of the same service must react to
-one, call it from the handler, or publish an application event through the injected `EventBus` (the
-in-process `springEventBus`, which delivers it after commit).
+one, call it from the handler, or publish an application event through the injected `EventBus`, the
+in-process `springEventBus`. With `cqrs.events.transactional=true` (the default), an event published
+inside the use case's transaction is delivered after that transaction commits:
+
+- With the `TransactionMiddleware` on, the handlers of the event run in a new transaction of their own
+  (`PROPAGATION_REQUIRES_NEW`), and the `@Idempotent` markers of the JDBC store join it; with the
+  middleware off, the JDBC store opens that new transaction for `@Idempotent` handlers. Commands and
+  queries that these handlers dispatch join it.
+- A handler's own `@Transactional` joins the transaction that has already committed when neither the
+  middleware nor the JDBC store opened a new one, so its work is never committed: keep the middleware
+  on.
+- A failing event handler rolls back only the event's transaction. The work of the use case stays
+  committed, but the failure still reaches the caller that dispatched the command, and the events
+  queued after the failing one are not delivered.
+
+With `cqrs.events.transactional=false` the event is dispatched at once and joins the use case's
+transaction, so a failing event handler rolls back the use case too. See
+[TransactionMiddleware](middleware.md#transactionmiddleware) and
+[Idempotent Handlers](idempotency.md#handlers-without-transactional).
 
 ## Request and reply between services
 
