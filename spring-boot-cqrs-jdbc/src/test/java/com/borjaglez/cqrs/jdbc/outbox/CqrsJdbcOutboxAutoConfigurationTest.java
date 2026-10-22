@@ -32,6 +32,8 @@ import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
+import io.micrometer.core.instrument.binder.MeterBinder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
 
@@ -275,6 +277,52 @@ class CqrsJdbcOutboxAutoConfigurationTest {
             context -> {
               assertThat(context).hasNotFailed();
               assertThat(context.getBean(OutboxTracing.class)).isSameAs(OutboxTracing.noop());
+            });
+  }
+
+  @Test
+  void metricsBeanWhenMicrometerPresent() {
+    enabled.run(
+        context -> {
+          assertThat(context).hasSingleBean(OutboxMetrics.class);
+          SimpleMeterRegistry registry = new SimpleMeterRegistry();
+          context.getBean(OutboxMetrics.class).bindTo(registry);
+          assertThat(registry.get("cqrs.outbox.pending").gauge().value()).isZero();
+        });
+  }
+
+  @Test
+  void theRelayReportsToTheMetrics() {
+    enabled.run(
+        context -> {
+          context.getBean(OutboxRelayScheduler.class).stop();
+          SimpleMeterRegistry registry = new SimpleMeterRegistry();
+          context.getBean(OutboxMetrics.class).bindTo(registry);
+          new TransactionTemplate(context.getBean(PlatformTransactionManager.class))
+              .executeWithoutResult(
+                  s -> context.getBean(OutboxEventBus.class).publish(new TestOrderPlaced("o-1")));
+
+          context.getBean(OutboxRelay.class).relayBatch();
+
+          assertThat(registry.get("cqrs.outbox.published").counter().count()).isEqualTo(1);
+        });
+  }
+
+  @Test
+  void noMetricsWhenDisabled() {
+    enabled
+        .withPropertyValues("cqrs.outbox.metrics.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(OutboxMetrics.class));
+  }
+
+  @Test
+  void noMetricsWithoutMicrometerOnTheClasspath() {
+    enabled
+        .withClassLoader(new FilteredClassLoader(MeterBinder.class))
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).doesNotHaveBean(OutboxMetrics.class);
             });
   }
 }

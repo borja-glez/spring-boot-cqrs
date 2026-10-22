@@ -187,6 +187,25 @@ transaction is stored with the row and the relay publishes inside a `cqrs.outbox
 continues it, so the broker send and the consumer stay in the original trace (enable
 `spring.kafka.template.observation-enabled` for Kafka headers).
 
+## Metrics
+
+With Micrometer on the classpath the outbox exposes these meters (turn them off with
+`cqrs.outbox.metrics.enabled=false`):
+
+| Meter | Type | Description |
+|---|---|---|
+| `cqrs.outbox.pending` | Gauge | Rows waiting to be relayed (not published, not set aside) |
+| `cqrs.outbox.set.aside` | Gauge | Rows set aside after `cqrs.outbox.relay.max-attempts` failed reads |
+| `cqrs.outbox.oldest.pending.age` | TimeGauge (seconds) | Age of the oldest pending row; 0 without pending rows |
+| `cqrs.outbox.published` | Counter | Rows published by this instance |
+| `cqrs.outbox.publish.failures` | Counter | Failed attempts of the target bus to publish a row |
+
+The gauges read the table with a single query, reused for one second, so a scrape costs one read.
+They describe the whole table, shared by every instance; the counters only count what this
+instance relayed, and only after the batch committed. A growing `pending` or `oldest.pending.age`
+means the relay is not keeping up or the broker is down; `set.aside` above zero needs a look at
+`last_error` (see "Rows that cannot be read").
+
 ## Native images
 
 List the packages of outbox events in `cqrs.aot.message-packages`: their binding hints and the
@@ -203,6 +222,7 @@ logical-name index (`META-INF/cqrs/outbox-event-names.properties`) are generated
 | `cqrs.outbox.relay.interval` | `1s` | Delay between two relay runs |
 | `cqrs.outbox.relay.batch-size` | `100` | Rows relayed per transaction |
 | `cqrs.outbox.relay.max-attempts` | `10` | Failed reads (`read_failures`) after which an unreadable row is set aside; bus failures never set a row aside |
+| `cqrs.outbox.metrics.enabled` | `true` | Expose the outbox meters when Micrometer is present |
 | `cqrs.jdbc.outbox.table-name` | `cqrs_outbox` | Outbox table; may be schema-qualified |
 | `cqrs.jdbc.outbox.cleanup-enabled` | `true` | Delete published rows older than the retention |
 | `cqrs.jdbc.outbox.cleanup-interval` | `1h` | Delay between two cleanups |

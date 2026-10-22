@@ -34,6 +34,7 @@ public class OutboxRelay {
   private final TransactionTemplate transaction;
   private final int batchSize;
   private final int maxAttempts;
+  private final OutboxRelayListener listener;
 
   public OutboxRelay(
       OutboxStore store,
@@ -44,6 +45,28 @@ public class OutboxRelay {
       PlatformTransactionManager transactionManager,
       int batchSize,
       int maxAttempts) {
+    this(
+        store,
+        resolver,
+        serializer,
+        contextCodec,
+        target,
+        transactionManager,
+        batchSize,
+        maxAttempts,
+        OutboxRelayListener.noop());
+  }
+
+  public OutboxRelay(
+      OutboxStore store,
+      OutboxEventTypeResolver resolver,
+      MessageSerializer serializer,
+      OutboxContextCodec contextCodec,
+      EventBus target,
+      PlatformTransactionManager transactionManager,
+      int batchSize,
+      int maxAttempts,
+      OutboxRelayListener listener) {
     if (batchSize < 1) {
       throw new IllegalArgumentException("cqrs.outbox.relay.batch-size must be at least 1");
     }
@@ -58,18 +81,38 @@ public class OutboxRelay {
     this.transaction = new TransactionTemplate(transactionManager);
     this.batchSize = batchSize;
     this.maxAttempts = maxAttempts;
+    this.listener = listener;
   }
 
   public EventBus target() {
     return target;
   }
 
-  /** Relays one batch in its own transaction. */
+  /**
+   * Relays one batch in its own transaction. The listener hears about it after the commit; a batch
+   * that rolls back is not reported.
+   */
   public BatchResult relayBatch() {
-    return transaction.execute(status -> relay(store.lockBatch(batchSize)));
+    boolean[] publishFailed = new boolean[1];
+    BatchResult result =
+        transaction.execute(
+            status -> {
+              publishFailed[0] = false;
+              return relay(store.lockBatch(batchSize), publishFailed);
+            });
+    if (result.published() > 0) {
+      listener.published(result.published());
+    }
+    if (publishFailed[0]) {
+      listener.publishFailed();
+    }
+    if (result.setAside() > 0) {
+      listener.setAside(result.setAside());
+    }
+    return result;
   }
 
-  private BatchResult relay(List<OutboxRecord> rows) {
+  private BatchResult relay(List<OutboxRecord> rows, boolean[] publishFailed) {
     boolean full = rows.size() == batchSize;
     int published = 0;
     int setAside = 0;
@@ -115,6 +158,7 @@ public class OutboxRelay {
         contextCodec.runWithin(decoded.context(), () -> target.publish(decoded.event()));
       } catch (RuntimeException e) {
         store.markPublishFailed(row.id(), row.attempts() + 1, describe(e));
+        publishFailed[0] = true;
         LOG.warn(
             "Could not publish outbox event '"
                 + row.eventName()

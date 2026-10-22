@@ -35,6 +35,7 @@ import com.borjaglez.cqrs.jdbc.outbox.OutboxEventBus;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxEventTypeResolver;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxRelay;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxSchemaInitializer;
+import com.borjaglez.cqrs.jdbc.outbox.OutboxStats;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxStore;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxTracing;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
@@ -187,5 +188,24 @@ class OutboxRelayPostgresIntegrationTest {
                     + " AND indexname IN ('events_outbox_pending', 'events_outbox_published')",
                 Integer.class))
         .isEqualTo(2);
+  }
+
+  @Test
+  void statsCountsPendingAndSetAsideRowsInOneQuery() {
+    OutboxStore store = new OutboxStore(dataSource, OutboxStore.DEFAULT_TABLE_NAME);
+    OutboxEventBus outbox = new OutboxEventBus(store, serializer, naming, codec);
+    TransactionTemplate tx = new TransactionTemplate(transactionManager);
+    for (int i = 0; i < 3; i++) {
+      String orderId = "o-" + i;
+      tx.executeWithoutResult(s -> outbox.publish(new TestOrderPlaced(orderId)));
+    }
+    jdbc.update(
+        "UPDATE cqrs_outbox SET failed_at = now() WHERE id = (SELECT MIN(id) FROM cqrs_outbox)");
+
+    OutboxStats stats = store.stats();
+
+    assertThat(stats.pending()).isEqualTo(2);
+    assertThat(stats.setAside()).isEqualTo(1);
+    assertThat(stats.oldestPendingCreatedAt()).isNotNull();
   }
 }

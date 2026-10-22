@@ -276,4 +276,42 @@ class OutboxStoreTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("detect");
   }
+
+  @Test
+  void statsCountsPendingAndSetAsideRows() {
+    Instant older = NOW.minus(Duration.ofMinutes(10));
+    Instant newer = NOW.minus(Duration.ofMinutes(5));
+    for (String id : List.of("e-1", "e-2", "e-3", "e-4", "e-5")) {
+      insert(id);
+    }
+    jdbc.update(
+        "UPDATE cqrs_outbox SET created_at = ? WHERE event_id = 'e-1'", Timestamp.from(newer));
+    jdbc.update(
+        "UPDATE cqrs_outbox SET created_at = ? WHERE event_id = 'e-2'", Timestamp.from(older));
+    jdbc.update(
+        "UPDATE cqrs_outbox SET created_at = ?, published_at = ? WHERE event_id = 'e-3'",
+        Timestamp.from(NOW.minus(Duration.ofDays(1))),
+        Timestamp.from(NOW));
+    jdbc.update(
+        "UPDATE cqrs_outbox SET created_at = ?, failed_at = ? WHERE event_id = 'e-4'",
+        Timestamp.from(NOW.minus(Duration.ofDays(2))),
+        Timestamp.from(NOW));
+    jdbc.update("UPDATE cqrs_outbox SET failed_at = ? WHERE event_id = 'e-5'", Timestamp.from(NOW));
+
+    OutboxStats stats = store.stats();
+
+    assertThat(stats.pending()).isEqualTo(2);
+    assertThat(stats.setAside()).isEqualTo(2);
+    assertThat(stats.oldestPendingCreatedAt()).isEqualTo(older);
+  }
+
+  @Test
+  void statsOldestPendingIsNullWhenEmpty() {
+    assertThat(store.stats()).isEqualTo(new OutboxStats(0, 0, null));
+
+    insert("e-1");
+    store.markPublished(lock(1).get(0).id());
+
+    assertThat(store.stats()).isEqualTo(new OutboxStats(0, 0, null));
+  }
 }

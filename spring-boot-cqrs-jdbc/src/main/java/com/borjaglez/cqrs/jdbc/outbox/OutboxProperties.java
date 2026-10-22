@@ -20,6 +20,16 @@ public class OutboxProperties {
 
   private Relay relay = new Relay();
 
+  private Metrics metrics = new Metrics();
+
+  @Getter
+  @Setter
+  public static class Metrics {
+
+    /** Whether to expose the outbox meters when Micrometer is present. */
+    private boolean enabled = true;
+  }
+
   @Getter
   @Setter
   public static class Relay {
