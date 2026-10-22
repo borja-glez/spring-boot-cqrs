@@ -10,6 +10,7 @@ import com.borjaglez.cqrs.context.MessageContext;
 import com.borjaglez.cqrs.retry.BackoffStrategy;
 import com.borjaglez.cqrs.retry.RetryPolicy;
 import com.borjaglez.cqrs.tracing.TracingMiddleware;
+import com.borjaglez.cqrs.transaction.QueryTransactions;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -28,6 +29,7 @@ public class CqrsProperties {
   private RetryProperties retry = new RetryProperties();
   private IdempotencyProperties idempotency = new IdempotencyProperties();
   private HandlersProperties handlers = new HandlersProperties();
+  private TransactionsProperties transactions = new TransactionsProperties();
 
   @Getter
   @Setter
@@ -157,5 +159,18 @@ public class CqrsProperties {
      * context already holds are left as they are.
      */
     private boolean scanEnabled = true;
+  }
+
+  @Getter
+  @Setter
+  public static class TransactionsProperties {
+    /** Whether to register the middleware that runs handlers in a transaction. */
+    private boolean enabled = false;
+
+    /**
+     * How queries run: read-only (a read-only transaction), read-write, or none (no transaction,
+     * for handlers that call other services and must not hold a connection).
+     */
+    private QueryTransactions queries = QueryTransactions.READ_ONLY;
   }
 }

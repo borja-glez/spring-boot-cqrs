@@ -291,13 +291,33 @@ RetryMiddleware retryMiddleware() {
 
 **Remote buses.** The middleware keeps the default phases, `LOCAL` and `INBOUND`: with RabbitMQ and Kafka it runs in the consumer (see [Middleware on Remote Buses](#middleware-on-remote-buses)), before the transport's own retry, and not on the sender, so a failed remote send (or a failed remote request/reply) is not retried by it. The attempts multiply: with `cqrs.retry.max-attempts=3` and `cqrs.rabbitmq.retry.max-attempts=3` a failing handler runs up to 9 times before the message is dead-lettered. Lower one of them when you enable both.
 
-**Transactions.** Retrying an optimistic-lock failure only helps when the transaction starts inside the retry: in the handler itself, or in a middleware ordered after `RetryMiddleware`. If the caller's transaction wraps the dispatch, it is already marked rollback-only after the first failure and every retry fails too.
+**Transactions.** Retrying an optimistic-lock failure only helps when the transaction starts inside the retry: in the handler itself, or in a middleware ordered after `RetryMiddleware` such as [`TransactionMiddleware`](#transactionmiddleware). If the caller's transaction wraps the dispatch, it is already marked rollback-only after the first failure and every retry fails too.
 
 Retrying an `@Idempotent` command is safe: a failed attempt leaves no marker once its transaction
 rolls back, so the next attempt runs the handler. When the command is dispatched locally inside the
 caller's transaction, the attempts share it and the marker of the failed attempt is still there: the
 next attempt skips the handler. Start the transaction inside the retry, as above. Events are still not retried in-process; with `@Idempotent` handlers a transport
 redelivery only re-runs the handlers that failed. See [Idempotent Handlers](idempotency.md).
+
+### TransactionMiddleware
+
+**Package:** `com.borjaglez.cqrs.transaction`
+**Auto-configured:** No, opt-in with `cqrs.transactions.enabled=true` (see [Configuration](configuration.md#transactions-properties))
+
+Runs the rest of the chain, and so the handler, in a transaction, so handlers need no `@Transactional` (for instance in hexagonal applications whose handlers carry no Spring annotations). It needs a single `PlatformTransactionManager` (or a `@Primary` one) and registers nothing otherwise.
+
+- **Commands and events** run with `PROPAGATION_REQUIRED`: they join a transaction in progress or start one.
+- **Queries** follow `cqrs.transactions.queries`: `read-only` (the default) uses a read-only transaction, `read-write` a regular one, and `none` runs the query without a transaction, which suits a handler that calls another service and must not hold a connection.
+- **Failures** roll the transaction back and are rethrown as they are. A checked exception also rolls back and is not wrapped further than the bus already does.
+- **Order.** `TransactionMiddleware.ORDER` is `Ordered.LOWEST_PRECEDENCE - 50`, inside `RetryMiddleware` (`LOWEST_PRECEDENCE - 100`): each retry attempt runs in its own transaction. The chain includes the `@Idempotent` invoker, so the idempotency marker is written in the same transaction as the handler's work.
+- **Phases.** The default ones, `LOCAL` and `INBOUND`: it runs on local dispatches and in the consumer of a remote bus, not on the sender.
+
+```java
+@Bean
+TransactionMiddleware transactionMiddleware(PlatformTransactionManager transactionManager) {
+    return new TransactionMiddleware(transactionManager, QueryTransactions.READ_ONLY);
+}
+```
 
 ## Message Context & Correlation ID
 
