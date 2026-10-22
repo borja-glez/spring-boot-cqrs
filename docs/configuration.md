@@ -22,6 +22,7 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `cqrs.naming.prefix` | `String` | `""` (empty) | Prefix prepended to all generated message names. Used in `@CqrsMessage` name resolution. |
+| `cqrs.handlers.scan-enabled` | `boolean` | `true` | Registers as beans the handler classes (`@CommandHandler`, `@QueryHandler`, `@EventHandler`) of the application packages, skipping those the context already holds. See [Handler registration](#handler-registration). |
 | `cqrs.validation.enabled` | `boolean` | `true` | Enables the `CommandValidationInterceptor` middleware. Requires `jakarta.validation` on the classpath. |
 | `cqrs.observability.enabled` | `boolean` | `true` | Enables the `MicrometerBusObservability` middleware. Requires Micrometer on the classpath. |
 | `cqrs.context.enabled` | `boolean` | `true` | Enables the `ContextPropagationMiddleware` (correlation ID + MDC + transport headers). Requires SLF4J on the classpath. |
@@ -88,6 +89,18 @@ cqrs:
 ```
 
 When enabled, and a Micrometer `MeterRegistry` bean is present, the `MicrometerBusObservability` is registered as middleware. It records `cqrs.bus.dispatch` timers for every dispatched message.
+
+### Handler registration
+
+```yaml
+cqrs:
+  handlers:
+    scan-enabled: true  # default
+```
+
+When enabled, the starters scan the application packages for handler classes and register a bean for each one the context does not already hold. The application packages are the auto-configuration packages (the package of the `@SpringBootApplication` class) and the base packages of every `@ComponentScan`, the implicit one of `@SpringBootApplication` included. See [Handler registration](core.md#handler-registration) for the details.
+
+Set it to `false` to register the handlers yourself, as `@Component`s or `@Bean`s.
 
 ## Context Propagation Properties
 
@@ -316,6 +329,8 @@ spring:
 cqrs:
   naming:
     prefix: order-service
+  handlers:
+    scan-enabled: true
   validation:
     enabled: true
   observability:
