@@ -15,7 +15,9 @@ import org.springframework.aot.generate.InMemoryGeneratedFiles;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.boot.LazyInitializationBeanFactoryPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -142,6 +144,33 @@ class CqrsHandlersAutoConfigurationTest {
             context ->
                 assertThat(context.getBean(RegisteredCommands.class).types())
                     .containsExactly(ScannedCommand.class));
+  }
+
+  @Test
+  void scannedHandlersAreDiscoveredWithLazyInitialization() {
+    contextRunner
+        .withInitializer(
+            context -> {
+              AutoConfigurationPackages.register(
+                  (BeanDefinitionRegistry) context, APPLICATION_PACKAGE);
+              // What spring.main.lazy-initialization=true adds to the context.
+              context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
+            })
+        .run(
+            context -> {
+              // Explicitly not lazy, whatever lazy initialization leaves out.
+              AbstractBeanDefinition scannedHandlers =
+                  (AbstractBeanDefinition)
+                      context
+                          .getBeanFactory()
+                          .getBeanDefinition(CqrsHandlersRegistrar.ScannedHandlers.class.getName());
+              assertThat(scannedHandlers.getLazyInit()).isFalse();
+              assertThat(context.getBean(CommandHandlerRegistry.class).getRegisteredCommands())
+                  .containsExactly(ScannedCommand.class);
+              String result =
+                  context.getBean(CommandBus.class).dispatchAndReceive(new ScannedCommand());
+              assertThat(result).isEqualTo("application");
+            });
   }
 
   @Test

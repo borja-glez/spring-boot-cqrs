@@ -86,6 +86,8 @@ class CqrsHandlersRegistrar
     registry.registerBeanDefinition(HandlerScan.class.getName(), scan);
     RootBeanDefinition scannedHandlers = new RootBeanDefinition(ScannedHandlers.class);
     scannedHandlers.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+    // Created on startup even with lazy initialization, or the handlers would never be discovered.
+    scannedHandlers.setLazyInit(false);
     registry.registerBeanDefinition(ScannedHandlers.class.getName(), scannedHandlers);
   }
 
