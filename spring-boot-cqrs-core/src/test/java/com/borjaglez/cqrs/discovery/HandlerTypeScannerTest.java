@@ -216,4 +216,14 @@ class HandlerTypeScannerTest {
       return new ScannedCommandHandler();
     }
   }
+
+  @Test
+  void constructorRejectsNullArguments() {
+    assertThatThrownBy(() -> new HandlerTypeScanner(null, context))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("environment must not be null");
+    assertThatThrownBy(() -> new HandlerTypeScanner(context.getEnvironment(), null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resourceLoader must not be null");
+  }
 }

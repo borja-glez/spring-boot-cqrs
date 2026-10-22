@@ -62,12 +62,12 @@ public abstract class ResultType<T> {
   }
 
   @Override
-  public boolean equals(Object other) {
+  public final boolean equals(Object other) {
     return this == other || (other instanceof ResultType<?> that && type.equals(that.type));
   }
 
   @Override
-  public int hashCode() {
+  public final int hashCode() {
     return type.hashCode();
   }
 

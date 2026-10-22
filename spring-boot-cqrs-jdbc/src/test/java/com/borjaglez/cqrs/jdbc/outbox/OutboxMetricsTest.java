@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.jdbc.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -131,5 +132,15 @@ class OutboxMetricsTest {
 
     assertThat(registry.get("cqrs.outbox.published").counter().count()).isZero();
     assertThat(registry.get("cqrs.outbox.publish.failures").counter().count()).isZero();
+  }
+
+  @Test
+  void constructorRejectsNullArguments() {
+    assertThatThrownBy(() -> new OutboxMetrics(null, Clock.systemUTC()))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("store must not be null");
+    assertThatThrownBy(() -> new OutboxMetrics(mock(OutboxStore.class), null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("clock must not be null");
   }
 }
