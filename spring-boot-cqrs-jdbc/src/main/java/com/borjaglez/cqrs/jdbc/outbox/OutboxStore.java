@@ -164,7 +164,8 @@ public class OutboxStore {
 
   /**
    * Set-aside rows never have a {@code published_at}, so the filter keeps the query to the rows
-   * that are not published yet and the {@code (published_at, failed_at, id)} index can serve it.
+   * that are not published yet: the PostgreSQL {@code _unpublished} partial index and the H2 {@code
+   * (published_at, failed_at, id)} index serve it.
    */
   static String statsSql(String table) {
     return "SELECT COALESCE(SUM(CASE WHEN failed_at IS NULL THEN 1 ELSE 0 END), 0) AS pending,"

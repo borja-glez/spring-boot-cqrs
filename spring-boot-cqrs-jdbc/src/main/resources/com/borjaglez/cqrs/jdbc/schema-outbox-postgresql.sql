@@ -14,3 +14,4 @@ CREATE TABLE IF NOT EXISTS ${table} (
 );
 CREATE INDEX IF NOT EXISTS ${index}_pending ON ${table} (id) WHERE published_at IS NULL AND failed_at IS NULL;
 CREATE INDEX IF NOT EXISTS ${index}_published ON ${table} (published_at) WHERE published_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ${index}_unpublished ON ${table} (created_at) WHERE published_at IS NULL;

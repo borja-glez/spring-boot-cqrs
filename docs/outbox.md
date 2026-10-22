@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS cqrs_outbox (
 );
 CREATE INDEX IF NOT EXISTS cqrs_outbox_pending ON cqrs_outbox (id) WHERE published_at IS NULL AND failed_at IS NULL;
 CREATE INDEX IF NOT EXISTS cqrs_outbox_published ON cqrs_outbox (published_at) WHERE published_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS cqrs_outbox_unpublished ON cqrs_outbox (created_at) WHERE published_at IS NULL;
 ```
 
 `event_id` holds up to 64 characters: publishing an event whose custom event id is longer fails
@@ -200,7 +201,7 @@ With Micrometer on the classpath the outbox exposes these meters (turn them off 
 | `cqrs.outbox.published` | Counter | Rows published by this instance |
 | `cqrs.outbox.publish.failures` | Counter | Failed attempts of the target bus to publish a row |
 
-The gauges read the table with a single query, reused for one second, so a scrape costs one read.
+The gauges read the table with a single query over the unpublished rows only, reused for one second, so a scrape costs one read. On PostgreSQL that query is served by the `cqrs_outbox_unpublished` partial index (rows set aside are not in `cqrs_outbox_pending`); if you created the schema yourself before this index existed, add it with the DDL shown in the Schema section. H2 needs nothing extra: its `(published_at, failed_at, id)` index already covers the filter.
 They describe the whole table, shared by every instance; the counters only count what this
 instance relayed, and only after the batch committed. A growing `pending` or `oldest.pending.age`
 means the relay is not keeping up or the broker is down; `set.aside` above zero needs a look at
