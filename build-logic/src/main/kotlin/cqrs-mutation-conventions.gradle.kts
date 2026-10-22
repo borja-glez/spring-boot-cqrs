@@ -5,10 +5,6 @@ plugins {
 
 val libs = the<VersionCatalogsExtension>().named("libs")
 
-// The Spring Boot 3 BOM manages JUnit Jupiter at an older version than the platform launcher this
-// build declares; PIT's JUnit 5 plugin needs them aligned, so use the catalog JUnit version.
-extra["junit-jupiter.version"] = libs.findVersion("junit").get().requiredVersion
-
 // Report-only mutation testing: no threshold, and it is not wired into `check` or `quality`.
 // Run it through the root `mutationReport` task.
 pitest {

@@ -41,6 +41,9 @@ report-only: there is no threshold, and it is not part of `quality` or CI. Integ
 needs no Docker; the run takes several minutes. Surviving mutants point at behavior the tests do not pin
 down.
 
+Docker-based tests (`*.integration.*`, `*IntegrationTest`) are not mutation-tested. This includes core's
+`RetryMiddlewareIntegrationTest`, which needs no Docker but is excluded by name.
+
 ## Code Style
 
 - Formatting is managed by **Spotless** with Google Java Format.
