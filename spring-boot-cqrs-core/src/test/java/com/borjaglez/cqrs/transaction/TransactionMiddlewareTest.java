@@ -304,6 +304,37 @@ class TransactionMiddlewareTest {
     assertThat(transactionManager.readOnly).containsExactly(false, true);
   }
 
+  @Test
+  void aQueryAskedWhileTheCommittedTransactionIsCurrentRunsInANewWritableTransaction()
+      throws Exception {
+    TransactionMiddleware middleware = middleware(QueryTransactions.READ_WRITE);
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    handler.then = () -> middleware.process(new TestQuery("q"), message -> "a");
+    EventBus events = new TransactionalEventBus(new SpringEventBus(registryOf(handler), List.of()));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("e")));
+
+    assertThat(transactionManager.events)
+        .containsExactly("begin", "commit", "suspend", "begin", "commit", "resume");
+    assertThat(transactionManager.readOnly).containsExactly(false, false);
+  }
+
+  @Test
+  void aQueryAskedWhileTheCommittedTransactionIsCurrentOpensNothingWhenQueriesAreNone()
+      throws Exception {
+    TransactionMiddleware middleware = middleware(QueryTransactions.NONE);
+    RecordingEventHandler handler = new RecordingEventHandler(transactionManager);
+    handler.then = () -> middleware.process(new TestQuery("q"), message -> "a");
+    EventBus events = new TransactionalEventBus(new SpringEventBus(registryOf(handler), List.of()));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> events.publish(new TestEvent("e")));
+
+    assertThat(handler.handled).isOne();
+    assertThat(transactionManager.events).containsExactly("begin", "commit");
+  }
+
   private static EventHandlerRegistry registryOf(RecordingEventHandler handler)
       throws NoSuchMethodException {
     EventHandlerRegistry registry = new EventHandlerRegistry();

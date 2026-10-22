@@ -15,7 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -168,10 +168,11 @@ class TransactionMiddlewareJdbcTest {
     assertThat(count("cqrs_processed_message")).isOne();
   }
 
-  @ParameterizedTest(name = "{displayName} [auto-commit {0}]")
-  @ValueSource(booleans = {true, false})
-  void anEventDeliveredAfterCommitRunsInItsOwnTransaction(boolean autoCommit) throws Exception {
-    SpringCommandBus bus = publishingBus(autoCommit);
+  @ParameterizedTest(name = "{displayName} [middleware {0}, auto-commit {1}]")
+  @CsvSource({"true, true", "true, false", "false, true", "false, false"})
+  void anEventDeliveredAfterCommitRunsInItsOwnTransaction(boolean middleware, boolean autoCommit)
+      throws Exception {
+    SpringCommandBus bus = publishingBus(middleware, autoCommit);
 
     bus.dispatch(new PlainCommand());
 
@@ -182,11 +183,11 @@ class TransactionMiddlewareJdbcTest {
     assertThat(transactionManager.begun).isEqualTo(2);
   }
 
-  @ParameterizedTest(name = "{displayName} [auto-commit {0}]")
-  @ValueSource(booleans = {true, false})
-  void aFailingAfterCommitEventHandlerDoesNotAffectTheCommittedCommand(boolean autoCommit)
-      throws Exception {
-    SpringCommandBus bus = publishingBus(autoCommit);
+  @ParameterizedTest(name = "{displayName} [middleware {0}, auto-commit {1}]")
+  @CsvSource({"true, true", "true, false", "false, true", "false, false"})
+  void aFailingAfterCommitEventHandlerDoesNotAffectTheCommittedCommand(
+      boolean middleware, boolean autoCommit) throws Exception {
+    SpringCommandBus bus = publishingBus(middleware, autoCommit);
     eventHandler.fail = true;
 
     // The event is delivered when the command's transaction commits, so its failure still
@@ -203,13 +204,15 @@ class TransactionMiddlewareJdbcTest {
   /**
    * A command handler that writes a row and publishes an event on the default event bus, which
    * delivers it after the command's transaction commits; the event handler writes another row. Both
-   * handlers are idempotent and carry no Spring annotations; the middleware is the only source of
-   * transactions.
+   * handlers are idempotent and carry no Spring annotations; the transactions come from the
+   * middleware or, without it, from the idempotency store.
    *
+   * @param middleware whether the {@link TransactionMiddleware} is in the chain; without it the
+   *     idempotency store is the only source of transactions
    * @param autoCommit whether the data source hands out connections in auto-commit mode (as a pool
    *     does by default) or not (as a pool configured with {@code auto-commit=false} does)
    */
-  private SpringCommandBus publishingBus(boolean autoCommit) throws Exception {
+  private SpringCommandBus publishingBus(boolean middleware, boolean autoCommit) throws Exception {
     DataSource connections = autoCommit ? dataSource : withoutAutoCommit(dataSource);
     transactionManager = new CountingTransactionManager(connections);
     IdempotentInvoker idempotency =
@@ -217,7 +220,9 @@ class TransactionMiddlewareJdbcTest {
             new JdbcIdempotencyStore(
                 connections, transactionManager, JdbcIdempotencyStore.DEFAULT_TABLE_NAME));
     List<BusMiddleware> middlewares =
-        List.of(new TransactionMiddleware(transactionManager, QueryTransactions.READ_ONLY));
+        middleware
+            ? List.of(new TransactionMiddleware(transactionManager, QueryTransactions.READ_ONLY))
+            : List.of();
 
     EventHandlerRegistry eventHandlers = new EventHandlerRegistry();
     eventHandlers.setIdempotentInvoker(idempotency);

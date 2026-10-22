@@ -69,21 +69,20 @@ too), and every handler of an event.
 
 An event published inside a transaction is, with `cqrs.events.transactional=true` (the default),
 delivered after that transaction commits, while it is still bound to the thread. The middleware runs
-such an event in a new transaction, so the markers and the work of its handlers commit or roll back
-together, apart from the transaction that published it. Without the middleware, the store's
-transaction (`REQUIRED`) and a handler's own `@Transactional` join the committed transaction, which
-never commits again: depending on the transaction manager and on the auto-commit setting of the
-connection pool, the work and the marker are lost, or kept even when the handler fails. Enable the
-middleware for such handlers, or set `cqrs.events.transactional=false` to run the event in the
-publishing transaction.
+such an event in a new transaction, and so does the JDBC store when the middleware is off: the
+markers and the work of its handlers commit or roll back together, apart from the transaction that
+published it. With the middleware on, the store joins the middleware's new transaction (no extra
+one). A handler's own `@Transactional` (`REQUIRED`) still joins the committed transaction when
+neither the middleware nor the JDBC store opened a new one. Set `cqrs.events.transactional=false` to
+run the event in the publishing transaction instead.
 
 ## Stores and guarantees
 
 | Store | Guarantee |
 |---|---|
-| JDBC (`spring-boot-cqrs-jdbc`) | The marker is inserted in the transaction that runs the handler (the library opens one with `REQUIRED`, so the handler's `@Transactional` joins it). The insert runs in a JDBC savepoint on the connection of that Spring-managed transaction, so it works with `DataSourceTransactionManager`, `JdbcTransactionManager` and `JpaTransactionManager` (Spring Data JPA). The marker commits with the handler's database work, or both roll back. Two concurrent deliveries: the second waits for the first's row, then skips; if the first rolls back, the second runs. |
+| JDBC (`spring-boot-cqrs-jdbc`) | The marker is inserted in the transaction that runs the handler (the library opens one with `REQUIRED`, so the handler's `@Transactional` joins it; for an event delivered after commit it opens a new one with `REQUIRES_NEW`, unless the middleware already did). The insert runs in a JDBC savepoint on the connection of that Spring-managed transaction, so it works with `DataSourceTransactionManager`, `JdbcTransactionManager` and `JpaTransactionManager` (Spring Data JPA). The marker commits with the handler's database work, or both roll back. Two concurrent deliveries: the second waits for the first's row, then skips; if the first rolls back, the second runs. |
 | In-memory (`cqrs.idempotency.store=in-memory`) | Per process. A delivery in progress blocks duplicates for `cqrs.idempotency.in-memory.lease`; a handler that runs longer than the lease lets another delivery run it concurrently. A crash between the handler's effect and the marker lets a redelivery apply the effect again; markers are lost on restart and not shared between instances. |
-| Your own | Implement `IdempotencyStore` and declare it as a bean. Override `runInScope` to run the handler in your store's transaction; without it, a failure of `complete()` after the effect gives at-least-once behaviour. |
+| Your own | Implement `IdempotencyStore` and declare it as a bean. Override `runInScope` to run the handler in your store's transaction, and open a new one (`REQUIRES_NEW`) while `TransactionalEventBus.isDeliveringAfterCommit()` is true, because the transaction that published the event has already committed and joining it would never commit your work; without it, a failure of `complete()` after the effect gives at-least-once behaviour. |
 
 The transaction manager must manage the same `DataSource` as the store (the default JPA and JDBC
 managers of Spring Boot do). If the handler's transaction does not bind a JDBC connection for that
