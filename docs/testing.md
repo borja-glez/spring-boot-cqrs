@@ -195,11 +195,15 @@ dependency of `spring-boot-cqrs-test`, so add it to your own test classpath
 | `handlerMethodsAreInHandlerClasses()` | `@HandleCommand`/`@HandleQuery`/`@HandleEvent` methods live in classes with the matching class annotation |
 | `messagesAreAnnotatedWithCqrsMessage()` | concrete `Command`/`Query`/`Event` classes carry `@CqrsMessage` |
 | `messagesHaveANoArgConstructor()` | concrete messages have a no-arg constructor |
-| `messagesDoNotDependOnFrameworks()` | concrete messages do not depend on Spring, Jackson, JPA or Hibernate |
+| `messagesDoNotDependOnFrameworks()` | concrete messages do not depend on Spring, Jackson databind (2 and 3), JPA or Hibernate; Jackson annotations are allowed |
 
 "Messages" are concrete classes only; abstract base classes are ignored. The
 rules fail when no matching class is found, so a wrong package is not a silent
-pass.
+pass. A module with handlers but no messages is the realistic case where this
+gets in the way. Opt out for a single rule with
+`CqrsArchitectureRules.messagesHaveANoArgConstructor().allowEmptyShould(true)`,
+or globally with `archRule.failOnEmptyShould=false` in
+`archunit.properties` on the test classpath.
 
 ```java
 @AnalyzeClasses(packages = "com.example.shop", importOptions = ImportOption.DoNotIncludeTests.class)

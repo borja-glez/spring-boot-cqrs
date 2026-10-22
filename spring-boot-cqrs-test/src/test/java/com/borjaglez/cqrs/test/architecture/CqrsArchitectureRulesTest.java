@@ -19,7 +19,7 @@ class CqrsArchitectureRulesTest {
   @Test
   void fixturesAreImported() {
     assertThat(GOOD).hasSize(6);
-    assertThat(BAD).hasSize(5);
+    assertThat(BAD).hasSize(8);
   }
 
   @Test
@@ -29,7 +29,22 @@ class CqrsArchitectureRulesTest {
 
   @Test
   void handlersDoNotDependOnSpringReportsViolations() {
-    assertViolation(CqrsArchitectureRules.handlersDoNotDependOnSpring(), "SpringDependentCommandHandler");
+    assertViolation(
+        CqrsArchitectureRules.handlersDoNotDependOnSpring(), "SpringDependentCommandHandler");
+  }
+
+  @Test
+  void handlersDoNotDependOnSpringFlagsSpringFieldsAndAnnotations() {
+    assertViolation(
+        CqrsArchitectureRules.handlersDoNotDependOnSpring(), "AnnotatedSpringEventHandler");
+  }
+
+  @Test
+  void userDefinedAbstractMessageBaseIsIgnoredButItsSubclassIsChecked() {
+    assertThatThrownBy(() -> CqrsArchitectureRules.messagesAreAnnotatedWithCqrsMessage().check(BAD))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("ConcreteOrderCommand")
+        .hasMessageNotContaining("AbstractOrderCommand");
   }
 
   @Test
@@ -39,7 +54,8 @@ class CqrsArchitectureRulesTest {
 
   @Test
   void handlerMethodsAreInHandlerClassesReportsViolations() {
-    assertViolation(CqrsArchitectureRules.handlerMethodsAreInHandlerClasses(), "MisplacedQueryHandlerMethod");
+    assertViolation(
+        CqrsArchitectureRules.handlerMethodsAreInHandlerClasses(), "MisplacedQueryHandlerMethod");
   }
 
   @Test
@@ -49,7 +65,8 @@ class CqrsArchitectureRulesTest {
 
   @Test
   void messagesAreAnnotatedWithCqrsMessageReportsViolations() {
-    assertViolation(CqrsArchitectureRules.messagesAreAnnotatedWithCqrsMessage(), "NoAnnotationCommand");
+    assertViolation(
+        CqrsArchitectureRules.messagesAreAnnotatedWithCqrsMessage(), "NoAnnotationCommand");
   }
 
   @Test
@@ -59,7 +76,8 @@ class CqrsArchitectureRulesTest {
 
   @Test
   void messagesHaveANoArgConstructorReportsViolations() {
-    assertViolation(CqrsArchitectureRules.messagesHaveANoArgConstructor(), "NoDefaultConstructorQuery");
+    assertViolation(
+        CqrsArchitectureRules.messagesHaveANoArgConstructor(), "NoDefaultConstructorQuery");
   }
 
   @Test
@@ -69,7 +87,8 @@ class CqrsArchitectureRulesTest {
 
   @Test
   void messagesDoNotDependOnFrameworksReportsViolations() {
-    assertViolation(CqrsArchitectureRules.messagesDoNotDependOnFrameworks(), "SpringDependentEvent");
+    assertViolation(
+        CqrsArchitectureRules.messagesDoNotDependOnFrameworks(), "SpringDependentEvent");
   }
 
   @Test

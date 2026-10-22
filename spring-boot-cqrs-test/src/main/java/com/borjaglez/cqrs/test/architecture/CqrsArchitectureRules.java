@@ -19,9 +19,9 @@ import com.borjaglez.cqrs.query.annotation.HandleQuery;
 import com.borjaglez.cqrs.query.annotation.QueryHandler;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.properties.HasModifiers;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.properties.HasModifiers;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -88,7 +88,8 @@ public final class CqrsArchitectureRules {
               }
             })
         .should(
-            new ArchCondition<JavaMethod>("be declared in a class with the matching handler annotation") {
+            new ArchCondition<JavaMethod>(
+                "be declared in a class with the matching handler annotation") {
               @Override
               public void check(JavaMethod method, ConditionEvents events) {
                 HANDLER_CLASS_BY_METHOD_ANNOTATION.forEach(
@@ -142,7 +143,12 @@ public final class CqrsArchitectureRules {
         .because("serializers instantiate messages through a no-arg constructor");
   }
 
-  /** Messages are plain data and must not depend on Spring, Jackson or persistence frameworks. */
+  /**
+   * Messages are plain data and must not depend on Spring ({@code org.springframework..}), Jackson
+   * databind in versions 2 and 3 ({@code com.fasterxml.jackson.databind..}, {@code
+   * tools.jackson..}), JPA ({@code jakarta.persistence..}) or Hibernate ({@code org.hibernate..}).
+   * Jackson annotations ({@code com.fasterxml.jackson.annotation..}) are allowed.
+   */
   public static ArchRule messagesDoNotDependOnFrameworks() {
     return noClasses()
         .that(CONCRETE_MESSAGES)

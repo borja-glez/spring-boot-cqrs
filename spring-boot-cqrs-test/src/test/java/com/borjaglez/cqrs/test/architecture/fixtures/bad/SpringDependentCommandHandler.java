@@ -1,8 +1,9 @@
 package com.borjaglez.cqrs.test.architecture.fixtures.bad;
 
-import com.borjaglez.cqrs.command.annotation.HandleCommand;
-import com.borjaglez.cqrs.command.annotation.CommandHandler;
 import org.springframework.util.StringUtils;
+
+import com.borjaglez.cqrs.command.annotation.CommandHandler;
+import com.borjaglez.cqrs.command.annotation.HandleCommand;
 
 @CommandHandler
 public class SpringDependentCommandHandler {
