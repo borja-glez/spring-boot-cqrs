@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.core.ParameterizedTypeReference;
 
@@ -64,6 +65,7 @@ public class RabbitMqQueryBus implements QueryBus {
   @Override
   @SuppressWarnings("unchecked")
   public <R> R ask(Query query, ResultType<R> resultType) {
+    Objects.requireNonNull(resultType, "resultType must not be null");
     return (R) send(query, ParameterizedTypeReference.forType(resultType.type()));
   }
 

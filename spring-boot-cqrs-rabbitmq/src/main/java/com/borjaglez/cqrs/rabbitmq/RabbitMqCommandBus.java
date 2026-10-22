@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.rabbitmq;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.core.ParameterizedTypeReference;
 
@@ -88,6 +89,7 @@ public class RabbitMqCommandBus implements CommandBus {
   @Override
   @SuppressWarnings("unchecked")
   public <R> R dispatchAndReceive(Command command, ResultType<R> resultType) {
+    Objects.requireNonNull(resultType, "resultType must not be null");
     ParameterizedTypeReference<R> responseType =
         ParameterizedTypeReference.forType(resultType.type());
     return (R)

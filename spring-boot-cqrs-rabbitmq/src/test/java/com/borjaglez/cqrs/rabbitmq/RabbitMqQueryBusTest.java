@@ -101,6 +101,16 @@ class RabbitMqQueryBusTest {
   }
 
   @Test
+  void askWithNullResultTypeShouldThrowWithoutPublishing() {
+    TestQuery query = new TestQuery("test-data");
+
+    assertThatThrownBy(() -> queryBus.ask(query, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resultType must not be null");
+    verifyNoInteractions(publisher);
+  }
+
+  @Test
   void askWithResultTypeShouldPassTypeToPublisher() {
     TestQuery query = new TestQuery("test-data");
     ResultType<String> resultType = new ResultType<String>() {};

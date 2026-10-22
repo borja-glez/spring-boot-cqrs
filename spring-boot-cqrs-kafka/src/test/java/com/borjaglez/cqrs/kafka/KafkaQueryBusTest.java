@@ -83,6 +83,16 @@ class KafkaQueryBusTest {
   }
 
   @Test
+  void askWithNullResultTypeShouldThrowWithoutSending() {
+    TestQuery query = new TestQuery("test");
+
+    assertThatThrownBy(() -> queryBus.ask(query, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resultType must not be null");
+    verifyNoInteractions(requestReplyClient);
+  }
+
+  @Test
   void askWithResultTypeShouldPassTypeReference() throws Exception {
     TestQuery query = new TestQuery("test");
     ResultType<String> resultType = new ResultType<String>() {};

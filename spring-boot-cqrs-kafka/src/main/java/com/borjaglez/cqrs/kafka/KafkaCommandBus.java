@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.core.ParameterizedTypeReference;
 
@@ -89,6 +90,7 @@ public class KafkaCommandBus implements CommandBus {
   @Override
   @SuppressWarnings("unchecked")
   public <R> R dispatchAndReceive(Command command, ResultType<R> resultType) {
+    Objects.requireNonNull(resultType, "resultType must not be null");
     ParameterizedTypeReference<R> responseType =
         ParameterizedTypeReference.forType(resultType.type());
     return (R)

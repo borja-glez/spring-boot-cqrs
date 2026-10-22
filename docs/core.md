@@ -3,7 +3,7 @@
 Module: `spring-boot-cqrs-core`  
 Package: `com.borjaglez.cqrs`
 
-The core module contains all the fundamental types, interfaces, annotations, and infrastructure for the CQRS pattern. It has no Spring Boot auto-configuration -- that responsibility belongs to the starter modules (boot3-starter and boot4-starter).
+The core module contains the CQRS infrastructure: the registries, the Spring bus implementations, handler discovery, the middleware pipeline, the serialization SPI and AOT support. It has no Spring Boot auto-configuration -- that responsibility belongs to the starter modules (boot3-starter and boot4-starter). This guide also describes the API types the core builds on.
 
 The messages (`Command`, `Event`, `Query`, `AggregateRoot`, `KeyedMessage`), the bus interfaces, `ResultType` and the annotations (`@CommandHandler`, `@HandleCommand` and their query and event counterparts, `@CqrsMessage`, `@Idempotent`) live in `spring-boot-cqrs-api`, a module without dependencies that the core brings in, so a domain module can depend on them without Spring. Their packages are the ones described here.
 

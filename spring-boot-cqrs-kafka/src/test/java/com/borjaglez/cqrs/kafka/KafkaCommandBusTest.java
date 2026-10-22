@@ -148,6 +148,16 @@ class KafkaCommandBusTest {
   }
 
   @Test
+  void dispatchAndReceiveWithNullResultTypeShouldThrowWithoutSending() {
+    TestCommand command = new TestCommand("test");
+
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resultType must not be null");
+    verifyNoInteractions(publisher, requestReplyClient);
+  }
+
+  @Test
   void dispatchAndReceiveWithResultTypeShouldPassTypeReference() throws Exception {
     TestCommand command = new TestCommand("test");
     ResultType<String> resultType = new ResultType<String>() {};

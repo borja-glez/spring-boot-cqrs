@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.kafka;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.core.ParameterizedTypeReference;
 
@@ -60,6 +61,7 @@ public class KafkaQueryBus implements QueryBus {
   @Override
   @SuppressWarnings("unchecked")
   public <R> R ask(Query query, ResultType<R> resultType) {
+    Objects.requireNonNull(resultType, "resultType must not be null");
     return (R) send(query, ParameterizedTypeReference.forType(resultType.type()));
   }
 

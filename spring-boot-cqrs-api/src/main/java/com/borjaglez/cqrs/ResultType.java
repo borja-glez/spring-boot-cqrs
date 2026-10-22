@@ -27,12 +27,20 @@ public abstract class ResultType<T> {
   private final Type type;
 
   /**
-   * Captures the type argument of the anonymous subclass being created.
+   * Captures the type argument given to {@code ResultType} by the class that extends it directly:
+   * the anonymous subclass being created, or an intermediate subclass it extends. As with Spring's
+   * {@code ParameterizedTypeReference}, a type variable in that argument is not resolved: for
+   * {@code class ListOf<E> extends ResultType<List<E>>}, {@code new ListOf<Order>() {}} captures
+   * {@code List<E>}.
    *
-   * @throws IllegalArgumentException if the subclass gives no type argument
+   * @throws IllegalArgumentException if that class gives no type argument
    */
   protected ResultType() {
-    if (!(getClass().getGenericSuperclass() instanceof ParameterizedType superclass)) {
+    Class<?> subclass = getClass();
+    while (subclass.getSuperclass() != ResultType.class) {
+      subclass = subclass.getSuperclass();
+    }
+    if (!(subclass.getGenericSuperclass() instanceof ParameterizedType superclass)) {
       throw new IllegalArgumentException(
           "ResultType must be created with a type argument, e.g. new ResultType<List<Order>>() {}");
     }

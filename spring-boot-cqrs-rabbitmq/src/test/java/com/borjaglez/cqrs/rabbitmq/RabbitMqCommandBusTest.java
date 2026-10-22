@@ -159,6 +159,16 @@ class RabbitMqCommandBusTest {
   }
 
   @Test
+  void dispatchAndReceiveWithNullResultTypeShouldThrowWithoutPublishing() {
+    TestCommand command = new TestCommand("test-data");
+
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resultType must not be null");
+    verifyNoInteractions(publisher);
+  }
+
+  @Test
   void dispatchAndReceiveWithResultTypeShouldPassTypeToPublisher() {
     TestCommand command = new TestCommand("test-data");
     ResultType<String> resultType = new ResultType<String>() {};

@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +29,31 @@ class ResultTypeTest {
   }
 
   @Test
+  void capturesTypeThroughAFixedIntermediateSubclass() {
+    Type listOfStrings = new ResultType<List<String>>() {}.type();
+
+    assertThat(new ListOfStrings().type()).isEqualTo(listOfStrings);
+    assertThat(new ListOfStrings() {}.type()).isEqualTo(listOfStrings);
+  }
+
+  @Test
+  void capturesTheTypeArgumentOfTheClassThatExtendsResultType() {
+    // As Spring's ParameterizedTypeReference does: a type variable of an intermediate subclass is
+    // not resolved, whatever the anonymous subclass binds it to.
+    Type type = new ListOf<Integer>() {}.type();
+
+    assertThat(type).isInstanceOf(ParameterizedType.class);
+    ParameterizedType parameterized = (ParameterizedType) type;
+    assertThat(parameterized.getRawType()).isEqualTo(List.class);
+    assertThat(parameterized.getActualTypeArguments()).hasSize(1);
+    assertThat(parameterized.getActualTypeArguments()[0])
+        .isEqualTo(ListOf.class.getTypeParameters()[0])
+        .isInstanceOf(TypeVariable.class);
+    assertThat(new MapOf<String, Integer>() {}.type().getTypeName())
+        .isEqualTo("java.util.Map<K, V>");
+  }
+
+  @Test
   void ofWrapsAGivenType() {
     Type listOfStrings = new ResultType<List<String>>() {}.type();
 
@@ -45,6 +72,10 @@ class ResultTypeTest {
   @SuppressWarnings("rawtypes")
   void rejectsMissingTypeArgument() {
     assertThatThrownBy(() -> new ResultType() {})
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage(
+            "ResultType must be created with a type argument, e.g. new ResultType<List<Order>>() {}");
+    assertThatThrownBy(() -> new RawResultType() {})
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage(
             "ResultType must be created with a type argument, e.g. new ResultType<List<Order>>() {}");
@@ -72,4 +103,13 @@ class ResultTypeTest {
         .hasToString("ResultType<java.util.List<java.lang.String>>");
     assertThat(ResultType.of(String.class)).hasToString("ResultType<java.lang.String>");
   }
+
+  static class ListOfStrings extends ResultType<List<String>> {}
+
+  abstract static class ListOf<E> extends ResultType<List<E>> {}
+
+  abstract static class MapOf<K, V> extends ResultType<Map<K, V>> {}
+
+  @SuppressWarnings("rawtypes")
+  abstract static class RawResultType extends ResultType {}
 }
