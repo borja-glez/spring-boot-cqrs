@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="746" viewBox="0 0 850 746" role="img" aria-labelledby="rr-title rr-desc">
+<title id="rr-title">RabbitMQ request and reply</title>
+<desc id="rr-desc">A sequence diagram of a command sent over RabbitMQ with a reply. The caller calls RabbitMqCommandBus.dispatchAndReceive (RabbitMqQueryBus.ask and dispatchAndWait work the same way). The OUTBOUND middleware runs in the sending process, then RabbitMqPublisher sends the request through RabbitTemplate.sendAndReceive to the cqrs.commands topic exchange, with the message name as routing key, the cqrs.message.type and cqrs.context headers, a reply-to address (Spring AMQP&#x27;s direct reply-to, amq.rabbitmq.reply-to, by default) and a correlation id. The exchange routes it to the queue of the responding service, cqrs.stock.commands. RabbitMqCommandConsumer checks that the message is exposed, rehydrates the MessageContext from the headers, runs the INBOUND middleware and calls the handler. The result goes back to the reply-to address with the same correlation id, the requester matches it and converts it, with the ResultType when one was passed, and the caller receives it. The requester waits up to the reply timeout, spring.rabbitmq.template.reply-timeout (5 seconds by default) or cqrs.rabbitmq.commands.reply-timeout and cqrs.rabbitmq.queries.reply-timeout. Three outcomes: the handler returns, and a business refusal is returned as a result record such as Reservation(false, &quot;no stock&quot;); the handler throws, the error reply carries the cqrs.error and cqrs.error.type headers and the caller gets a RemoteHandlerException with the remote exception&#x27;s type name and message only; or no reply arrives in time and the caller gets a RemoteReplyTimeoutException while the handler may still run or may have run, so it must be idempotent by business key. The animation plays the three outcomes in turn.</desc>
+<defs>
+<filter id="rr-sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.45"/></filter>
+<filter id="rr-gl" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="rr-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f141b"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+<marker id="rr-m-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#e6edf3"/></marker>
+</defs>
+<style>
+text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+.m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace}
+.flow{stroke-dasharray:6 5;animation:flow 1.1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-11}}
+@keyframes k1{0.00%{opacity:0;transform:translate(70px,190px)}1.25%{opacity:0;transform:translate(70px,190px)}1.75%{opacity:1;transform:translate(106px,190px)}3.25%{opacity:1;transform:translate(214px,190px)}3.75%{opacity:0;transform:translate(250px,190px)}100.00%{opacity:0;transform:translate(250px,190px)}}
+.k1{animation:k1 24s linear infinite}
+@keyframes k2{0.00%{opacity:0}3.75%{opacity:0}4.50%{opacity:1.0}5.83%{opacity:1.0}6.58%{opacity:0}100.00%{opacity:0}}
+.k2{animation:k2 24s linear infinite}
+@keyframes k3{0.00%{opacity:0;transform:translate(250px,252px)}5.83%{opacity:0;transform:translate(250px,252px)}6.33%{opacity:1;transform:translate(285.4px,252px)}7.83%{opacity:1;transform:translate(391.6px,252px)}8.33%{opacity:0;transform:translate(427px,252px)}100.00%{opacity:0;transform:translate(427px,252px)}}
+.k3{animation:k3 24s linear infinite}
+@keyframes k4{0.00%{opacity:0;transform:translate(236px,252px)}5.83%{opacity:0;transform:translate(236px,252px)}6.33%{opacity:1;transform:translate(236px,258.94px)}24.92%{opacity:1;transform:translate(236px,517.06px)}25.42%{opacity:0;transform:translate(236px,524px)}100.00%{opacity:0;transform:translate(236px,524px)}}
+.k4{animation:k4 24s linear infinite}
+@keyframes k5{0.00%{opacity:0}8.33%{opacity:0}9.08%{opacity:1.0}10.00%{opacity:1.0}10.75%{opacity:0}100.00%{opacity:0}}
+.k5{animation:k5 24s linear infinite}
+@keyframes k6{0.00%{opacity:0;transform:translate(427px,340px)}10.00%{opacity:0;transform:translate(427px,340px)}10.50%{opacity:1;transform:translate(463.6px,340px)}12.00%{opacity:1;transform:translate(573.4px,340px)}12.50%{opacity:0;transform:translate(610px,340px)}100.00%{opacity:0;transform:translate(610px,340px)}}
+.k6{animation:k6 24s linear infinite}
+@keyframes k7{0.00%{opacity:0}12.50%{opacity:0}13.25%{opacity:1.0}14.58%{opacity:1.0}15.33%{opacity:0}100.00%{opacity:0}}
+.k7{animation:k7 24s linear infinite}
+@keyframes k8{0.00%{opacity:0;transform:translate(610px,430px)}14.58%{opacity:0;transform:translate(610px,430px)}15.08%{opacity:1;transform:translate(649.6px,430px)}16.17%{opacity:1;transform:translate(735.4px,430px)}16.67%{opacity:0;transform:translate(775px,430px)}100.00%{opacity:0;transform:translate(775px,430px)}}
+.k8{animation:k8 24s linear infinite}
+@keyframes k9{0.00%{opacity:0}16.67%{opacity:0}17.42%{opacity:1.0}18.33%{opacity:1.0}19.08%{opacity:0}100.00%{opacity:0}}
+.k9{animation:k9 24s linear infinite}
+@keyframes k10{0.00%{opacity:0;transform:translate(775px,460px)}18.33%{opacity:0;transform:translate(775px,460px)}18.83%{opacity:1;transform:translate(735.4px,460px)}19.92%{opacity:1;transform:translate(649.6px,460px)}20.42%{opacity:0;transform:translate(610px,460px)}100.00%{opacity:0;transform:translate(610px,460px)}}
+.k10{animation:k10 24s linear infinite}
+@keyframes k11{0.00%{opacity:0;transform:translate(610px,492px)}20.42%{opacity:0;transform:translate(610px,492px)}20.92%{opacity:1;transform:translate(573.4px,492px)}22.42%{opacity:1;transform:translate(463.6px,492px)}22.92%{opacity:0;transform:translate(427px,492px)}100.00%{opacity:0;transform:translate(427px,492px)}}
+.k11{animation:k11 24s linear infinite}
+@keyframes k12{0.00%{opacity:0;transform:translate(427px,524px)}22.92%{opacity:0;transform:translate(427px,524px)}23.42%{opacity:1;transform:translate(391.6px,524px)}24.92%{opacity:1;transform:translate(285.4px,524px)}25.42%{opacity:0;transform:translate(250px,524px)}100.00%{opacity:0;transform:translate(250px,524px)}}
+.k12{animation:k12 24s linear infinite}
+@keyframes k13{0.00%{opacity:0}25.42%{opacity:0}26.17%{opacity:1.0}27.50%{opacity:1.0}28.25%{opacity:0}100.00%{opacity:0}}
+.k13{animation:k13 24s linear infinite}
+@keyframes k14{0.00%{opacity:0;transform:translate(250px,600px)}27.50%{opacity:0;transform:translate(250px,600px)}28.00%{opacity:1;transform:translate(214px,600px)}29.50%{opacity:1;transform:translate(106px,600px)}30.00%{opacity:0;transform:translate(70px,600px)}100.00%{opacity:0;transform:translate(70px,600px)}}
+.k14{animation:k14 24s linear infinite}
+@keyframes k15{0.00%{opacity:0}30.00%{opacity:0}30.75%{opacity:1.0}33.33%{opacity:1.0}34.08%{opacity:0}100.00%{opacity:0}}
+.k15{animation:k15 24s linear infinite}
+@keyframes k16{0.00%{opacity:0;transform:translate(70px,190px)}34.58%{opacity:0;transform:translate(70px,190px)}35.08%{opacity:1;transform:translate(106px,190px)}36.58%{opacity:1;transform:translate(214px,190px)}37.08%{opacity:0;transform:translate(250px,190px)}100.00%{opacity:0;transform:translate(250px,190px)}}
+.k16{animation:k16 24s linear infinite}
+@keyframes k17{0.00%{opacity:0;transform:translate(250px,252px)}39.17%{opacity:0;transform:translate(250px,252px)}39.67%{opacity:1;transform:translate(285.4px,252px)}41.17%{opacity:1;transform:translate(391.6px,252px)}41.67%{opacity:0;transform:translate(427px,252px)}100.00%{opacity:0;transform:translate(427px,252px)}}
+.k17{animation:k17 24s linear infinite}
+@keyframes k18{0.00%{opacity:0;transform:translate(236px,252px)}39.17%{opacity:0;transform:translate(236px,252px)}39.67%{opacity:1;transform:translate(236px,259.77px)}56.17%{opacity:1;transform:translate(236px,516.23px)}56.67%{opacity:0;transform:translate(236px,524px)}100.00%{opacity:0;transform:translate(236px,524px)}}
+.k18{animation:k18 24s linear infinite}
+@keyframes k19{0.00%{opacity:0;transform:translate(427px,340px)}43.33%{opacity:0;transform:translate(427px,340px)}43.83%{opacity:1;transform:translate(463.6px,340px)}45.33%{opacity:1;transform:translate(573.4px,340px)}45.83%{opacity:0;transform:translate(610px,340px)}100.00%{opacity:0;transform:translate(610px,340px)}}
+.k19{animation:k19 24s linear infinite}
+@keyframes k20{0.00%{opacity:0;transform:translate(610px,430px)}47.92%{opacity:0;transform:translate(610px,430px)}48.42%{opacity:1;transform:translate(649.6px,430px)}49.50%{opacity:1;transform:translate(735.4px,430px)}50.00%{opacity:0;transform:translate(775px,430px)}100.00%{opacity:0;transform:translate(775px,430px)}}
+.k20{animation:k20 24s linear infinite}
+@keyframes k21{0.00%{opacity:0}50.00%{opacity:0}50.75%{opacity:1.0}55.00%{opacity:1.0}55.75%{opacity:0}100.00%{opacity:0}}
+.k21{animation:k21 24s linear infinite}
+@keyframes k22{0.00%{opacity:0}50.00%{opacity:0}50.75%{opacity:1.0}52.50%{opacity:1.0}53.25%{opacity:0}100.00%{opacity:0}}
+.k22{animation:k22 24s linear infinite}
+@keyframes k23{0.00%{opacity:0;transform:translate(610px,492px)}51.67%{opacity:0;transform:translate(610px,492px)}52.17%{opacity:1;transform:translate(573.4px,492px)}53.67%{opacity:1;transform:translate(463.6px,492px)}54.17%{opacity:0;transform:translate(427px,492px)}100.00%{opacity:0;transform:translate(427px,492px)}}
+.k23{animation:k23 24s linear infinite}
+@keyframes k24{0.00%{opacity:0}51.67%{opacity:0}52.42%{opacity:1.0}57.50%{opacity:1.0}58.25%{opacity:0}100.00%{opacity:0}}
+.k24{animation:k24 24s linear infinite}
+@keyframes k25{0.00%{opacity:0;transform:translate(427px,524px)}54.17%{opacity:0;transform:translate(427px,524px)}54.67%{opacity:1;transform:translate(391.6px,524px)}56.17%{opacity:1;transform:translate(285.4px,524px)}56.67%{opacity:0;transform:translate(250px,524px)}100.00%{opacity:0;transform:translate(250px,524px)}}
+.k25{animation:k25 24s linear infinite}
+@keyframes k26{0.00%{opacity:0;transform:translate(250px,600px)}58.33%{opacity:0;transform:translate(250px,600px)}58.83%{opacity:1;transform:translate(214px,600px)}60.33%{opacity:1;transform:translate(106px,600px)}60.83%{opacity:0;transform:translate(70px,600px)}100.00%{opacity:0;transform:translate(70px,600px)}}
+.k26{animation:k26 24s linear infinite}
+@keyframes k27{0.00%{opacity:0}60.83%{opacity:0}61.58%{opacity:1.0}65.00%{opacity:1.0}65.75%{opacity:0}100.00%{opacity:0}}
+.k27{animation:k27 24s linear infinite}
+@keyframes k28{0.00%{opacity:0;transform:translate(70px,190px)}67.92%{opacity:0;transform:translate(70px,190px)}68.42%{opacity:1;transform:translate(106px,190px)}69.92%{opacity:1;transform:translate(214px,190px)}70.42%{opacity:0;transform:translate(250px,190px)}100.00%{opacity:0;transform:translate(250px,190px)}}
+.k28{animation:k28 24s linear infinite}
+@keyframes k29{0.00%{opacity:0;transform:translate(250px,252px)}72.50%{opacity:0;transform:translate(250px,252px)}73.00%{opacity:1;transform:translate(285.4px,252px)}74.50%{opacity:1;transform:translate(391.6px,252px)}75.00%{opacity:0;transform:translate(427px,252px)}100.00%{opacity:0;transform:translate(427px,252px)}}
+.k29{animation:k29 24s linear infinite}
+@keyframes k30{0.00%{opacity:0;transform:translate(236px,252px)}72.50%{opacity:0;transform:translate(236px,252px)}73.00%{opacity:1;transform:translate(236px,259.77px)}89.50%{opacity:1;transform:translate(236px,516.23px)}90.00%{opacity:0;transform:translate(236px,524px)}100.00%{opacity:0;transform:translate(236px,524px)}}
+.k30{animation:k30 24s linear infinite}
+@keyframes k31{0.00%{opacity:0;transform:translate(427px,340px)}76.67%{opacity:0;transform:translate(427px,340px)}77.17%{opacity:1;transform:translate(463.6px,340px)}78.67%{opacity:1;transform:translate(573.4px,340px)}79.17%{opacity:0;transform:translate(610px,340px)}100.00%{opacity:0;transform:translate(610px,340px)}}
+.k31{animation:k31 24s linear infinite}
+@keyframes k32{0.00%{opacity:0;transform:translate(610px,430px)}81.25%{opacity:0;transform:translate(610px,430px)}81.75%{opacity:1;transform:translate(649.6px,430px)}82.83%{opacity:1;transform:translate(735.4px,430px)}83.33%{opacity:0;transform:translate(775px,430px)}100.00%{opacity:0;transform:translate(775px,430px)}}
+.k32{animation:k32 24s linear infinite}
+@keyframes k33{0.00%{opacity:0}83.33%{opacity:0}84.08%{opacity:1.0}97.50%{opacity:1.0}98.25%{opacity:0}100.00%{opacity:0}}
+.k33{animation:k33 24s linear infinite}
+@keyframes k34{0.00%{opacity:0}83.33%{opacity:0}84.08%{opacity:1.0}97.50%{opacity:1.0}98.25%{opacity:0}100.00%{opacity:0}}
+.k34{animation:k34 24s linear infinite}
+@keyframes k35{0.00%{opacity:0}90.00%{opacity:0}90.75%{opacity:1.0}95.83%{opacity:1.0}96.58%{opacity:0}100.00%{opacity:0}}
+.k35{animation:k35 24s linear infinite}
+@keyframes k36{0.00%{opacity:0;transform:translate(250px,600px)}91.67%{opacity:0;transform:translate(250px,600px)}92.17%{opacity:1;transform:translate(214px,600px)}93.67%{opacity:1;transform:translate(106px,600px)}94.17%{opacity:0;transform:translate(70px,600px)}100.00%{opacity:0;transform:translate(70px,600px)}}
+.k36{animation:k36 24s linear infinite}
+@keyframes k37{0.00%{opacity:0}94.17%{opacity:0}94.92%{opacity:1.0}98.33%{opacity:1.0}99.08%{opacity:0}100.00%{opacity:0}}
+.k37{animation:k37 24s linear infinite}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}.tok{display:none}}
+</style>
+<rect x="0.5" y="0.5" width="849" height="745" rx="16" fill="url(#rr-panel)" stroke="#30363d"/>
+<text x="24" y="38" font-size="20" fill="#e6edf3" font-weight="600">RabbitMQ request/reply</text>
+<text x="24" y="60" font-size="13" fill="#8b949e">dispatchAndReceive, dispatchAndWait and ask wait for the reply with their correlation id, up to the reply timeout</text>
+<text x="174" y="88" font-size="12" fill="#f0883e" font-weight="600" text-anchor="middle">requesting service</text>
+<path d="M14,96 L334,96" fill="none" stroke="#f0883e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="427" y="88" font-size="12" fill="#8b949e" font-weight="600" text-anchor="middle">broker</text>
+<path d="M342,96 L512,96" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="677" y="88" font-size="12" fill="#3fb950" font-weight="600" text-anchor="middle">responding service</text>
+<path d="M520,96 L834,96" fill="none" stroke="#3fb950" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect class="bx" x="14" y="104" width="112" height="60" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="70" y="130" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">caller</text>
+<text x="70" y="148" font-size="12" fill="#8b949e" text-anchor="middle">your code</text>
+<path d="M70,164 L70,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<rect class="bx" x="166" y="104" width="168" height="60" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text class="m" x="250" y="124" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMqCommandBus</text>
+<text class="m" x="250" y="142" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMqPublisher</text>
+<text class="m" x="250" y="160" font-size="12" fill="#8b949e" text-anchor="middle">RabbitTemplate</text>
+<path d="M250,164 L250,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<rect class="bx" x="342" y="104" width="170" height="60" rx="10" fill="#161b22" stroke="#8b949e" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="427" y="124" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">RabbitMQ</text>
+<text class="m" x="427" y="142" font-size="12" fill="#e6edf3" text-anchor="middle">cqrs.commands</text>
+<text x="427" y="160" font-size="12" fill="#8b949e" text-anchor="middle">topic exchange</text>
+<path d="M427,164 L427,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<rect class="bx" x="520" y="104" width="180" height="60" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text class="m" x="610" y="130" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMqCommandConsumer</text>
+<text x="610" y="148" font-size="12" fill="#8b949e" text-anchor="middle">listener container</text>
+<path d="M610,164 L610,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<rect class="bx" x="716" y="104" width="118" height="60" rx="10" fill="#161b22" stroke="#39c5bb" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="775" y="130" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">handler</text>
+<text class="m" x="775" y="148" font-size="12" fill="#e6edf3" text-anchor="middle">@HandleCommand</text>
+<path d="M775,164 L775,624" fill="none" stroke="#8b949e" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" opacity="0.7"/>
+<path d="M70,190 L247,190" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text x="160" y="183" font-size="12" fill="#e6edf3" text-anchor="middle">dispatchAndReceive · ask</text>
+<rect class="bx" x="257" y="200" width="152" height="26" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="333" y="218" font-size="12" fill="#f0883e" text-anchor="middle">OUTBOUND middleware</text>
+<path d="M250,252 L424,252" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text x="338.5" y="245" font-size="12" fill="#e6edf3" text-anchor="middle">request</text>
+<text x="338.5" y="269" font-size="12" fill="#8b949e" text-anchor="middle">reply-to · correlation id</text>
+<rect class="bx" x="348" y="280" width="158" height="42" rx="8" fill="#161b22" stroke="#8b949e" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="427" y="298" font-size="12" fill="#8b949e" text-anchor="middle">routes to the queue</text>
+<text class="m" x="427" y="314" font-size="12" fill="#e6edf3" text-anchor="middle">cqrs.stock.commands</text>
+<path d="M427,340 L607,340" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text x="518.5" y="333" font-size="12" fill="#e6edf3" text-anchor="middle">deliver</text>
+<rect class="bx" x="524" y="352" width="172" height="58" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="610" y="370" font-size="12" fill="#e6edf3" text-anchor="middle">exposure check</text>
+<text x="610" y="386" font-size="12" fill="#e6edf3" text-anchor="middle">context from headers</text>
+<text x="610" y="402" font-size="12" fill="#3fb950" text-anchor="middle">INBOUND middleware</text>
+<path d="M610,430 L772,430" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text class="m" x="692.5" y="423" font-size="12" fill="#e6edf3" text-anchor="middle">handle(command)</text>
+<path d="M775,460 L613,460" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#rr-m-text)"/>
+<text x="692.5" y="453" font-size="12" fill="#e6edf3" text-anchor="middle">result record</text>
+<path d="M610,492 L430,492" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text x="518.5" y="485" font-size="12" fill="#e6edf3" text-anchor="middle">reply, same correlation id</text>
+<path d="M427,524 L253,524" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text class="m" x="338.5" y="517" font-size="12" fill="#e6edf3" text-anchor="middle">amq.rabbitmq.reply-to</text>
+<rect class="bx" x="168" y="536" width="164" height="42" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="250" y="554" font-size="12" fill="#e6edf3" text-anchor="middle">matches correlation id</text>
+<text x="250" y="570" font-size="12" fill="#e6edf3" text-anchor="middle">reads it as ResultType</text>
+<path d="M250,600 L73,600" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#rr-m-text)"/>
+<text x="160" y="593" font-size="12" fill="#e6edf3" text-anchor="middle">result</text>
+<path d="M242,252 H236 V524 H242" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="228" y="374" font-size="12" fill="#d29922" text-anchor="end">waits up to the</text>
+<text class="m" x="228" y="390" font-size="12" fill="#d29922" text-anchor="end">reply-timeout</text>
+<text x="228" y="406" font-size="12" fill="#8b949e" text-anchor="end">5s by default</text>
+<rect class="bx" x="14" y="642" width="264" height="92" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="26" y="664" font-size="12.5" fill="#3fb950" font-weight="600">the handler returns</text>
+<text x="26" y="684" font-size="12" fill="#8b949e">a business &quot;no&quot; is a result:</text>
+<text class="m" x="26" y="702" font-size="12" fill="#e6edf3">Reservation(false, &quot;no stock&quot;)</text>
+<text x="26" y="720" font-size="12" fill="#8b949e">ResultType for generic results</text>
+<rect class="bx" x="290" y="642" width="264" height="92" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="302" y="664" font-size="12.5" fill="#f85149" font-weight="600">the handler throws</text>
+<text class="m" x="302" y="684" font-size="12" fill="#e6edf3">cqrs.error, cqrs.error.type</text>
+<text class="m" x="302" y="702" font-size="12" fill="#f85149">RemoteHandlerException</text>
+<text x="302" y="720" font-size="12" fill="#8b949e">only type name and message</text>
+<rect class="bx" x="566" y="642" width="268" height="92" rx="10" fill="#161b22" stroke="#d29922" stroke-width="1.2" filter="url(#rr-sh)"/>
+<text x="578" y="664" font-size="12.5" fill="#d29922" font-weight="600">no reply in time</text>
+<text class="m" x="578" y="684" font-size="12" fill="#d29922">RemoteReplyTimeoutException</text>
+<text x="578" y="702" font-size="12" fill="#8b949e">the handler may still run:</text>
+<text x="578" y="720" font-size="12" fill="#8b949e">make it idempotent by key</text>
+<circle class="tok k1" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k2" x="254" y="197" width="158" height="32" rx="10" stroke="#f0883e" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k3" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k4" r="3.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k5" x="345" y="277" width="164" height="48" rx="10" stroke="#8b949e" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k6" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k7" x="521" y="349" width="178" height="64" rx="10" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k8" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k9" x="713" y="101" width="124" height="66" rx="13" stroke="#39c5bb" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k10" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k11" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k12" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k13" x="165" y="533" width="170" height="48" rx="10" stroke="#f0883e" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k14" r="4.5" fill="#3fb950" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k15" x="11" y="639" width="270" height="98" rx="13" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k16" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k17" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k18" r="3.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k19" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k20" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<text class="k21" x="782" y="448" font-size="12" fill="#f85149" font-weight="600" opacity="0">throws</text>
+<rect class="k22" x="713" y="101" width="124" height="66" rx="13" stroke="#f85149" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k23" r="4.5" fill="#f85149" filter="url(#rr-gl)" opacity="0"/>
+<text class="m k24" x="518" y="509" font-size="12" fill="#f85149" text-anchor="middle" opacity="0">cqrs.error</text>
+<circle class="tok k25" r="4.5" fill="#f85149" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k26" r="4.5" fill="#f85149" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k27" x="287" y="639" width="270" height="98" rx="13" stroke="#f85149" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k28" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k29" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k30" r="3.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k31" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<circle class="tok k32" r="4.5" fill="#58a6ff" filter="url(#rr-gl)" opacity="0"/>
+<text class="k33" x="782" y="448" font-size="12" fill="#d29922" font-weight="600" opacity="0">slow</text>
+<rect class="k34" x="713" y="101" width="124" height="66" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+<text class="k35" x="228" y="424" font-size="12" fill="#d29922" font-weight="600" text-anchor="end" opacity="0">timed out</text>
+<circle class="tok k36" r="4.5" fill="#d29922" filter="url(#rr-gl)" opacity="0"/>
+<rect class="k37" x="563" y="639" width="274" height="98" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+</svg>

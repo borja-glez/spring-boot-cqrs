@@ -1,0 +1,288 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="724" viewBox="0 0 850 724" role="img" aria-labelledby="dp-title dp-desc">
+<title id="dp-title">Dispatch pipeline and middleware phases</title>
+<desc id="dp-desc">How a message passes the middleware pipeline. Every bus receives all BusMiddleware beans in @Order order and runs only those whose phases() contain its DispatchPhase. LOCAL: the in-process buses SpringCommandBus, SpringQueryBus and springEventBus run the LOCAL chain and then call the handler through its registry, with no broker. OUTBOUND and INBOUND: a remote bus of the RabbitMQ or Kafka adapter (RabbitMqCommandBus, KafkaQueryBus and the others) runs the OUTBOUND chain in the sending process and then publishes; in the receiving process the consumer rehydrates the MessageContext from the context headers, runs the INBOUND chain and calls the handler through its registry. The built-in middleware, in order: ContextPropagationMiddleware (Ordered.HIGHEST_PRECEDENCE; LOCAL, OUTBOUND and INBOUND); TracingMiddleware (HIGHEST_PRECEDENCE + 10; LOCAL and INBOUND); the opt-in RetryMiddleware (RetryMiddleware.ORDER, LOWEST_PRECEDENCE - 100; LOCAL and INBOUND); the opt-in TransactionMiddleware (TransactionMiddleware.ORDER, LOWEST_PRECEDENCE - 50; LOCAL and INBOUND), so every retry attempt runs in its own transaction; CommandValidationInterceptor (no @Order, so LOWEST_PRECEDENCE; LOCAL, OUTBOUND and INBOUND); MicrometerBusObservability (no @Order; LOCAL and INBOUND); and your own middleware at its @Order, by default in LOCAL and INBOUND. At the end of the LOCAL and INBOUND chains the registry invokes the handler, through IdempotentInvoker when the handler is @Idempotent; at the end of the OUTBOUND chain the message is published. The animation follows a local dispatch, then a remote send and its reception, lighting the middleware each chain runs.</desc>
+<defs>
+<filter id="dp-sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.45"/></filter>
+<filter id="dp-gl" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="dp-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f141b"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+<marker id="dp-m-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#58a6ff"/></marker><marker id="dp-m-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#3fb950"/></marker><marker id="dp-m-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#f0883e"/></marker>
+</defs>
+<style>
+text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+.m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace}
+.flow{stroke-dasharray:6 5;animation:flow 1.1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-11}}
+@keyframes k1{0.00%{opacity:0;transform:translate(70px,131px)}1.67%{opacity:0;transform:translate(70px,131px)}2.33%{opacity:1;transform:translate(93.6px,131px)}7.67%{opacity:1;transform:translate(282.4px,131px)}8.33%{opacity:0;transform:translate(306px,131px)}100.00%{opacity:0;transform:translate(306px,131px)}}
+.k1{animation:k1 18s linear infinite}
+@keyframes k2{0.00%{opacity:0}8.33%{opacity:0}9.33%{opacity:1.0}25.00%{opacity:1.0}26.00%{opacity:0}100.00%{opacity:0}}
+.k2{animation:k2 18s linear infinite}
+@keyframes k3{0.00%{opacity:0}8.33%{opacity:0}9.33%{opacity:1.0}10.11%{opacity:1.0}11.11%{opacity:0}100.00%{opacity:0}}
+.k3{animation:k3 18s linear infinite}
+@keyframes k4{0.00%{opacity:0}8.33%{opacity:0}9.33%{opacity:1.0}10.11%{opacity:1.0}11.11%{opacity:0}100.00%{opacity:0}}
+.k4{animation:k4 18s linear infinite}
+@keyframes k5{0.00%{opacity:0}10.39%{opacity:0}11.39%{opacity:1.0}12.17%{opacity:1.0}13.17%{opacity:0}100.00%{opacity:0}}
+.k5{animation:k5 18s linear infinite}
+@keyframes k6{0.00%{opacity:0}10.39%{opacity:0}11.39%{opacity:1.0}12.17%{opacity:1.0}13.17%{opacity:0}100.00%{opacity:0}}
+.k6{animation:k6 18s linear infinite}
+@keyframes k7{0.00%{opacity:0}12.44%{opacity:0}13.44%{opacity:1.0}14.22%{opacity:1.0}15.22%{opacity:0}100.00%{opacity:0}}
+.k7{animation:k7 18s linear infinite}
+@keyframes k8{0.00%{opacity:0}12.44%{opacity:0}13.44%{opacity:1.0}14.22%{opacity:1.0}15.22%{opacity:0}100.00%{opacity:0}}
+.k8{animation:k8 18s linear infinite}
+@keyframes k9{0.00%{opacity:0}14.50%{opacity:0}15.50%{opacity:1.0}16.28%{opacity:1.0}17.28%{opacity:0}100.00%{opacity:0}}
+.k9{animation:k9 18s linear infinite}
+@keyframes k10{0.00%{opacity:0}14.50%{opacity:0}15.50%{opacity:1.0}16.28%{opacity:1.0}17.28%{opacity:0}100.00%{opacity:0}}
+.k10{animation:k10 18s linear infinite}
+@keyframes k11{0.00%{opacity:0}16.56%{opacity:0}17.56%{opacity:1.0}18.33%{opacity:1.0}19.33%{opacity:0}100.00%{opacity:0}}
+.k11{animation:k11 18s linear infinite}
+@keyframes k12{0.00%{opacity:0}16.56%{opacity:0}17.56%{opacity:1.0}18.33%{opacity:1.0}19.33%{opacity:0}100.00%{opacity:0}}
+.k12{animation:k12 18s linear infinite}
+@keyframes k13{0.00%{opacity:0}18.61%{opacity:0}19.61%{opacity:1.0}20.39%{opacity:1.0}21.39%{opacity:0}100.00%{opacity:0}}
+.k13{animation:k13 18s linear infinite}
+@keyframes k14{0.00%{opacity:0}18.61%{opacity:0}19.61%{opacity:1.0}20.39%{opacity:1.0}21.39%{opacity:0}100.00%{opacity:0}}
+.k14{animation:k14 18s linear infinite}
+@keyframes k15{0.00%{opacity:0}20.67%{opacity:0}21.67%{opacity:1.0}22.44%{opacity:1.0}23.44%{opacity:0}100.00%{opacity:0}}
+.k15{animation:k15 18s linear infinite}
+@keyframes k16{0.00%{opacity:0}20.67%{opacity:0}21.67%{opacity:1.0}22.44%{opacity:1.0}23.44%{opacity:0}100.00%{opacity:0}}
+.k16{animation:k16 18s linear infinite}
+@keyframes k17{0.00%{opacity:0}22.72%{opacity:0}23.72%{opacity:1.0}24.50%{opacity:1.0}25.50%{opacity:0}100.00%{opacity:0}}
+.k17{animation:k17 18s linear infinite}
+@keyframes k18{0.00%{opacity:0}22.72%{opacity:0}23.72%{opacity:1.0}24.50%{opacity:1.0}25.50%{opacity:0}100.00%{opacity:0}}
+.k18{animation:k18 18s linear infinite}
+@keyframes k19{0.00%{opacity:0;transform:translate(306px,131px)}25.00%{opacity:0;transform:translate(306px,131px)}25.67%{opacity:1;transform:translate(353.2px,131px)}31.00%{opacity:1;transform:translate(730.8px,131px)}31.67%{opacity:0;transform:translate(778px,131px)}100.00%{opacity:0;transform:translate(778px,131px)}}
+.k19{animation:k19 18s linear infinite}
+@keyframes k20{0.00%{opacity:0}31.67%{opacity:0}32.67%{opacity:1.0}35.56%{opacity:1.0}36.56%{opacity:0}100.00%{opacity:0}}
+.k20{animation:k20 18s linear infinite}
+@keyframes k21{0.00%{opacity:0;transform:translate(70px,225px)}36.67%{opacity:0;transform:translate(70px,225px)}37.33%{opacity:1;transform:translate(98.32px,225px)}41.56%{opacity:1;transform:translate(277.68px,225px)}42.22%{opacity:0;transform:translate(306px,225px)}100.00%{opacity:0;transform:translate(306px,225px)}}
+.k21{animation:k21 18s linear infinite}
+@keyframes k22{0.00%{opacity:0}42.22%{opacity:0}43.22%{opacity:1.0}50.00%{opacity:1.0}51.00%{opacity:0}100.00%{opacity:0}}
+.k22{animation:k22 18s linear infinite}
+@keyframes k23{0.00%{opacity:0}42.22%{opacity:0}43.22%{opacity:1.0}44.44%{opacity:1.0}45.44%{opacity:0}100.00%{opacity:0}}
+.k23{animation:k23 18s linear infinite}
+@keyframes k24{0.00%{opacity:0}42.22%{opacity:0}43.22%{opacity:1.0}44.44%{opacity:1.0}45.44%{opacity:0}100.00%{opacity:0}}
+.k24{animation:k24 18s linear infinite}
+@keyframes k25{0.00%{opacity:0}44.72%{opacity:0}45.72%{opacity:1.0}46.94%{opacity:1.0}47.94%{opacity:0}100.00%{opacity:0}}
+.k25{animation:k25 18s linear infinite}
+@keyframes k26{0.00%{opacity:0}44.72%{opacity:0}45.72%{opacity:1.0}46.94%{opacity:1.0}47.94%{opacity:0}100.00%{opacity:0}}
+.k26{animation:k26 18s linear infinite}
+@keyframes k27{0.00%{opacity:0}47.22%{opacity:0}48.22%{opacity:1.0}49.44%{opacity:1.0}50.44%{opacity:0}100.00%{opacity:0}}
+.k27{animation:k27 18s linear infinite}
+@keyframes k28{0.00%{opacity:0}47.22%{opacity:0}48.22%{opacity:1.0}49.44%{opacity:1.0}50.44%{opacity:0}100.00%{opacity:0}}
+.k28{animation:k28 18s linear infinite}
+@keyframes k29{0.00%{opacity:0;transform:translate(306px,225px)}50.00%{opacity:0;transform:translate(306px,225px)}50.67%{opacity:1;transform:translate(329.6px,225px)}52.67%{opacity:1;transform:translate(400.4px,225px)}53.33%{opacity:0;transform:translate(424px,225px)}100.00%{opacity:0;transform:translate(424px,225px)}}
+.k29{animation:k29 18s linear infinite}
+@keyframes k30{0.00%{opacity:0}53.33%{opacity:0}54.33%{opacity:1.0}56.67%{opacity:1.0}57.67%{opacity:0}100.00%{opacity:0}}
+.k30{animation:k30 18s linear infinite}
+@keyframes k31{0.00%{opacity:0;transform:translate(424px,225px)}56.67%{opacity:0;transform:translate(424px,225px)}57.33%{opacity:1;transform:translate(452.32px,225px)}61.56%{opacity:1;transform:translate(631.68px,225px)}62.22%{opacity:0;transform:translate(660px,225px)}100.00%{opacity:0;transform:translate(660px,225px)}}
+.k31{animation:k31 18s linear infinite}
+@keyframes k32{0.00%{opacity:0}62.22%{opacity:0}63.22%{opacity:1.0}78.89%{opacity:1.0}79.89%{opacity:0}100.00%{opacity:0}}
+.k32{animation:k32 18s linear infinite}
+@keyframes k33{0.00%{opacity:0}62.22%{opacity:0}63.22%{opacity:1.0}64.00%{opacity:1.0}65.00%{opacity:0}100.00%{opacity:0}}
+.k33{animation:k33 18s linear infinite}
+@keyframes k34{0.00%{opacity:0}62.22%{opacity:0}63.22%{opacity:1.0}64.00%{opacity:1.0}65.00%{opacity:0}100.00%{opacity:0}}
+.k34{animation:k34 18s linear infinite}
+@keyframes k35{0.00%{opacity:0}64.28%{opacity:0}65.28%{opacity:1.0}66.06%{opacity:1.0}67.06%{opacity:0}100.00%{opacity:0}}
+.k35{animation:k35 18s linear infinite}
+@keyframes k36{0.00%{opacity:0}64.28%{opacity:0}65.28%{opacity:1.0}66.06%{opacity:1.0}67.06%{opacity:0}100.00%{opacity:0}}
+.k36{animation:k36 18s linear infinite}
+@keyframes k37{0.00%{opacity:0}66.33%{opacity:0}67.33%{opacity:1.0}68.11%{opacity:1.0}69.11%{opacity:0}100.00%{opacity:0}}
+.k37{animation:k37 18s linear infinite}
+@keyframes k38{0.00%{opacity:0}66.33%{opacity:0}67.33%{opacity:1.0}68.11%{opacity:1.0}69.11%{opacity:0}100.00%{opacity:0}}
+.k38{animation:k38 18s linear infinite}
+@keyframes k39{0.00%{opacity:0}68.39%{opacity:0}69.39%{opacity:1.0}70.17%{opacity:1.0}71.17%{opacity:0}100.00%{opacity:0}}
+.k39{animation:k39 18s linear infinite}
+@keyframes k40{0.00%{opacity:0}68.39%{opacity:0}69.39%{opacity:1.0}70.17%{opacity:1.0}71.17%{opacity:0}100.00%{opacity:0}}
+.k40{animation:k40 18s linear infinite}
+@keyframes k41{0.00%{opacity:0}70.44%{opacity:0}71.44%{opacity:1.0}72.22%{opacity:1.0}73.22%{opacity:0}100.00%{opacity:0}}
+.k41{animation:k41 18s linear infinite}
+@keyframes k42{0.00%{opacity:0}70.44%{opacity:0}71.44%{opacity:1.0}72.22%{opacity:1.0}73.22%{opacity:0}100.00%{opacity:0}}
+.k42{animation:k42 18s linear infinite}
+@keyframes k43{0.00%{opacity:0}72.50%{opacity:0}73.50%{opacity:1.0}74.28%{opacity:1.0}75.28%{opacity:0}100.00%{opacity:0}}
+.k43{animation:k43 18s linear infinite}
+@keyframes k44{0.00%{opacity:0}72.50%{opacity:0}73.50%{opacity:1.0}74.28%{opacity:1.0}75.28%{opacity:0}100.00%{opacity:0}}
+.k44{animation:k44 18s linear infinite}
+@keyframes k45{0.00%{opacity:0}74.56%{opacity:0}75.56%{opacity:1.0}76.33%{opacity:1.0}77.33%{opacity:0}100.00%{opacity:0}}
+.k45{animation:k45 18s linear infinite}
+@keyframes k46{0.00%{opacity:0}74.56%{opacity:0}75.56%{opacity:1.0}76.33%{opacity:1.0}77.33%{opacity:0}100.00%{opacity:0}}
+.k46{animation:k46 18s linear infinite}
+@keyframes k47{0.00%{opacity:0}76.61%{opacity:0}77.61%{opacity:1.0}78.39%{opacity:1.0}79.39%{opacity:0}100.00%{opacity:0}}
+.k47{animation:k47 18s linear infinite}
+@keyframes k48{0.00%{opacity:0}76.61%{opacity:0}77.61%{opacity:1.0}78.39%{opacity:1.0}79.39%{opacity:0}100.00%{opacity:0}}
+.k48{animation:k48 18s linear infinite}
+@keyframes k49{0.00%{opacity:0;transform:translate(660px,225px)}78.89%{opacity:0;transform:translate(660px,225px)}79.56%{opacity:1;transform:translate(683.6px,225px)}81.56%{opacity:1;transform:translate(754.4px,225px)}82.22%{opacity:0;transform:translate(778px,225px)}100.00%{opacity:0;transform:translate(778px,225px)}}
+.k49{animation:k49 18s linear infinite}
+@keyframes k50{0.00%{opacity:0}82.22%{opacity:0}83.22%{opacity:1.0}86.11%{opacity:1.0}87.11%{opacity:0}100.00%{opacity:0}}
+.k50{animation:k50 18s linear infinite}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}.tok{display:none}}
+</style>
+<rect x="0.5" y="0.5" width="849" height="723" rx="16" fill="url(#dp-panel)" stroke="#30363d"/>
+<text x="24" y="38" font-size="20" fill="#e6edf3" font-weight="600">Dispatch pipeline and middleware phases</text>
+<text x="24" y="60" font-size="13" fill="#8b949e">every bus gets all BusMiddleware beans in @Order order and runs those whose phases() contain its phase</text>
+<text x="20" y="98" font-size="12.5" fill="#e6edf3"><tspan fill="#58a6ff" font-weight="600">LOCAL</tspan><tspan fill="#8b949e"> · in-process buses</tspan></text>
+<rect class="bx" x="20" y="108" width="100" height="46" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="70" y="127" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">caller</text>
+<text x="70" y="144" font-size="12" fill="#8b949e" text-anchor="middle">your code</text>
+<rect class="bx" x="138" y="108" width="100" height="46" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="188" y="127" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">local bus</text>
+<text class="m" x="188" y="144" font-size="12" fill="#e6edf3" text-anchor="middle">Spring*Bus</text>
+<rect class="bx" x="256" y="108" width="100" height="46" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="306" y="127" font-size="13" fill="#58a6ff" font-weight="600" text-anchor="middle">LOCAL</text>
+<text x="306" y="144" font-size="12" fill="#8b949e" text-anchor="middle">middleware</text>
+<rect class="bx" x="728" y="108" width="100" height="46" rx="10" fill="#161b22" stroke="#39c5bb" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="778" y="127" font-size="13" fill="#39c5bb" font-weight="600" text-anchor="middle">handler</text>
+<text x="778" y="144" font-size="12" fill="#8b949e" text-anchor="middle">via registry</text>
+<path d="M120,131 L136,131" fill="none" stroke="#58a6ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-blue)"/>
+<path d="M238,131 L254,131" fill="none" stroke="#58a6ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-blue)"/>
+<path class="flow" d="M356,131 L726,131" fill="none" stroke="#58a6ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-blue)"/>
+<text x="542" y="123" font-size="12" fill="#8b949e" text-anchor="middle">no broker, no serialization</text>
+<text x="20" y="184" font-size="12.5" fill="#e6edf3"><tspan fill="#f0883e" font-weight="600">OUTBOUND</tspan><tspan fill="#8b949e"> then </tspan><tspan fill="#3fb950" font-weight="600">INBOUND</tspan><tspan fill="#8b949e"> · RabbitMQ and Kafka buses</tspan></text>
+<rect class="bx" x="20" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="70" y="213" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">caller</text>
+<text x="70" y="230" font-size="12" fill="#8b949e" text-anchor="middle">your code</text>
+<rect class="bx" x="138" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="188" y="213" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">remote bus</text>
+<text class="m" x="188" y="230" font-size="12" fill="#e6edf3" text-anchor="middle">RabbitMq*Bus</text>
+<text class="m" x="188" y="247" font-size="12" fill="#e6edf3" text-anchor="middle">Kafka*Bus</text>
+<rect class="bx" x="256" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="306" y="213" font-size="13" fill="#f0883e" font-weight="600" text-anchor="middle">OUTBOUND</text>
+<text x="306" y="230" font-size="12" fill="#8b949e" text-anchor="middle">middleware,</text>
+<text x="306" y="247" font-size="12" fill="#8b949e" text-anchor="middle">then publish</text>
+<rect class="bx" x="374" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#8b949e" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="424" y="213" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">broker</text>
+<text x="424" y="230" font-size="12" fill="#8b949e" text-anchor="middle">payload and</text>
+<text x="424" y="247" font-size="12" fill="#8b949e" text-anchor="middle">context headers</text>
+<rect class="bx" x="492" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="542" y="213" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">consumer</text>
+<text x="542" y="230" font-size="12" fill="#8b949e" text-anchor="middle">context from</text>
+<text x="542" y="247" font-size="12" fill="#8b949e" text-anchor="middle">the headers</text>
+<rect class="bx" x="610" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="660" y="213" font-size="13" fill="#3fb950" font-weight="600" text-anchor="middle">INBOUND</text>
+<text x="660" y="230" font-size="12" fill="#8b949e" text-anchor="middle">middleware</text>
+<rect class="bx" x="728" y="194" width="100" height="62" rx="10" fill="#161b22" stroke="#39c5bb" stroke-width="1.2" filter="url(#dp-sh)"/>
+<text x="778" y="213" font-size="13" fill="#39c5bb" font-weight="600" text-anchor="middle">handler</text>
+<text x="778" y="230" font-size="12" fill="#8b949e" text-anchor="middle">via registry</text>
+<path d="M120,225 L136,225" fill="none" stroke="#f0883e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-orange)"/>
+<path d="M238,225 L254,225" fill="none" stroke="#f0883e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-orange)"/>
+<path class="flow" d="M356,225 L372,225" fill="none" stroke="#f0883e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-orange)"/>
+<path class="flow" d="M474,225 L490,225" fill="none" stroke="#3fb950" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-green)"/>
+<path d="M592,225 L608,225" fill="none" stroke="#3fb950" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-green)"/>
+<path d="M710,225 L726,225" fill="none" stroke="#3fb950" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#dp-m-green)"/>
+<path d="M20,262 V268 H356 V262" fill="none" stroke="#f0883e" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="188" y="285" font-size="12" fill="#f0883e" text-anchor="middle">sending process</text>
+<path d="M492,262 V268 H828 V262" fill="none" stroke="#3fb950" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="660" y="285" font-size="12" fill="#3fb950" text-anchor="middle">receiving process</text>
+<rect x="20" y="304" width="810" height="308" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.2" filter="url(#dp-sh)"/>
+<rect x="561" y="305" width="88" height="306" rx="0" fill="#58a6ff" fill-opacity="0.05"/>
+<rect x="651" y="305" width="88" height="306" rx="0" fill="#f0883e" fill-opacity="0.05"/>
+<rect x="741" y="305" width="88" height="306" rx="0" fill="#3fb950" fill-opacity="0.05"/>
+<text x="32" y="326" font-size="12.5" fill="#8b949e" font-weight="600">middleware, in order</text>
+<text x="342" y="326" font-size="12.5" fill="#8b949e" font-weight="600">order</text>
+<text x="605" y="326" font-size="12.5" fill="#58a6ff" font-weight="600" text-anchor="middle">LOCAL</text>
+<text x="695" y="326" font-size="12.5" fill="#f0883e" font-weight="600" text-anchor="middle">OUTBOUND</text>
+<text x="785" y="326" font-size="12.5" fill="#3fb950" font-weight="600" text-anchor="middle">INBOUND</text>
+<path d="M20,338 L830,338" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="m" x="32" y="359" font-size="12" fill="#e6edf3">ContextPropagationMiddleware</text>
+<text x="342" y="359" font-size="12" fill="#e6edf3"><tspan class="m">HIGHEST_PRECEDENCE</tspan></text>
+<circle cx="605" cy="355" r="5" fill="#58a6ff"/>
+<circle cx="695" cy="355" r="5" fill="#f0883e"/>
+<circle cx="785" cy="355" r="5" fill="#3fb950"/>
+<path d="M28,370 L822,370" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text class="m" x="32" y="391" font-size="12" fill="#e6edf3">TracingMiddleware</text>
+<text x="342" y="391" font-size="12" fill="#e6edf3"><tspan class="m">HIGHEST_PRECEDENCE + 10</tspan></text>
+<circle cx="605" cy="387" r="5" fill="#58a6ff"/>
+<path d="M689,387 L701,387" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="785" cy="387" r="5" fill="#3fb950"/>
+<path d="M28,402 L822,402" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text class="m" x="32" y="423" font-size="12" fill="#e6edf3">RetryMiddleware</text>
+<rect x="150.36" y="410" width="50.16" height="18" rx="9" fill="#10151c" stroke="#8b949e" stroke-width="1.2"/>
+<text x="175.44" y="423.32" font-size="12" fill="#8b949e" text-anchor="middle">opt-in</text>
+<text x="342" y="423" font-size="12" fill="#e6edf3"><tspan class="m">LOWEST_PRECEDENCE - 100</tspan></text>
+<circle cx="605" cy="419" r="5" fill="#58a6ff"/>
+<path d="M689,419 L701,419" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="785" cy="419" r="5" fill="#3fb950"/>
+<path d="M28,434 L822,434" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text class="m" x="32" y="455" font-size="12" fill="#e6edf3">TransactionMiddleware</text>
+<rect x="193.7" y="442" width="50.16" height="18" rx="9" fill="#10151c" stroke="#8b949e" stroke-width="1.2"/>
+<text x="218.78" y="455.32" font-size="12" fill="#8b949e" text-anchor="middle">opt-in</text>
+<text x="342" y="455" font-size="12" fill="#e6edf3"><tspan class="m">LOWEST_PRECEDENCE - 50</tspan></text>
+<circle cx="605" cy="451" r="5" fill="#58a6ff"/>
+<path d="M689,451 L701,451" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="785" cy="451" r="5" fill="#3fb950"/>
+<path d="M28,466 L822,466" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text class="m" x="32" y="487" font-size="12" fill="#e6edf3">CommandValidationInterceptor</text>
+<text x="342" y="487" font-size="12" fill="#e6edf3"><tspan class="m">LOWEST_PRECEDENCE</tspan><tspan fill="#8b949e"> · no @Order</tspan></text>
+<circle cx="605" cy="483" r="5" fill="#58a6ff"/>
+<circle cx="695" cy="483" r="5" fill="#f0883e"/>
+<circle cx="785" cy="483" r="5" fill="#3fb950"/>
+<path d="M28,498 L822,498" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text class="m" x="32" y="519" font-size="12" fill="#e6edf3">MicrometerBusObservability</text>
+<text x="342" y="519" font-size="12" fill="#e6edf3"><tspan class="m">LOWEST_PRECEDENCE</tspan><tspan fill="#8b949e"> · no @Order</tspan></text>
+<circle cx="605" cy="515" r="5" fill="#58a6ff"/>
+<path d="M689,515 L701,515" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="785" cy="515" r="5" fill="#3fb950"/>
+<path d="M28,530 L822,530" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text x="32" y="551" font-size="12" fill="#e6edf3"><tspan fill="#8b949e">your </tspan><tspan class="m">BusMiddleware</tspan></text>
+<text x="342" y="551" font-size="12" fill="#e6edf3"><tspan fill="#8b949e">its @Order</tspan></text>
+<circle cx="605" cy="547" r="5" fill="#58a6ff"/>
+<path d="M689,547 L701,547" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="785" cy="547" r="5" fill="#3fb950"/>
+<path d="M28,562 L822,562" fill="none" stroke="#30363d" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+<text class="m" x="32" y="583" font-size="12" fill="#39c5bb">registry → IdempotentInvoker → handler</text>
+<text x="32" y="601" font-size="12" fill="#8b949e">IdempotentInvoker only wraps @Idempotent command and event handlers</text>
+<text x="605" y="591" font-size="12" fill="#58a6ff" text-anchor="middle">handler</text>
+<text x="695" y="591" font-size="12" fill="#f0883e" text-anchor="middle">publish</text>
+<text x="785" y="591" font-size="12" fill="#3fb950" text-anchor="middle">handler</text>
+<text x="24" y="638" font-size="12" fill="#e6edf3"><tspan class="m" fill="#8b949e">Spring*Bus</tspan><tspan fill="#8b949e"> = SpringCommandBus, SpringQueryBus and springEventBus; </tspan><tspan class="m" fill="#8b949e">RabbitMq*Bus</tspan><tspan fill="#8b949e">, </tspan><tspan class="m" fill="#8b949e">Kafka*Bus</tspan><tspan fill="#8b949e"> = each adapter&#x27;s buses</tspan></text>
+<text x="24" y="658" font-size="12" fill="#e6edf3"><tspan fill="#8b949e">Retry wraps Transaction: every attempt runs in its own transaction, joined by the </tspan><tspan class="m" fill="#8b949e">@Idempotent</tspan><tspan fill="#8b949e"> marker</tspan></text>
+<text x="24" y="678" font-size="12" fill="#e6edf3"><tspan fill="#8b949e">Validation, metrics and unordered middleware share </tspan><tspan class="m" fill="#8b949e">LOWEST_PRECEDENCE</tspan><tspan fill="#8b949e"> and run inside both</tspan></text>
+<text x="24" y="698" font-size="12" fill="#e6edf3"><tspan class="m" fill="#8b949e">phases()</tspan><tspan fill="#8b949e"> defaults to LOCAL and INBOUND; override it to run a middleware before remote sends too</tspan></text>
+<circle class="tok k1" r="4.5" fill="#58a6ff" filter="url(#dp-gl)" opacity="0"/>
+<rect class="k2" x="253" y="105" width="106" height="52" rx="13" stroke="#58a6ff" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k3" x="24" y="340" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k4" x="565" y="341" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k5" x="24" y="372" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k6" x="565" y="373" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k7" x="24" y="404" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k8" x="565" y="405" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k9" x="24" y="436" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k10" x="565" y="437" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k11" x="24" y="468" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k12" x="565" y="469" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k13" x="24" y="500" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k14" x="565" y="501" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k15" x="24" y="532" width="802" height="28" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k16" x="565" y="533" width="80" height="26" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<rect class="k17" x="24" y="564" width="802" height="46" rx="6" stroke="#58a6ff" stroke-width="0.8" opacity="0" fill="#58a6ff" fill-opacity="0.06"/>
+<rect class="k18" x="565" y="565" width="80" height="44" rx="6" stroke="#58a6ff" stroke-width="1.6" opacity="0" fill="#58a6ff" fill-opacity="0.16"/>
+<circle class="tok k19" r="4.5" fill="#58a6ff" filter="url(#dp-gl)" opacity="0"/>
+<rect class="k20" x="725" y="105" width="106" height="52" rx="13" stroke="#39c5bb" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k21" r="4.5" fill="#f0883e" filter="url(#dp-gl)" opacity="0"/>
+<rect class="k22" x="253" y="191" width="106" height="68" rx="13" stroke="#f0883e" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k23" x="24" y="340" width="802" height="28" rx="6" stroke="#f0883e" stroke-width="0.8" opacity="0" fill="#f0883e" fill-opacity="0.06"/>
+<rect class="k24" x="655" y="341" width="80" height="26" rx="6" stroke="#f0883e" stroke-width="1.6" opacity="0" fill="#f0883e" fill-opacity="0.16"/>
+<rect class="k25" x="24" y="468" width="802" height="28" rx="6" stroke="#f0883e" stroke-width="0.8" opacity="0" fill="#f0883e" fill-opacity="0.06"/>
+<rect class="k26" x="655" y="469" width="80" height="26" rx="6" stroke="#f0883e" stroke-width="1.6" opacity="0" fill="#f0883e" fill-opacity="0.16"/>
+<rect class="k27" x="24" y="564" width="802" height="46" rx="6" stroke="#f0883e" stroke-width="0.8" opacity="0" fill="#f0883e" fill-opacity="0.06"/>
+<rect class="k28" x="655" y="565" width="80" height="44" rx="6" stroke="#f0883e" stroke-width="1.6" opacity="0" fill="#f0883e" fill-opacity="0.16"/>
+<circle class="tok k29" r="4.5" fill="#f0883e" filter="url(#dp-gl)" opacity="0"/>
+<rect class="k30" x="371" y="191" width="106" height="68" rx="13" stroke="#8b949e" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k31" r="4.5" fill="#3fb950" filter="url(#dp-gl)" opacity="0"/>
+<rect class="k32" x="607" y="191" width="106" height="68" rx="13" stroke="#3fb950" stroke-width="2.2" opacity="0" fill="none"/>
+<rect class="k33" x="24" y="340" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k34" x="745" y="341" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k35" x="24" y="372" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k36" x="745" y="373" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k37" x="24" y="404" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k38" x="745" y="405" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k39" x="24" y="436" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k40" x="745" y="437" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k41" x="24" y="468" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k42" x="745" y="469" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k43" x="24" y="500" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k44" x="745" y="501" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k45" x="24" y="532" width="802" height="28" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k46" x="745" y="533" width="80" height="26" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<rect class="k47" x="24" y="564" width="802" height="46" rx="6" stroke="#3fb950" stroke-width="0.8" opacity="0" fill="#3fb950" fill-opacity="0.06"/>
+<rect class="k48" x="745" y="565" width="80" height="44" rx="6" stroke="#3fb950" stroke-width="1.6" opacity="0" fill="#3fb950" fill-opacity="0.16"/>
+<circle class="tok k49" r="4.5" fill="#3fb950" filter="url(#dp-gl)" opacity="0"/>
+<rect class="k50" x="725" y="191" width="106" height="68" rx="13" stroke="#39c5bb" stroke-width="2.2" opacity="0" fill="none"/>
+</svg>

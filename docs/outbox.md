@@ -39,6 +39,8 @@ class PlaceOrderHandler {
 
 ## How it works
 
+<p align="center"><img src="assets/diagrams/outbox.svg" alt="A command handler saves its changes and calls OutboxEventBus.publish in one business transaction, which inserts a cqrs_outbox row. OutboxRelay runs every relay interval: in one batch transaction it locks the oldest pending rows with FOR UPDATE SKIP LOCKED, publishes each through the target EventBus (KafkaEventBus or RabbitMqEventBus) to the broker and sets published_at, and stops at the first failure. A failure of the target bus increments attempts and is retried at every run, forever; a row that cannot be read increments read_failures and is set aside with failed_at after max-attempts. After the batch commits, OutboxRelayListener beans such as OutboxMetrics hear the outcome." width="100%"></p>
+
 1. `OutboxEventBus.publish` inserts a row: event id, logical name (`@CqrsMessage` /
    `MessageNamingStrategy`), Java class name, payload (`MessageSerializer`), and the
    `MessageContext` plus the current trace.
@@ -206,6 +208,11 @@ They describe the whole table, shared by every instance; the counters only count
 instance relayed, and only after the batch committed. A growing `pending` or `oldest.pending.age`
 means the relay is not keeping up or the broker is down; `set.aside` above zero needs a look at
 `last_error` (see "Rows that cannot be read").
+
+The counters are fed by `OutboxMetrics` as an `OutboxRelayListener`. The relay calls every
+`OutboxRelayListener` bean after a batch transaction commits, never for a batch that rolled back:
+`published(count)`, `publishFailed()` and `setAside(count)`. A listener that throws is logged and does
+not affect the relay or the other listeners. Declare one to report the outcomes somewhere else.
 
 ## Native images
 

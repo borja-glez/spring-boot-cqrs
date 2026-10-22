@@ -11,6 +11,7 @@ The RabbitMQ module provides distributed implementations of all three buses. Whe
 - [Exchanges, Queues, and Routing](#exchanges-queues-and-routing)
 - [Exposed and local messages](#exposed-and-local-messages)
 - [Bus Implementations](#bus-implementations)
+  - [Request and reply](#request-and-reply)
   - [Reply timeout per bus](#reply-timeout-per-bus)
   - [Generic results](#generic-results)
 - [Retry and Dead-Letter Queue Strategy](#retry-and-dead-letter-queue-strategy)
@@ -163,6 +164,22 @@ Shared publisher component that wraps `RabbitTemplate`:
 - `publish(exchange, routingKey, message, type)` -- one-way publish with a `cqrs.message.type` header and a `cqrs.message.name` header holding the routing key (the logical message name); every method below sets both
 - `publishAndReceive(exchange, routingKey, message, type)` -- RPC-style send/receive; checks for a `cqrs.error` header on the reply
 - `publishAndReceive(exchange, routingKey, message, type, responseType)` -- the same, converting the reply with the `ParameterizedTypeReference` through the `SmartMessageConverter`
+
+### Request and reply
+
+<p align="center"><img src="assets/diagrams/rabbitmq-request-reply.svg" alt="Sequence diagram. The caller calls RabbitMqCommandBus.dispatchAndReceive; after the OUTBOUND middleware, RabbitMqPublisher sends the request through RabbitTemplate to the cqrs.commands exchange with a reply-to address and a correlation id; the exchange routes it to the cqrs.stock.commands queue; RabbitMqCommandConsumer checks the exposure, rehydrates the context, runs the INBOUND middleware and calls the handler; the result goes back to amq.rabbitmq.reply-to with the same correlation id and the caller receives it. The requester waits up to the reply timeout. Outcomes: a result, where a business refusal is a result record; a handler exception, which arrives as RemoteHandlerException; no reply in time, which raises RemoteReplyTimeoutException." width="100%"></p>
+
+`dispatchAndReceive`, `dispatchAndWait` and `ask` send a request and wait for its reply. `RabbitMqPublisher.publishAndReceive` sends it through `RabbitTemplate.sendAndReceive` to the exchange of the bus, with the message name as routing key and the `cqrs.message.type` (`command_reply`, `command_wait` or `query`), `cqrs.message.name` and context headers. The template sets a reply-to address, Spring AMQP's direct reply-to (`amq.rabbitmq.reply-to`) by default, and a correlation id. The consumer of the receiving application runs the handler and answers to that address with the same correlation id:
+
+| Outcome | Reply | What the caller gets |
+|---|---|---|
+| The handler returns a result | The result, written by the JSON converter | The result, read as the `ResultType` when one is given (see [Generic results](#generic-results)) |
+| The handler returns `null` | An empty body with the `cqrs.result.null` header | `null` |
+| `dispatchAndWait`: the handler finishes | An empty result | `dispatchAndWait` returns |
+| The handler throws, or the message is not exposed | An error reply: `cqrs.error=true`, `cqrs.error.type` and the exception message as body | `RemoteHandlerException`, with the class name in `getRemoteExceptionType()` |
+| No reply before the reply timeout | -- | `RemoteReplyTimeoutException` |
+
+A failed request is answered with the error reply; it is neither retried nor dead-lettered. The exception itself does not cross the broker, only its class name and message, so return a refusal that the caller must act on as a result record (`new Reservation(false, "no stock")`) rather than throwing it. After a timeout the handler may still run, or may have run; a caller that tries again sends a new command with a new id, so make the handler idempotent on a business key.
 
 ### Reply timeout per bus
 

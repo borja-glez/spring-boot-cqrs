@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="694" viewBox="0 0 850 694" role="img" aria-labelledby="hx-title hx-desc">
+<title id="hx-title">Hexagonal application with spring-boot-cqrs</title>
+<desc id="hx-desc">Three nested rings of one application, with every source dependency pointing inwards. The domain ring in the centre holds the aggregate Order, the domain event OrderPlaced and the repository port OrderRepository; it is plain Java and does not use the library. The application ring around it depends only on the domain and on spring-boot-cqrs-api: its input ports are the messages PlaceOrder (a Command) and FindOrder (a Query), its use cases are PlaceOrderHandler, annotated @CommandHandler, and FindOrderHandler, annotated @QueryHandler, and its output ports are OrderEvents and OrderViews. The infrastructure ring outside holds everything that knows Spring: the driving adapters (OrderController, a REST controller that uses PlaceOrder, and the broker consumers of the spring-boot-cqrs-rabbitmq and spring-boot-cqrs-kafka modules), the driven adapters (OutboxOrderEvents implements OrderEvents and publishes through OutboxEventBus of spring-boot-cqrs-jdbc, JpaOrderRepository implements OrderRepository, JpaOrderViews implements OrderViews), the bus implementations SpringCommandBus and SpringQueryBus of spring-boot-cqrs-core, which run the middleware pipeline before the handler, and the composition root configured by the boot3 or boot4 starter: handlers registered by the starter&#x27;s scan or as @Bean methods with cqrs.handlers.scan-enabled=false, and TransactionMiddleware around every handler with cqrs.transactions.enabled=true. The animation follows a PlaceOrder request: from OrderController to SpringCommandBus, to PlaceOrderHandler, into the Order aggregate, out through the OrderRepository port to JpaOrderRepository, and out through the OrderEvents port to OutboxOrderEvents. Control flows out through the ports while the source dependencies still point inwards.</desc>
+<defs>
+<filter id="hx-sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.45"/></filter>
+<filter id="hx-gl" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="hx-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f141b"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+<marker id="hx-m-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#d29922"/></marker><marker id="hx-m-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#e6edf3"/></marker>
+</defs>
+<style>
+text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+.m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace}
+.flow{stroke-dasharray:6 5;animation:flow 1.1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-11}}
+@keyframes k1{0.00%{opacity:0;transform:translate(93px,236px)}2.86%{opacity:0;transform:translate(93px,236px)}3.71%{opacity:1;transform:translate(93px,214.32px)}5.78%{opacity:1;transform:translate(93px,162px)}12.71%{opacity:1;transform:translate(268.32px,162px)}13.57%{opacity:0;transform:translate(290px,162px)}100.00%{opacity:0;transform:translate(290px,162px)}}
+.k1{animation:k1 14s linear infinite}
+@keyframes k2{0.00%{opacity:0}13.57%{opacity:0}14.86%{opacity:1.0}20.71%{opacity:1.0}22.00%{opacity:0}100.00%{opacity:0}}
+.k2{animation:k2 14s linear infinite}
+@keyframes k3{0.00%{opacity:0;transform:translate(425px,196px)}20.71%{opacity:0;transform:translate(425px,196px)}21.57%{opacity:1;transform:translate(425px,205.6px)}23.43%{opacity:1;transform:translate(425px,226.4px)}24.29%{opacity:0;transform:translate(425px,236px)}100.00%{opacity:0;transform:translate(425px,236px)}}
+.k3{animation:k3 14s linear infinite}
+@keyframes k4{0.00%{opacity:0}24.29%{opacity:0}25.57%{opacity:1.0}30.71%{opacity:1.0}32.00%{opacity:0}100.00%{opacity:0}}
+.k4{animation:k4 14s linear infinite}
+@keyframes k5{0.00%{opacity:0;transform:translate(426px,284px)}30.71%{opacity:0;transform:translate(426px,284px)}31.57%{opacity:1;transform:translate(426px,294.08px)}33.43%{opacity:1;transform:translate(426px,315.92px)}34.29%{opacity:0;transform:translate(426px,326px)}100.00%{opacity:0;transform:translate(426px,326px)}}
+.k5{animation:k5 14s linear infinite}
+@keyframes k6{0.00%{opacity:0}34.29%{opacity:0}35.57%{opacity:1.0}40.00%{opacity:1.0}41.29%{opacity:0}100.00%{opacity:0}}
+.k6{animation:k6 14s linear infinite}
+@keyframes k7{0.00%{opacity:0;transform:translate(512px,416px)}40.00%{opacity:0;transform:translate(512px,416px)}40.86%{opacity:1;transform:translate(528.8px,416px)}47.71%{opacity:1;transform:translate(663.2px,416px)}48.57%{opacity:0;transform:translate(680px,416px)}100.00%{opacity:0;transform:translate(680px,416px)}}
+.k7{animation:k7 14s linear infinite}
+@keyframes k8{0.00%{opacity:0}48.57%{opacity:0}49.86%{opacity:1.0}55.00%{opacity:1.0}56.29%{opacity:0}100.00%{opacity:0}}
+.k8{animation:k8 14s linear infinite}
+@keyframes k9{0.00%{opacity:0;transform:translate(520px,252px)}55.00%{opacity:0;transform:translate(520px,252px)}55.86%{opacity:1;transform:translate(534.77px,252px)}63.43%{opacity:1;transform:translate(665.23px,252px)}64.29%{opacity:0;transform:translate(680px,252px)}100.00%{opacity:0;transform:translate(680px,252px)}}
+.k9{animation:k9 14s linear infinite}
+@keyframes k10{0.00%{opacity:0}64.29%{opacity:0}65.57%{opacity:1.0}71.43%{opacity:1.0}72.71%{opacity:0}100.00%{opacity:0}}
+.k10{animation:k10 14s linear infinite}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}.tok{display:none}}
+</style>
+<rect x="0.5" y="0.5" width="849" height="693" rx="16" fill="url(#hx-panel)" stroke="#30363d"/>
+<text x="24" y="38" font-size="20" fill="#e6edf3" font-weight="600">A hexagonal application with spring-boot-cqrs</text>
+<text x="24" y="60" font-size="13" fill="#8b949e">the core depends on spring-boot-cqrs-api at most; Spring, buses, brokers and databases stay outside</text>
+<rect x="24" y="74" width="12" height="12" rx="3" fill="#3fb950" fill-opacity="0.12" stroke="#3fb950" stroke-width="1.2"/>
+<text x="42" y="84" font-size="12" fill="#8b949e">domain</text>
+<rect x="98.16" y="74" width="12" height="12" rx="3" fill="#58a6ff" fill-opacity="0.12" stroke="#58a6ff" stroke-width="1.2"/>
+<text x="116.16" y="84" font-size="12" fill="#8b949e">application</text>
+<rect x="204.12" y="74" width="12" height="12" rx="3" fill="#f0883e" fill-opacity="0.12" stroke="#f0883e" stroke-width="1.2"/>
+<text x="222.12" y="84" font-size="12" fill="#8b949e">infrastructure</text>
+<rect x="329.16" y="71" width="117.14" height="18" rx="9" fill="#10151c" stroke="#39c5bb" stroke-width="1.2"/>
+<text class="m" x="387.73" y="84.32" font-size="12" fill="#39c5bb" text-anchor="middle">library module</text>
+<path d="M464.3,80 L490.3,80" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-text)" opacity="0.85"/>
+<text x="498.3" y="84" font-size="12" fill="#8b949e">source dependency</text>
+<path class="flow" d="M624.42,80 L650.42,80" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<circle cx="637.416" cy="80" r="3.5" fill="#d29922"/>
+<text x="658.42" y="84" font-size="12" fill="#8b949e">PlaceOrder at runtime</text>
+<rect x="12" y="108" width="826" height="570" rx="26" fill="#f0883e" fill-opacity="0.04" stroke="#f0883e" stroke-width="1.3"/>
+<rect x="184" y="216" width="482" height="332" rx="22" fill="#58a6ff" fill-opacity="0.05" stroke="#58a6ff" stroke-width="1.3"/>
+<rect x="326" y="306" width="198" height="156" rx="18" fill="#3fb950" fill-opacity="0.06" stroke="#3fb950" stroke-width="1.3"/>
+<rect x="28" y="97" width="378.14" height="22" rx="11" fill="#10151c" stroke="#f0883e" stroke-width="1.2"/>
+<text x="38" y="112.68" font-size="13" fill="#e6edf3"><tspan fill="#f0883e" font-weight="600">infrastructure</tspan><tspan fill="#8b949e"> · adapters, composition root, Spring</tspan></text>
+<rect x="198" y="205" width="252.68" height="22" rx="11" fill="#10151c" stroke="#58a6ff" stroke-width="1.2"/>
+<text x="208" y="220.68" font-size="13" fill="#e6edf3"><tspan fill="#58a6ff" font-weight="600">application</tspan><tspan fill="#8b949e"> · use cases and ports</tspan></text>
+<rect x="491.52" y="205" width="160.48" height="22" rx="11" fill="#10151c" stroke="#39c5bb" stroke-width="1.2"/>
+<text class="m" x="571.76" y="220.32" font-size="12" fill="#39c5bb" text-anchor="middle">spring-boot-cqrs-api</text>
+<rect x="336" y="295" width="64.23" height="22" rx="11" fill="#10151c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="346" y="310.68" font-size="13" fill="#e6edf3"><tspan fill="#3fb950" font-weight="600">domain</tspan></text>
+<rect x="432.4" y="295" width="79.6" height="22" rx="11" fill="#10151c" stroke="#8b949e" stroke-width="1.2"/>
+<text x="472.2" y="310.32" font-size="12" fill="#8b949e" text-anchor="middle">no library</text>
+<rect class="bx" x="290" y="128" width="270" height="68" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="425" y="150" font-size="12" fill="#e6edf3" text-anchor="middle">SpringCommandBus · SpringQueryBus</text>
+<text x="425" y="168" font-size="12" fill="#8b949e" text-anchor="middle">middleware pipeline, then the handler</text>
+<text class="m" x="425" y="186" font-size="12" fill="#39c5bb" text-anchor="middle">spring-boot-cqrs-core</text>
+<rect class="bx" x="196" y="236" width="122" height="48" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="208" y="256" font-size="12" fill="#e6edf3">PlaceOrder</text>
+<text x="208" y="274" font-size="12" fill="#8b949e">Command</text>
+<rect class="bx" x="330" y="236" width="190" height="48" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="342" y="256" font-size="12" fill="#58a6ff">@CommandHandler</text>
+<text class="m" x="342" y="274" font-size="12" fill="#e6edf3">PlaceOrderHandler</text>
+<rect class="bx" x="532" y="236" width="122" height="48" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="544" y="256" font-size="12" fill="#e6edf3">OrderEvents</text>
+<text x="544" y="274" font-size="12" fill="#8b949e">output port</text>
+<rect class="bx" x="196" y="484" width="122" height="48" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="208" y="504" font-size="12" fill="#e6edf3">FindOrder</text>
+<text x="208" y="522" font-size="12" fill="#8b949e">Query</text>
+<rect class="bx" x="330" y="484" width="190" height="48" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="342" y="504" font-size="12" fill="#58a6ff">@QueryHandler</text>
+<text class="m" x="342" y="522" font-size="12" fill="#e6edf3">FindOrderHandler</text>
+<rect class="bx" x="532" y="484" width="122" height="48" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="544" y="504" font-size="12" fill="#e6edf3">OrderViews</text>
+<text x="544" y="522" font-size="12" fill="#8b949e">output port</text>
+<text x="257" y="386" font-size="12" fill="#8b949e" text-anchor="middle">input ports</text>
+<text x="257" y="402" font-size="12" fill="#8b949e" text-anchor="middle">messages</text>
+<text x="593" y="344" font-size="12" fill="#8b949e" text-anchor="middle">output ports</text>
+<text x="593" y="360" font-size="12" fill="#8b949e" text-anchor="middle">interfaces</text>
+<rect class="bx" x="338" y="326" width="174" height="30" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="350" y="346" font-size="12" fill="#e6edf3">Order</text>
+<text x="500" y="346" font-size="12" fill="#8b949e" text-anchor="end">aggregate</text>
+<rect class="bx" x="338" y="368" width="174" height="30" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="350" y="388" font-size="12" fill="#e6edf3">OrderPlaced</text>
+<text x="500" y="388" font-size="12" fill="#8b949e" text-anchor="end">event</text>
+<rect class="bx" x="338" y="410" width="174" height="30" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="350" y="430" font-size="12" fill="#e6edf3">OrderRepository</text>
+<text x="500" y="430" font-size="12" fill="#8b949e" text-anchor="end">port</text>
+<rect class="bx" x="20" y="236" width="146" height="48" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="32" y="256" font-size="12" fill="#e6edf3">OrderController</text>
+<text x="32" y="274" font-size="12" fill="#8b949e">REST adapter</text>
+<rect class="bx" x="20" y="484" width="146" height="48" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text x="32" y="504" font-size="13" fill="#e6edf3" font-weight="600">broker consumers</text>
+<text class="m" x="32" y="522" font-size="12" fill="#39c5bb">rabbitmq · kafka</text>
+<text x="93" y="386" font-size="12" fill="#8b949e" text-anchor="middle">driving</text>
+<text x="93" y="402" font-size="12" fill="#8b949e" text-anchor="middle">adapters</text>
+<rect class="bx" x="680" y="236" width="150" height="48" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="692" y="256" font-size="12" fill="#e6edf3">OutboxOrderEvents</text>
+<text class="m" x="692" y="274" font-size="12" fill="#39c5bb">→ OutboxEventBus</text>
+<text class="m" x="755" y="302" font-size="12" fill="#39c5bb" text-anchor="middle">spring-boot-cqrs-jdbc</text>
+<text x="755" y="352" font-size="12" fill="#8b949e" text-anchor="middle">driven adapters</text>
+<rect class="bx" x="680" y="402" width="150" height="48" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="692" y="422" font-size="12" fill="#e6edf3">JpaOrderRepository</text>
+<text x="692" y="440" font-size="12" fill="#8b949e">persistence</text>
+<rect class="bx" x="680" y="484" width="150" height="48" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text class="m" x="692" y="504" font-size="12" fill="#e6edf3">JpaOrderViews</text>
+<text x="692" y="522" font-size="12" fill="#8b949e">read model</text>
+<rect class="bx" x="20" y="568" width="810" height="96" rx="10" fill="#161b22" stroke="#f0883e" stroke-width="1.2" filter="url(#hx-sh)"/>
+<text x="34" y="590" font-size="13" fill="#e6edf3"><tspan class="m" font-weight="600">config</tspan><tspan fill="#8b949e"> · composition root, the only place where Spring meets the core</tspan></text>
+<text class="m" x="816" y="590" font-size="12" fill="#39c5bb" text-anchor="end">boot3 / boot4 starter</text>
+<text x="34" y="614" font-size="12.5" fill="#e6edf3"><tspan fill="#8b949e">handlers  </tspan>registered by the starter&#x27;s scan, or as <tspan class="m">@Bean</tspan> methods with <tspan class="m">cqrs.handlers.scan-enabled=false</tspan></text>
+<text x="34" y="634" font-size="12.5" fill="#e6edf3"><tspan fill="#8b949e">transactions  </tspan><tspan class="m">cqrs.transactions.enabled=true</tspan> runs every handler inside <tspan class="m">TransactionMiddleware</tspan></text>
+<text x="34" y="654" font-size="12.5" fill="#e6edf3"><tspan fill="#8b949e">ports  </tspan>Spring injects the adapter beans into the handler constructors</text>
+<path d="M166,260 L194,260" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-text)" opacity="0.85"/>
+<path d="M680,270 L656,270" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-text)" opacity="0.85"/>
+<path d="M680,432 L514,432" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-text)" opacity="0.85"/>
+<text x="598" y="450" font-size="12" fill="#8b949e" text-anchor="middle">implements</text>
+<path d="M408,284 L408,324" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-text)" opacity="0.85"/>
+<path d="M680,518 L656,518" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-text)" opacity="0.85"/>
+<path class="flow" d="M93,236 L93,162 L288,162" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<path class="flow" d="M425,196 L425,234" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<path class="flow" d="M426,284 L426,324" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<path class="flow" d="M514,416 L678,416" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<text x="598" y="408" font-size="12" fill="#d29922" text-anchor="middle">save</text>
+<path class="flow" d="M520,252 L530,252" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<path class="flow" d="M654,252 L678,252" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#hx-m-amber)"/>
+<circle class="tok k1" r="4.5" fill="#d29922" filter="url(#hx-gl)" opacity="0"/>
+<rect class="k2" x="287" y="125" width="276" height="74" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k3" r="4.5" fill="#d29922" filter="url(#hx-gl)" opacity="0"/>
+<rect class="k4" x="327" y="233" width="196" height="54" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k5" r="4.5" fill="#d29922" filter="url(#hx-gl)" opacity="0"/>
+<rect class="k6" x="335" y="323" width="180" height="36" rx="12" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k7" r="4.5" fill="#d29922" filter="url(#hx-gl)" opacity="0"/>
+<rect class="k8" x="677" y="399" width="156" height="54" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+<circle class="tok k9" r="4.5" fill="#d29922" filter="url(#hx-gl)" opacity="0"/>
+<rect class="k10" x="677" y="233" width="156" height="54" rx="13" stroke="#d29922" stroke-width="2.2" opacity="0" fill="none"/>
+</svg>
