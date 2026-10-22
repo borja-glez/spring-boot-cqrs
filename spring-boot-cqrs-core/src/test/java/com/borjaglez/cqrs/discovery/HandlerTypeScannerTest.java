@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.discovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Set;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.beans.factory.support.SimpleBeanDefinitionRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +20,10 @@ import org.springframework.core.type.filter.AssignableTypeFilter;
 
 import com.borjaglez.cqrs.fixtures.scan.command.AbstractScannedCommandHandler;
 import com.borjaglez.cqrs.fixtures.scan.command.ScannedCommandHandler;
+import com.borjaglez.cqrs.fixtures.scan.conditional.HandlersEnabledCondition;
 import com.borjaglez.cqrs.fixtures.scan.event.ScannedEventHandler;
 import com.borjaglez.cqrs.fixtures.scan.query.ScannedQueryHandler;
+import com.borjaglez.cqrs.fixtures.scan.unrelated.UnrelatedComponent;
 
 class HandlerTypeScannerTest {
 
@@ -27,6 +31,10 @@ class HandlerTypeScannerTest {
   private static final String QUERY_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.query";
   private static final String EVENT_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.event";
   private static final String UNRELATED_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.unrelated";
+  private static final String CONDITIONAL_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.conditional";
+  private static final String BASE_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.inheritance.base";
+  private static final String DETAILED_PACKAGE =
+      "com.borjaglez.cqrs.fixtures.scan.inheritance.detailed";
 
   private final GenericApplicationContext context = new GenericApplicationContext();
 
@@ -119,6 +127,57 @@ class HandlerTypeScannerTest {
     assertThat(registered).containsExactly("scannedCommandHandler");
     assertThat(simpleRegistry.getBeanDefinition("scannedCommandHandler").getBeanClassName())
         .isEqualTo(ScannedCommandHandler.class.getName());
+  }
+
+  @Test
+  void registersIntoAnApplicationContextThatIsNotRefreshed() {
+    Set<String> registered = scanner.register(context, List.of(COMMAND_PACKAGE));
+
+    assertThat(registered).containsExactly("scannedCommandHandler");
+    context.refresh();
+    assertThat(context.getBeansOfType(ScannedCommandHandler.class))
+        .containsOnlyKeys("scannedCommandHandler");
+  }
+
+  @Test
+  void registersHandlerWhoseConditionMatches() {
+    registry.registerBeanDefinition(
+        HandlersEnabledCondition.ENABLING_BEAN, new RootBeanDefinition(Object.class));
+
+    Set<String> registered = scanner.register(registry, List.of(CONDITIONAL_PACKAGE));
+
+    assertThat(registered).containsExactly("conditionalCommandHandler");
+  }
+
+  @Test
+  void skipsHandlerWhoseConditionDoesNotMatch() {
+    Set<String> registered = scanner.register(registry, List.of(CONDITIONAL_PACKAGE));
+
+    assertThat(registered).isEmpty();
+    assertThat(registry.containsBeanDefinition("conditionalCommandHandler")).isFalse();
+  }
+
+  @Test
+  void failsWhenTheBeanNameIsUsedByAnotherClass() {
+    registry.registerBeanDefinition(
+        "scannedCommandHandler", new RootBeanDefinition(UnrelatedComponent.class));
+
+    assertThatThrownBy(() -> scanner.register(registry, List.of(COMMAND_PACKAGE)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(ScannedCommandHandler.class.getName())
+        .hasMessageContaining(UnrelatedComponent.class.getName());
+    assertThat(registry.getBeanDefinition("scannedCommandHandler").getBeanClassName())
+        .isEqualTo(UnrelatedComponent.class.getName());
+  }
+
+  @Test
+  void registersBaseAndSubclassHandlersInEitherOrder() {
+    Set<String> baseFirst = scanner.register(registry, List.of(BASE_PACKAGE, DETAILED_PACKAGE));
+    Set<String> subclassFirst =
+        scanner.register(new DefaultListableBeanFactory(), List.of(DETAILED_PACKAGE, BASE_PACKAGE));
+
+    assertThat(baseFirst).containsExactly("auditEventHandler", "detailedAuditEventHandler");
+    assertThat(subclassFirst).containsExactly("detailedAuditEventHandler", "auditEventHandler");
   }
 
   @Test

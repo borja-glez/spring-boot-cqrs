@@ -23,10 +23,12 @@ import com.borjaglez.cqrs.fixtures.scan.application.ImplicitComponentScanConfigu
 import com.borjaglez.cqrs.fixtures.scan.application.ScannedCommandHandler;
 import com.borjaglez.cqrs.fixtures.scan.component.ComponentCommandHandler;
 import com.borjaglez.cqrs.fixtures.scan.componentscan.ComponentScannedCommandHandler;
+import com.borjaglez.cqrs.fixtures.scan.conditional.ConditionalCommandHandler;
 
 class CqrsHandlersAutoConfigurationTest {
 
   private static final String APPLICATION_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.application";
+  private static final String CONDITIONAL_PACKAGE = "com.borjaglez.cqrs.fixtures.scan.conditional";
 
   private final ApplicationContextRunner contextRunner =
       new ApplicationContextRunner()
@@ -110,6 +112,35 @@ class CqrsHandlersAutoConfigurationTest {
   }
 
   @Test
+  void registersHandlerWhoseConditionMatches() {
+    contextRunner
+        .withInitializer(
+            context ->
+                AutoConfigurationPackages.register(
+                    (BeanDefinitionRegistry) context, CONDITIONAL_PACKAGE))
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(ConditionalCommandHandler.class);
+              String result =
+                  context.getBean(CommandBus.class).dispatchAndReceive(new ScannedCommand());
+              assertThat(result).isEqualTo("conditional");
+            });
+  }
+
+  @Test
+  void skipsHandlerSwitchedOffByItsCondition() {
+    // The application's own scan registers the handler, then removes it as its condition fails.
+    contextRunner
+        .withBean(ConditionalCommandHandler.OVERRIDE, String.class, () -> "override")
+        .withUserConfiguration(ConditionalHandlerConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).doesNotHaveBean(ConditionalCommandHandler.class);
+            });
+  }
+
+  @Test
   void doesNothingWhenScanDisabled() {
     contextRunner
         .withInitializer(
@@ -157,6 +188,10 @@ class CqrsHandlersAutoConfigurationTest {
   @Configuration(proxyBeanMethods = false)
   @ComponentScan(basePackageClasses = ComponentCommandHandler.class)
   static class ComponentHandlerConfiguration {}
+
+  @Configuration(proxyBeanMethods = false)
+  @ComponentScan(basePackageClasses = ConditionalCommandHandler.class)
+  static class ConditionalHandlerConfiguration {}
 
   /**
    * Leaves {@link ScannedCommandHandler} out, as Spring Boot's test support leaves out the classes
