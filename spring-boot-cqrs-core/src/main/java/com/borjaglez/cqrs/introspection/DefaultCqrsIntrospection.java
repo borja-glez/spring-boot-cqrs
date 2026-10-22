@@ -19,41 +19,46 @@ import com.borjaglez.cqrs.middleware.BusMiddleware;
 import com.borjaglez.cqrs.observability.BusObservabilityInterceptor;
 import com.borjaglez.cqrs.query.registry.QueryHandlerRegistry;
 
+/**
+ * Describes the handlers of the registries and the middleware it is given. The handlers are read
+ * from the registries on every call, so they include the handlers registered after this object was
+ * created: a handler is registered when its bean is created, which can happen after the bean of
+ * this introspection.
+ */
 public class DefaultCqrsIntrospection implements CqrsIntrospection {
 
-  private final List<HandlerDescriptor> handlers;
+  private final CommandHandlerRegistry commandRegistry;
+  private final EventHandlerRegistry eventRegistry;
+  private final QueryHandlerRegistry queryRegistry;
   private final List<MiddlewareDescriptor> middleware;
-  private final Set<Class<?>> registeredMessageTypes;
 
   public DefaultCqrsIntrospection(
       CommandHandlerRegistry commandRegistry,
       EventHandlerRegistry eventRegistry,
       QueryHandlerRegistry queryRegistry,
       List<BusMiddleware> middlewares) {
-    this.handlers =
-        Collections.unmodifiableList(
-            buildHandlerDescriptors(commandRegistry, eventRegistry, queryRegistry));
+    this.commandRegistry = commandRegistry;
+    this.eventRegistry = eventRegistry;
+    this.queryRegistry = queryRegistry;
     this.middleware = Collections.unmodifiableList(buildMiddlewareDescriptors(middlewares));
-    this.registeredMessageTypes =
-        Collections.unmodifiableSet(
-            buildMessageTypes(commandRegistry, eventRegistry, queryRegistry));
   }
 
   @Override
   public List<HandlerDescriptor> getHandlers() {
-    return handlers;
+    return Collections.unmodifiableList(
+        buildHandlerDescriptors(commandRegistry, eventRegistry, queryRegistry));
   }
 
   @Override
   public List<HandlerDescriptor> getHandlers(HandlerType type) {
     return List.copyOf(
-        handlers.stream().filter(h -> h.handlerType() == type).collect(Collectors.toList()));
+        getHandlers().stream().filter(h -> h.handlerType() == type).collect(Collectors.toList()));
   }
 
   @Override
   public List<HandlerDescriptor> getHandlersForMessage(Class<?> messageType) {
     return List.copyOf(
-        handlers.stream()
+        getHandlers().stream()
             .filter(h -> h.messageType().equals(messageType))
             .collect(Collectors.toList()));
   }
@@ -65,12 +70,13 @@ public class DefaultCqrsIntrospection implements CqrsIntrospection {
 
   @Override
   public Set<Class<?>> getRegisteredMessageTypes() {
-    return registeredMessageTypes;
+    return Collections.unmodifiableSet(
+        buildMessageTypes(commandRegistry, eventRegistry, queryRegistry));
   }
 
   @Override
   public int getHandlerCount(HandlerType type) {
-    return (int) handlers.stream().filter(h -> h.handlerType() == type).count();
+    return (int) getHandlers().stream().filter(h -> h.handlerType() == type).count();
   }
 
   private static List<HandlerDescriptor> buildHandlerDescriptors(

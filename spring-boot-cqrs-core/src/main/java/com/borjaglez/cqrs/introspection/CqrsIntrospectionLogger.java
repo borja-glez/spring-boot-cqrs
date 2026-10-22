@@ -5,6 +5,11 @@ import java.util.logging.Logger;
 
 import org.springframework.beans.factory.SmartInitializingSingleton;
 
+/**
+ * Logs the handlers and middleware a {@link CqrsIntrospection} describes: the counts at {@code
+ * INFO}, every handler at {@code FINE}. It logs once every singleton of the context has been
+ * created, and so once every handler bean has registered its handler.
+ */
 public class CqrsIntrospectionLogger implements SmartInitializingSingleton {
 
   private static final Logger log = Logger.getLogger(CqrsIntrospectionLogger.class.getName());
