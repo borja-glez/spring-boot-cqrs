@@ -139,7 +139,7 @@ public class CqrsJdbcOutboxAutoConfiguration {
             transactionManager,
             relay.getBatchSize(),
             relay.getMaxAttempts(),
-            listener.getIfUnique(OutboxRelayListener::noop));
+            OutboxRelayListener.composite(listener.orderedStream().toList()));
       }
 
       @Bean

@@ -62,12 +62,7 @@ public class OutboxStore {
             + " SET attempts = ?, read_failures = ?, last_error = ?, failed_at = ? WHERE id = ?";
     this.publishFailedSql = "UPDATE " + table + " SET attempts = ?, last_error = ? WHERE id = ?";
     this.deleteSql = "DELETE FROM " + table + " WHERE published_at < ?";
-    this.statsSql =
-        "SELECT COALESCE(SUM(CASE WHEN failed_at IS NULL AND published_at IS NULL THEN 1 ELSE 0"
-            + " END), 0) AS pending, COALESCE(SUM(CASE WHEN failed_at IS NOT NULL THEN 1 ELSE 0"
-            + " END), 0) AS set_aside, MIN(CASE WHEN failed_at IS NULL AND published_at IS NULL"
-            + " THEN created_at END) AS oldest_pending FROM "
-            + table;
+    this.statsSql = statsSql(table);
   }
 
   public void insert(
@@ -165,6 +160,18 @@ public class OutboxStore {
   /** Deletes the rows published before {@code cutoff}; returns how many. */
   public int deletePublishedBefore(Instant cutoff) {
     return jdbc.update(deleteSql, Timestamp.from(cutoff));
+  }
+
+  /**
+   * Set-aside rows never have a {@code published_at}, so the filter keeps the query to the rows
+   * that are not published yet and the {@code (published_at, failed_at, id)} index can serve it.
+   */
+  static String statsSql(String table) {
+    return "SELECT COALESCE(SUM(CASE WHEN failed_at IS NULL THEN 1 ELSE 0 END), 0) AS pending,"
+        + " COALESCE(SUM(CASE WHEN failed_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS set_aside,"
+        + " MIN(CASE WHEN failed_at IS NULL THEN created_at END) AS oldest_pending FROM "
+        + table
+        + " WHERE published_at IS NULL";
   }
 
   /**

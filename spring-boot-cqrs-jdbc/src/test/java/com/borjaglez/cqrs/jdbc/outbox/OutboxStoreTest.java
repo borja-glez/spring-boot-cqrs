@@ -314,4 +314,20 @@ class OutboxStoreTest {
 
     assertThat(store.stats()).isEqualTo(new OutboxStats(0, 0, null));
   }
+
+  @Test
+  void statsIgnoresPublishedRows() {
+    for (int i = 0; i < 20; i++) {
+      insert("p-" + i);
+    }
+    jdbc.update("UPDATE cqrs_outbox SET published_at = ?", Timestamp.from(NOW));
+    insert("e-1");
+
+    assertThat(store.stats()).isEqualTo(new OutboxStats(1, 0, NOW));
+  }
+
+  @Test
+  void statsReadsPendingAndSetAsideRowsOnly() {
+    assertThat(OutboxStore.statsSql("t")).contains("FROM t WHERE published_at IS NULL");
+  }
 }
