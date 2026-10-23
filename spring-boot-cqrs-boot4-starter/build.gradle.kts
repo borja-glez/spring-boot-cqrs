@@ -18,6 +18,7 @@ dependencies {
     annotationProcessor(libs.spring.boot4.autoconfigure.processor)
 
     testImplementation(libs.spring.boot4.starter.test)
+    testImplementation(libs.archunit.junit5)
     testImplementation(libs.spring.boot4.starter.validation)
     testImplementation(libs.spring.boot4.starter.actuator)
     testImplementation(libs.micrometer.core.versioned)
