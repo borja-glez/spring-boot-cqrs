@@ -35,7 +35,11 @@ import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitTemplateFactory;
 
 @AutoConfiguration
-@AutoConfigureAfter(RabbitMqCqrsAutoConfiguration.class)
+// The declarations read the handler registries when they are created, so the handlers registered
+// by the handler scan of the starters must be created before them.
+@AutoConfigureAfter(
+    value = RabbitMqCqrsAutoConfiguration.class,
+    name = "com.borjaglez.cqrs.autoconfigure.CqrsHandlersAutoConfiguration")
 @ConditionalOnClass(RabbitTemplate.class)
 @ConditionalOnBean(CommandHandlerRegistry.class)
 @ConditionalOnProperty(

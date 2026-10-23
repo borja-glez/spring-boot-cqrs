@@ -222,6 +222,30 @@ class DefaultCqrsIntrospectionTest {
   }
 
   @Test
+  void descriptorsReflectHandlersRegisteredAfterConstruction() throws Exception {
+    DefaultCqrsIntrospection introspection =
+        new DefaultCqrsIntrospection(
+            commandRegistry, eventRegistry, queryRegistry, Collections.emptyList());
+
+    registerCommand();
+    registerEvent();
+    registerQuery();
+
+    assertThat(introspection.getHandlers())
+        .extracting(HandlerDescriptor::handlerBeanType)
+        .containsExactly(TestCommandHandler.class, TestEventHandler.class, TestQueryHandler.class);
+    assertThat(introspection.getHandlers(HandlerType.COMMAND))
+        .extracting(HandlerDescriptor::messageType)
+        .containsExactly(TestCommand.class);
+    assertThat(introspection.getHandlersForMessage(TestEvent.class))
+        .extracting(HandlerDescriptor::handlerType)
+        .containsExactly(HandlerType.EVENT);
+    assertThat(introspection.getHandlerCount(HandlerType.QUERY)).isEqualTo(1);
+    assertThat(introspection.getRegisteredMessageTypes())
+        .containsExactlyInAnyOrder(TestCommand.class, TestEvent.class, TestQuery.class);
+  }
+
+  @Test
   void middlewareWithOrderAnnotation() {
     DefaultCqrsIntrospection introspection =
         new DefaultCqrsIntrospection(
