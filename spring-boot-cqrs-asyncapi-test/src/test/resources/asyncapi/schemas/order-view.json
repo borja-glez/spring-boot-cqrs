@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["orderId", "status", "total"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "status": { "enum": ["PLACED", "SHIPPED", "CANCELLED"] },
+    "total": { "$ref": "definitions.json#/definitions/money" }
+  }
+}

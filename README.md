@@ -141,6 +141,7 @@ That is all you need. The starter auto-configures the bus, discovers your handle
 | `spring-boot-cqrs-rabbitmq` | Distributed messaging adapter with retry and dead-letter queue support |
 | `spring-boot-cqrs-jdbc` | JDBC idempotency store for `@Idempotent` handlers and transactional outbox for reliable event publication |
 | `spring-boot-cqrs-test` | Test utilities: spy/in-memory buses, AssertJ assertions, `@CqrsTest` slice annotation |
+| `spring-boot-cqrs-asyncapi-test` | Test support that verifies messages, payload schemas and handlers against an AsyncAPI 3.0 contract |
 | `examples` | Runnable sample applications |
 
 Most applications only need the **boot3-starter** or **boot4-starter** (pick the one matching your Spring Boot version). The core module does not depend on Jackson at runtime -- each starter brings the correct Jackson version for its Spring Boot generation. Add the **rabbitmq** or **kafka** module when you need inter-service messaging.
@@ -627,6 +628,7 @@ The repository includes five example applications:
 - [Configuration Reference](docs/configuration.md) -- All properties with YAML examples
 - [Actuator Endpoints](docs/actuator.md) -- `/actuator/cqrs`, `info` contributor, transport health
 - [Testing](docs/testing.md) -- Test utilities: spy buses, in-memory buses, AssertJ assertions, `@CqrsTest` slice
+- [AsyncAPI Contracts](docs/asyncapi.md) -- Verify messages against an AsyncAPI 3.0 document: payloads, coverage, closed schemas, handlers
 - [GraalVM Native](docs/graalvm-native.md) -- AOT support, native image builds
 - [Upgrading](docs/upgrading.md) -- Breaking changes of each release and how to migrate
 

@@ -17,6 +17,7 @@ tasks.register("coverage") {
         ":spring-boot-cqrs-kafka:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-rabbitmq:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-jdbc:jacocoTestCoverageVerification",
+        ":spring-boot-cqrs-asyncapi-test:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-boot3-starter:jacocoTestCoverageVerification",
         ":spring-boot-cqrs-boot4-starter:jacocoTestCoverageVerification"
     )
@@ -31,6 +32,7 @@ tasks.register("quality") {
         ":spring-boot-cqrs-kafka:test",
         ":spring-boot-cqrs-rabbitmq:test",
         ":spring-boot-cqrs-jdbc:test",
+        ":spring-boot-cqrs-asyncapi-test:test",
         ":spring-boot-cqrs-boot3-starter:test",
         ":spring-boot-cqrs-boot4-starter:test",
         "coverage",
@@ -68,6 +70,7 @@ tasks.register("spotlessCheckAll") {
         ":spring-boot-cqrs-boot3-starter:spotlessCheck",
         ":spring-boot-cqrs-boot4-starter:spotlessCheck",
         ":spring-boot-cqrs-test:spotlessCheck",
+        ":spring-boot-cqrs-asyncapi-test:spotlessCheck",
         ":examples:example-basic:spotlessCheck",
         ":examples:example-outbox:spotlessCheck",
         ":examples:example-rabbitmq:spotlessCheck",
@@ -92,6 +95,7 @@ tasks.register("spotlessApplyAll") {
         ":spring-boot-cqrs-boot3-starter:spotlessApply",
         ":spring-boot-cqrs-boot4-starter:spotlessApply",
         ":spring-boot-cqrs-test:spotlessApply",
+        ":spring-boot-cqrs-asyncapi-test:spotlessApply",
         ":examples:example-basic:spotlessApply",
         ":examples:example-outbox:spotlessApply",
         ":examples:example-rabbitmq:spotlessApply",

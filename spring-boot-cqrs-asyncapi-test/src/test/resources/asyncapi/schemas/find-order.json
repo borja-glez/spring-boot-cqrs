@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["queryId", "orderId"],
+  "properties": {
+    "queryId": { "type": "string" },
+    "orderId": { "type": "string" }
+  }
+}
