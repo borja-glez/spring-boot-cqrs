@@ -1,5 +1,7 @@
 package com.borjaglez.cqrs.query;
 
+import java.util.Objects;
+
 import com.borjaglez.cqrs.ResultType;
 
 public interface QueryBus {
@@ -12,6 +14,7 @@ public interface QueryBus {
    * return the handler's result as it is, which this default does.
    */
   default <R> R ask(Query query, ResultType<R> resultType) {
+    Objects.requireNonNull(resultType, "resultType must not be null");
     return ask(query);
   }
 }

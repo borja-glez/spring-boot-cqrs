@@ -515,4 +515,14 @@ class OutboxRelayTest {
     noop.publishFailed();
     noop.setAside(1);
   }
+
+  @Test
+  void constructorRejectsANullListener() {
+    assertThatThrownBy(
+            () ->
+                new OutboxRelay(
+                    store, resolver, serializer, codec, target, transactionManager, 10, 3, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("listener must not be null");
+  }
 }

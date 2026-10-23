@@ -3,6 +3,7 @@ package com.borjaglez.cqrs.jdbc.outbox;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import io.micrometer.core.instrument.Counter;
@@ -29,8 +30,8 @@ public class OutboxMetrics implements MeterBinder, OutboxRelayListener {
   private Snapshot snapshot;
 
   public OutboxMetrics(OutboxStore store, Clock clock) {
-    this.store = store;
-    this.clock = clock;
+    this.store = Objects.requireNonNull(store, "store must not be null");
+    this.clock = Objects.requireNonNull(clock, "clock must not be null");
   }
 
   @Override

@@ -12,6 +12,9 @@ Artifacts are published under group ID `com.borjaglez.cqrs` and configured for O
 | `spring-boot-cqrs-boot4-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter` |
 | `spring-boot-cqrs-rabbitmq` | `com.borjaglez.cqrs:spring-boot-cqrs-rabbitmq` |
 | `spring-boot-cqrs-kafka` | `com.borjaglez.cqrs:spring-boot-cqrs-kafka` |
+| `spring-boot-cqrs-jdbc` | `com.borjaglez.cqrs:spring-boot-cqrs-jdbc` |
+| `spring-boot-cqrs-test` | `com.borjaglez.cqrs:spring-boot-cqrs-test` |
+| `spring-boot-cqrs-asyncapi-test` | `com.borjaglez.cqrs:spring-boot-cqrs-asyncapi-test` |
 
 The `examples/*` modules are NOT published.
 

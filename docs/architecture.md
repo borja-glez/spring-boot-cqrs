@@ -6,6 +6,10 @@ The project is split into a framework-free API, a core with the Spring implement
 - `spring-boot-cqrs-core` depends on the API and contains the Spring bus implementations, middleware pipeline, registries, handler discovery, serialization SPI, and AOT support.
 - `spring-boot-cqrs-boot3-starter` and `spring-boot-cqrs-boot4-starter` provide Spring Boot auto-configuration, handler discovery, and Jackson serialization for their respective Spring Boot generations.
 - `spring-boot-cqrs-rabbitmq` provides distributed bus implementations over RabbitMQ with retry and dead-letter queue support.
+- `spring-boot-cqrs-kafka` provides distributed event publication and consumption over Kafka, with retry and dead-letter topics.
+- `spring-boot-cqrs-jdbc` provides the JDBC idempotency store and the transactional outbox with its relay and metrics.
+- `spring-boot-cqrs-test` provides test support: spy and in-memory buses, AssertJ assertions, `@CqrsTest` and the reusable ArchUnit rules.
+- `spring-boot-cqrs-asyncapi-test` verifies an AsyncAPI 3 document against your messages in tests.
 
 All library code lives under the `com.borjaglez.cqrs` package hierarchy. The API and the core share packages (`com.borjaglez.cqrs.command`, `com.borjaglez.cqrs.event`, ...), which works on the classpath but not as named JPMS modules, so neither declares an `Automatic-Module-Name`.
 

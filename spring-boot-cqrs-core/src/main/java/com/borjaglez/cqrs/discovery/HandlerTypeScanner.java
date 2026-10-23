@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.beans.BeanUtils;
@@ -51,6 +52,9 @@ import com.borjaglez.cqrs.query.annotation.QueryHandler;
  * definition of another class fails with an {@link IllegalStateException}. The definitions honour
  * the annotations a component scan honours, such as {@code @Scope}, {@code @Lazy}, {@code @Primary}
  * and {@code @DependsOn}.
+ *
+ * <p>This is the scanning SPI of the starters: their registrars use it to register handlers;
+ * applications do not normally use it directly.
  */
 public final class HandlerTypeScanner {
 
@@ -65,8 +69,8 @@ public final class HandlerTypeScanner {
   private final List<TypeFilter> excludeFilters = new ArrayList<>();
 
   public HandlerTypeScanner(Environment environment, ResourceLoader resourceLoader) {
-    this.environment = environment;
-    this.resourceLoader = resourceLoader;
+    this.environment = Objects.requireNonNull(environment, "environment must not be null");
+    this.resourceLoader = Objects.requireNonNull(resourceLoader, "resourceLoader must not be null");
   }
 
   /**

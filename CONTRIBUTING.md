@@ -37,12 +37,11 @@ No additional installation is needed — the project uses the Gradle wrapper (`.
 Runs [PIT](https://pitest.org) on `api`, `core`, `jdbc`, `kafka`, `rabbitmq`, `test` and `asyncapi-test`
 and writes an HTML and an XML report to `<module>/build/reports/pitest/` (open `index.html`). It is
 report-only: there is no threshold, and it is not part of `quality` or CI. Integration tests
-(`*.integration.*` packages and `*IntegrationTest` classes, which use Testcontainers) are excluded, so it
-needs no Docker; the run takes several minutes. Surviving mutants point at behavior the tests do not pin
+(`*.integration.*` packages and `*IntegrationTest` classes, which use Testcontainers) are excluded
+and are not mutation-tested, so it needs no Docker; the run takes several minutes. Surviving mutants point at behavior the tests do not pin
 down.
 
-Docker-based tests (`*.integration.*`, `*IntegrationTest`) are not mutation-tested. This includes core's
-`RetryMiddlewareIntegrationTest`, which needs no Docker but is excluded by name.
+Core's `RetryMiddlewareIntegrationTest` needs no Docker but is excluded by name too.
 
 ## Code Style
 

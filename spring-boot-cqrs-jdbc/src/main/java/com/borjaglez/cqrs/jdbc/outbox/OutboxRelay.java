@@ -1,6 +1,7 @@
 package com.borjaglez.cqrs.jdbc.outbox;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -81,7 +82,7 @@ public class OutboxRelay {
     this.transaction = new TransactionTemplate(transactionManager);
     this.batchSize = batchSize;
     this.maxAttempts = maxAttempts;
-    this.listener = listener;
+    this.listener = Objects.requireNonNull(listener, "listener must not be null");
   }
 
   public EventBus target() {

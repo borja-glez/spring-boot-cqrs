@@ -30,7 +30,7 @@ a `KafkaTransactionManager` or a `RabbitTransactionManager`, makes it back off: 
 transaction manager `@Primary`, or define the `JdbcIdempotencyStore` bean yourself.
 
 ```kotlin
-implementation("com.borjaglez:spring-boot-cqrs-jdbc:<version>")
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-jdbc:<version>")
 ```
 
 ## Semantics
@@ -72,7 +72,10 @@ delivered after that transaction commits, while it is still bound to the thread.
 such an event in a new transaction, and so does the JDBC store when the middleware is off: the
 markers and the work of its handlers commit or roll back together, apart from the transaction that
 published it. With the middleware on, the store joins the middleware's new transaction (no extra
-one). A handler's own `@Transactional` (`REQUIRED`) still joins the committed transaction when
+one). Without it, the store's new transaction takes one more connection from the pool while the
+event is delivered, because the connection of the publishing transaction stays held (suspended);
+each nesting level of events published and delivered this way takes another one, so size the pool
+for it. A handler's own `@Transactional` (`REQUIRED`) still joins the committed transaction when
 neither the middleware nor the JDBC store opened a new one. Set `cqrs.events.transactional=false` to
 run the event in the publishing transaction instead.
 
