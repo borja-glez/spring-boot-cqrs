@@ -16,17 +16,20 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.borjaglez.cqrs.event.transactional.TransactionalEventBus;
 import com.borjaglez.cqrs.idempotency.Acquisition;
 import com.borjaglez.cqrs.idempotency.IdempotencyStore;
 
 /**
  * {@link IdempotencyStore} backed by a table. {@link #runInScope} runs the handler in a transaction
- * (joining the caller's one when there is one) and {@link #tryAcquire} inserts the marker in it, so
- * the marker commits with the handler's database work and a rollback removes both. A concurrent
+ * (joining the caller's one when there is one, or in a new one when an event is being delivered
+ * after the commit of the publishing transaction) and {@link #tryAcquire} inserts the marker in it,
+ * so the marker commits with the handler's database work and a rollback removes both. A concurrent
  * delivery of the same message blocks on the uncommitted row and then sees a duplicate key. The
  * insert runs in a JDBC savepoint on the transaction's connection, so a duplicate does not abort
  * the caller's transaction. This works under DataSource, Jdbc and JPA transaction managers, as long
@@ -44,6 +47,7 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
   private final JdbcTemplate jdbc;
   private final TransactionTemplate scope;
+  private final TransactionTemplate afterCommitScope;
   private final DataSource dataSource;
   private final String insertSql;
   private final String deleteSql;
@@ -63,6 +67,8 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     this.dataSource = dataSource;
     this.jdbc = new JdbcTemplate(dataSource);
     this.scope = new TransactionTemplate(transactionManager);
+    this.afterCommitScope = new TransactionTemplate(transactionManager);
+    this.afterCommitScope.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     this.insertSql =
         "INSERT INTO " + table + " (handler_id, message_id, processed_at) VALUES (?, ?, ?)";
     this.deleteSql = "DELETE FROM " + table + " WHERE processed_at < ?";
@@ -79,7 +85,11 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
   @Override
   public <T> T runInScope(Supplier<T> work) {
-    return scope.execute(status -> work.get());
+    // While TransactionalEventBus delivers after a commit, the committed transaction is still the
+    // current one and REQUIRED would join it: nothing would commit or roll back the work again.
+    TransactionTemplate template =
+        TransactionalEventBus.isDeliveringAfterCommit() ? afterCommitScope : scope;
+    return template.execute(status -> work.get());
   }
 
   @Override
