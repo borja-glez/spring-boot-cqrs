@@ -146,6 +146,24 @@ class CqrsPropertiesTest {
   }
 
   @Test
+  void handlerScanIsEnabledByDefault() {
+    contextRunner.run(
+        context ->
+            assertThat(context.getBean(CqrsProperties.class).getHandlers().isScanEnabled())
+                .isTrue());
+  }
+
+  @Test
+  void handlerScanCanBeDisabled() {
+    contextRunner
+        .withPropertyValues("cqrs.handlers.scan-enabled=false")
+        .run(
+            context ->
+                assertThat(context.getBean(CqrsProperties.class).getHandlers().isScanEnabled())
+                    .isFalse());
+  }
+
+  @Test
   void defaultRetryIsDisabledWithJitteredExponentialBackoff() {
     contextRunner.run(
         context -> {

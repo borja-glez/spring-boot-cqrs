@@ -320,6 +320,38 @@ All three implementations accept a `List<BusMiddleware>` and run, in order and b
 
 ## Handler Discovery
 
+### Handler registration
+
+The discoverer only sees handlers that are beans. With a Spring Boot starter, `CqrsHandlersAutoConfiguration` registers them: it scans the application packages, and their sub-packages, for concrete classes annotated, directly or as a meta-annotation, with `@CommandHandler`, `@QueryHandler` or `@EventHandler`, and registers a bean for each one. The application packages are:
+
+- the auto-configuration packages: the package of the `@SpringBootApplication` class, or of any class annotated with `@AutoConfigurationPackage`;
+- the base packages of every `@ComponentScan` of the registered configuration classes, the implicit one of `@SpringBootApplication` included: `basePackages` (`scanBasePackages`), the packages of `basePackageClasses` (`scanBasePackageClasses`), or, without either, the package of the annotated class.
+
+A handler the context already holds is left as it is: one registered by the application's own component scan or by hand, or a bean of exactly its class declared by a `@Bean` method (a bean of a subclass does not count, so a handler and a handler extending it are both registered). The include and exclude filters of a `@ComponentScan` do not apply to the handler scan, except Spring Boot's `TypeExcludeFilter` beans, which `@SpringBootApplication` applies too: a handler class nested in a test class, which Spring Boot's test support leaves out of the component scan, is not registered by the handler scan either.
+
+The conditions of a handler class (`@Conditional`, `@Profile`, `@ConditionalOnMissingBean` and the other conditions of Spring Boot) are evaluated when the handler scan is about to register it, against the context's bean factory; a handler whose condition does not match is not registered. The bean is named as a component scan would name it (`createOrderHandler` for `CreateOrderHandler`); when another bean definition already uses that name, startup fails with an `IllegalStateException` naming both classes. `@Scope`, `@Lazy`, `@Primary` and `@DependsOn` on the handler class are honoured.
+
+To register the handlers yourself, set `cqrs.handlers.scan-enabled=false` (see [Configuration](configuration.md#handler-registration)) and declare each handler as a `@Component` or with a `@Bean` method:
+
+```java
+@Configuration
+class HandlerConfiguration {
+
+    @Bean
+    CreateOrderHandler createOrderHandler(OrderRepository orders) {
+        return new CreateOrderHandler(orders);
+    }
+}
+```
+
+Without Spring Boot, annotate a configuration class with `@EnableCqrsHandlers`. It registers the handlers of `basePackages`, of the packages of `basePackageClasses` or, without either, of the package of the annotated class, with the same rules except the `TypeExcludeFilter`s, which belong to Spring Boot; `HandlerTypeScanner` does the scanning for both.
+
+```java
+@Configuration
+@EnableCqrsHandlers(basePackages = "com.example.orders")
+class CqrsConfiguration {}
+```
+
 ### BeanPostProcessorHandlerDiscoverer
 
 Implements Spring's `BeanPostProcessor` to scan beans at startup. For each bean:

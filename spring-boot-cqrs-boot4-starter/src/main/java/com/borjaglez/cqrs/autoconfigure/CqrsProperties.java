@@ -27,6 +27,7 @@ public class CqrsProperties {
   private TracingProperties tracing = new TracingProperties();
   private RetryProperties retry = new RetryProperties();
   private IdempotencyProperties idempotency = new IdempotencyProperties();
+  private HandlersProperties handlers = new HandlersProperties();
 
   @Getter
   @Setter
@@ -145,5 +146,16 @@ public class CqrsProperties {
   public static class InMemoryIdempotencyProperties {
     /** How long a delivery being processed blocks duplicates in the in-memory store. */
     private Duration lease = Duration.ofMinutes(5);
+  }
+
+  @Getter
+  @Setter
+  public static class HandlersProperties {
+    /**
+     * Whether to register as beans the handler classes of the application packages: the
+     * auto-configuration packages and the base packages of every @ComponentScan. Handlers the
+     * context already holds are left as they are.
+     */
+    private boolean scanEnabled = true;
   }
 }

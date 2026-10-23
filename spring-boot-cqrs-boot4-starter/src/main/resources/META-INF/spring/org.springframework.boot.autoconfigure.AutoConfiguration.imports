@@ -7,3 +7,4 @@ com.borjaglez.cqrs.autoconfigure.CqrsTracingAutoConfiguration
 com.borjaglez.cqrs.autoconfigure.CqrsRetryAutoConfiguration
 com.borjaglez.cqrs.autoconfigure.CqrsActuatorAutoConfiguration
 com.borjaglez.cqrs.autoconfigure.CqrsIdempotencyAutoConfiguration
+com.borjaglez.cqrs.autoconfigure.CqrsHandlersAutoConfiguration
