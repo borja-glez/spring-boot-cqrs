@@ -11,6 +11,7 @@ having to boot a full Spring application or mock the bus interfaces by hand.
 - [AssertJ Assertions](#assertj-assertions)
 - [`@CqrsTest` Slice](#cqrstest-slice)
 - [Middleware Test Harness](#middleware-test-harness)
+- [Architecture rules](#architecture-rules)
 - [When to use which](#when-to-use-which)
 
 ## Installation
@@ -180,6 +181,50 @@ void validationMiddlewareRejectsInvalidCommand() {
 
 The variadic `middlewares` argument accepts zero or more middlewares; if `null`
 is passed, the chain is treated as empty.
+
+## Architecture rules
+
+`CqrsArchitectureRules` provides reusable [ArchUnit](https://www.archunit.org/)
+rules for applications that use the library. ArchUnit is a `compileOnly`
+dependency of `spring-boot-cqrs-test`, so add it to your own test classpath
+(for example `com.tngtech.archunit:archunit-junit5`).
+
+| Rule | Checks |
+|---|---|
+| `handlersDoNotDependOnSpring()` | `@CommandHandler`/`@QueryHandler`/`@EventHandler` classes do not depend on `org.springframework..` |
+| `handlerMethodsAreInHandlerClasses()` | `@HandleCommand`/`@HandleQuery`/`@HandleEvent` methods live in classes with the matching class annotation |
+| `messagesAreAnnotatedWithCqrsMessage()` | concrete `Command`/`Query`/`Event` classes carry `@CqrsMessage` |
+| `messagesHaveANoArgConstructor()` | concrete messages have a no-arg constructor |
+| `messagesDoNotDependOnFrameworks()` | concrete messages do not depend on Spring, Jackson databind (2 and 3), JPA or Hibernate; Jackson annotations are allowed |
+
+"Messages" are concrete classes only; abstract base classes are ignored. The
+rules fail when no matching class is found, so a wrong package is not a silent
+pass. A module with handlers but no messages is the realistic case where this
+gets in the way. Opt out for a single rule with
+`CqrsArchitectureRules.messagesHaveANoArgConstructor().allowEmptyShould(true)`,
+or globally with `archRule.failOnEmptyShould=false` in
+`archunit.properties` on the test classpath.
+
+```java
+@AnalyzeClasses(packages = "com.example.shop", importOptions = ImportOption.DoNotIncludeTests.class)
+class CqrsArchitectureTest {
+
+    @ArchTest
+    static final ArchRule handlersAreFrameworkFree = CqrsArchitectureRules.handlersDoNotDependOnSpring();
+
+    @ArchTest
+    static final ArchRule handleMethodsPlacement = CqrsArchitectureRules.handlerMethodsAreInHandlerClasses();
+
+    @ArchTest
+    static final ArchRule messagesAreAnnotated = CqrsArchitectureRules.messagesAreAnnotatedWithCqrsMessage();
+
+    @ArchTest
+    static final ArchRule messagesHaveNoArgConstructor = CqrsArchitectureRules.messagesHaveANoArgConstructor();
+
+    @ArchTest
+    static final ArchRule messagesAreFrameworkFree = CqrsArchitectureRules.messagesDoNotDependOnFrameworks();
+}
+```
 
 ## When to use which
 

@@ -12,6 +12,8 @@ dependencies {
     compileOnly(libs.spring.boot.starter.test)
     compileOnly(libs.assertj.core)
     compileOnly(libs.junit.jupiter)
+    compileOnly(libs.archunit)
 
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.archunit.junit5)
 }
