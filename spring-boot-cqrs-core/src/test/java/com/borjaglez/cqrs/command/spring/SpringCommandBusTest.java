@@ -11,8 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.command.registry.CommandHandlerRegistry;
 import com.borjaglez.cqrs.fixtures.RecordingMiddleware;
@@ -160,13 +160,13 @@ class SpringCommandBusTest {
   }
 
   @Test
-  void dispatchAndReceiveWithTypeReferenceDelegatesToUntyped() {
+  void dispatchAndReceiveWithResultTypeDelegatesToUntyped() {
     CommandHandlerRegistry registry = mock(CommandHandlerRegistry.class);
     TestCommand command = new TestCommand("data");
     when(registry.handle(command)).thenReturn("result");
 
     SpringCommandBus bus = new SpringCommandBus(registry, List.of());
-    String result = bus.dispatchAndReceive(command, new ParameterizedTypeReference<String>() {});
+    String result = bus.dispatchAndReceive(command, new ResultType<String>() {});
 
     assertThat(result).isEqualTo("result");
   }

@@ -121,7 +121,7 @@ Implements `CommandBus`. Publishes commands to the command exchange.
 
 - `dispatch(command)` -- publishes fire-and-forget with message type `"command"`
 - `dispatchAndReceive(command)` -- uses `RabbitTemplate.sendAndReceive()` for RPC-style request/reply with message type `"command_reply"`
-- `dispatchAndReceive(command, responseType)` -- the same, converting the reply to the given `ParameterizedTypeReference` (see [Generic results](#generic-results))
+- `dispatchAndReceive(command, resultType)` -- the same, converting the reply to the given `ResultType` (see [Generic results](#generic-results))
 
 ### RabbitMqEventBus
 
@@ -154,7 +154,7 @@ After a timeout the broker may still have accepted the event, so a caller that r
 
 ### RabbitMqQueryBus
 
-Implements `QueryBus`. Uses `sendAndReceive()` for synchronous request/reply with message type `"query"`. `ask(query, responseType)` converts the reply to the given `ParameterizedTypeReference` (see [Generic results](#generic-results)).
+Implements `QueryBus`. Uses `sendAndReceive()` for synchronous request/reply with message type `"query"`. `ask(query, resultType)` converts the reply to the given `ResultType` (see [Generic results](#generic-results)).
 
 ### RabbitMqPublisher
 
@@ -183,20 +183,18 @@ These beans are not default candidates: injecting `RabbitTemplate` or `RabbitMqP
 
 ### Generic results
 
-The consumer's reply is converted by the Spring AMQP JSON converter from the runtime class of the handler's result: the `__TypeId__` / `__ContentTypeId__` headers name that erased class (`java.util.ArrayList`, `java.util.ImmutableCollections$ListN`, ...), never the handler's declared return type. Without a `responseType` the caller converts the reply from those headers, so:
+The consumer's reply is converted by the Spring AMQP JSON converter from the runtime class of the handler's result: the `__TypeId__` / `__ContentTypeId__` headers name that erased class (`java.util.ArrayList`, `java.util.ImmutableCollections$ListN`, ...), never the handler's declared return type. Without a `ResultType` the caller converts the reply from those headers, so:
 
 - A result whose class describes it fully (a record, a POJO, `String`, a boxed primitive) comes back as it was sent.
 - A generic result comes back with untyped content: a `List<OrderDto>` is a list of `LinkedHashMap`, a `Result<OrderDto>` wrapper holds a `LinkedHashMap`. This includes lists built with `List.of(...)` or `Stream.toList()`.
 
-Pass a `ParameterizedTypeReference` to get the element types back:
+Pass a `ResultType` to get the element types back:
 
 ```java
-List<OrderDto> orders =
-    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+List<OrderDto> orders = queryBus.ask(new ListOrders(), new ResultType<List<OrderDto>>() {});
 
 Result<OrderDto> placed =
-    commandBus.dispatchAndReceive(
-        new PlaceOrder("o-1"), new ParameterizedTypeReference<Result<OrderDto>>() {});
+    commandBus.dispatchAndReceive(new PlaceOrder("o-1"), new ResultType<Result<OrderDto>>() {});
 ```
 
 The local buses do not need it; they return the handler's object as it is.

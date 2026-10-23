@@ -9,8 +9,8 @@ import java.lang.annotation.Target;
 /**
  * Makes a {@code @HandleCommand} or {@code @HandleEvent} method run at most once per message: a
  * redelivered command or event whose previous processing by this handler succeeded is skipped. A
- * failed processing leaves no trace, so the redelivery runs the handler again. Requires an {@link
- * IdempotencyStore} bean.
+ * failed processing leaves no trace, so the redelivery runs the handler again. Requires an {@code
+ * IdempotencyStore} bean (from {@code spring-boot-cqrs-core}).
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

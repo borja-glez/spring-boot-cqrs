@@ -6,6 +6,7 @@ Artifacts are published under group ID `com.borjaglez.cqrs` and configured for O
 
 | Module | Artifact |
 |---|---|
+| `spring-boot-cqrs-api` | `com.borjaglez.cqrs:spring-boot-cqrs-api` |
 | `spring-boot-cqrs-core` | `com.borjaglez.cqrs:spring-boot-cqrs-core` |
 | `spring-boot-cqrs-boot3-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot3-starter` |
 | `spring-boot-cqrs-boot4-starter` | `com.borjaglez.cqrs:spring-boot-cqrs-boot4-starter` |

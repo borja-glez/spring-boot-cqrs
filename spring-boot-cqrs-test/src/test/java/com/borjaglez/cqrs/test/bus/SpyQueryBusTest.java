@@ -5,8 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.query.QueryBus;
 import com.borjaglez.cqrs.test.assertion.QueryBusAssert;
 import com.borjaglez.cqrs.test.fixtures.TestQuery;
@@ -27,11 +27,11 @@ class SpyQueryBusTest {
   }
 
   @Test
-  void askWithTypeReferenceRecordsAndDelegates() {
+  void askWithResultTypeRecordsAndDelegates() {
     QueryBus delegate = mock(QueryBus.class);
     SpyQueryBus spy = new SpyQueryBus(delegate);
     TestQuery query = new TestQuery("a");
-    ParameterizedTypeReference<String> ref = new ParameterizedTypeReference<String>() {};
+    ResultType<String> ref = new ResultType<String>() {};
     when(delegate.<String>ask(query, ref)).thenReturn("typed");
 
     String result = spy.ask(query, ref);

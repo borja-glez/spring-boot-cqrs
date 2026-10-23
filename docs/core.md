@@ -3,7 +3,9 @@
 Module: `spring-boot-cqrs-core`  
 Package: `com.borjaglez.cqrs`
 
-The core module contains all the fundamental types, interfaces, annotations, and infrastructure for the CQRS pattern. It has no Spring Boot auto-configuration -- that responsibility belongs to the starter modules (boot3-starter and boot4-starter).
+The core module contains the CQRS infrastructure: the registries, the Spring bus implementations, handler discovery, the middleware pipeline, the serialization SPI and AOT support. It has no Spring Boot auto-configuration -- that responsibility belongs to the starter modules (boot3-starter and boot4-starter). This guide also describes the API types the core builds on.
+
+The messages (`Command`, `Event`, `Query`, `AggregateRoot`, `KeyedMessage`), the bus interfaces, `ResultType` and the annotations (`@CommandHandler`, `@HandleCommand` and their query and event counterparts, `@CqrsMessage`, `@Idempotent`) live in `spring-boot-cqrs-api`, a module without dependencies that the core brings in, so a domain module can depend on them without Spring. Their packages are the ones described here.
 
 ## Table of Contents
 
@@ -119,9 +121,9 @@ public class OrderCancelled extends Event implements KeyedMessage {
 
 | Annotation | Target | Purpose |
 |---|---|---|
-| `@CommandHandler` | Class | Marks a Spring bean as a command handler. Also acts as `@Service`. |
-| `@EventHandler` | Class | Marks a Spring bean as an event handler. Also acts as `@Service`. |
-| `@QueryHandler` | Class | Marks a Spring bean as a query handler. Also acts as `@Service`. |
+| `@CommandHandler` | Class | Marks a class as a command handler. It is not a Spring stereotype; see [Handler registration](#handler-registration). |
+| `@EventHandler` | Class | Marks a class as an event handler. It is not a Spring stereotype; see [Handler registration](#handler-registration). |
+| `@QueryHandler` | Class | Marks a class as a query handler. It is not a Spring stereotype; see [Handler registration](#handler-registration). |
 | `@CqrsMessage` | Class | Declares a structured message name for routing and RabbitMQ integration. |
 
 ### Method-level annotations
@@ -260,14 +262,14 @@ public interface CommandBus {
     void dispatch(Command command);
     void dispatchAndWait(Command command);
     <R> R dispatchAndReceive(Command command);
-    <R> R dispatchAndReceive(Command command, ParameterizedTypeReference<R> responseType);
+    <R> R dispatchAndReceive(Command command, ResultType<R> resultType);
 }
 ```
 
 - `dispatch` -- fire-and-forget; the handler return value is discarded.
 - `dispatchAndWait` -- dispatches and waits for the handler to finish; the return value is discarded.
 - `dispatchAndReceive` -- dispatches and returns the handler's return value.
-- `dispatchAndReceive(command, responseType)` -- the same, for a generic result sent over a remote bus (see [Generic results on remote buses](#generic-results-on-remote-buses)).
+- `dispatchAndReceive(command, resultType)` -- the same, for a generic result sent over a remote bus (see [Generic results on remote buses](#generic-results-on-remote-buses)).
 
 ### EventBus
 
@@ -285,22 +287,21 @@ Publishes one or more events. All registered handlers for each event type are in
 ```java
 public interface QueryBus {
     <R> R ask(Query query);
-    <R> R ask(Query query, ParameterizedTypeReference<R> responseType);
+    <R> R ask(Query query, ResultType<R> resultType);
 }
 ```
 
-Dispatches a query and returns the handler's result. The `responseType` overload is for a generic result sent over a remote bus.
+Dispatches a query and returns the handler's result. The `resultType` overload is for a generic result sent over a remote bus.
 
 ### Generic results on remote buses
 
-The RabbitMQ and Kafka buses send a result back with its runtime class only, so the requester loses the type arguments of a generic result: without a type reference a `List<OrderDto>` comes back as a list of `LinkedHashMap`. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) are not affected. Pass a `ParameterizedTypeReference` to keep the element types:
+The RabbitMQ and Kafka buses send a result back with its runtime class only, so the requester loses the type arguments of a generic result: without a result type a `List<OrderDto>` comes back as a list of `LinkedHashMap`. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) are not affected. Pass a `ResultType` (`com.borjaglez.cqrs.ResultType`) to keep the element types:
 
 ```java
-List<OrderDto> orders =
-    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+List<OrderDto> orders = queryBus.ask(new ListOrders(), new ResultType<List<OrderDto>>() {});
 ```
 
-The local buses (`SpringCommandBus`, `SpringQueryBus`) return the handler's object as it is; the default overloads ignore the type reference. See the [RabbitMQ](rabbitmq-adapter.md#generic-results) and [Kafka](kafka-adapter.md#generic-results) adapter guides.
+`new ResultType<...>() {}` captures the type argument of the anonymous subclass, as Spring's `ParameterizedTypeReference` does; `ResultType.of(type)` wraps a `java.lang.reflect.Type` built at runtime. The local buses (`SpringCommandBus`, `SpringQueryBus`) return the handler's object as it is; the default overloads ignore the result type. See the [RabbitMQ](rabbitmq-adapter.md#generic-results) and [Kafka](kafka-adapter.md#generic-results) adapter guides.
 
 ## Spring Implementations
 
@@ -327,7 +328,7 @@ The discoverer only sees handlers that are beans. With a Spring Boot starter, `C
 - the auto-configuration packages: the package of the `@SpringBootApplication` class, or of any class annotated with `@AutoConfigurationPackage`;
 - the base packages of every `@ComponentScan` of the registered configuration classes, the implicit one of `@SpringBootApplication` included: `basePackages` (`scanBasePackages`), the packages of `basePackageClasses` (`scanBasePackageClasses`), or, without either, the package of the annotated class.
 
-A handler the context already holds is left as it is: one registered by the application's own component scan or by hand, or a bean of exactly its class declared by a `@Bean` method (a bean of a subclass does not count, so a handler and a handler extending it are both registered). The include and exclude filters of a `@ComponentScan` do not apply to the handler scan, except Spring Boot's `TypeExcludeFilter` beans, which `@SpringBootApplication` applies too: a handler class nested in a test class, which Spring Boot's test support leaves out of the component scan, is not registered by the handler scan either.
+A handler the context already holds is left as it is: one registered by the application's own component scan or by hand, or a bean of exactly its class declared by a `@Bean` method (a bean of a subclass does not count, so a handler and a handler extending it are both registered). Because the auto-configuration packages are always scanned, narrowing `scanBasePackages` does not narrow the handler scan. The include and exclude filters of a `@ComponentScan` do not apply to the handler scan, except Spring Boot's `TypeExcludeFilter` beans, which `@SpringBootApplication` applies too: a handler class nested in a test class, which Spring Boot's test support leaves out of the component scan, is not registered by the handler scan either.
 
 The conditions of a handler class (`@Conditional`, `@Profile`, `@ConditionalOnMissingBean` and the other conditions of Spring Boot) are evaluated when the handler scan is about to register it, against the context's bean factory; a handler whose condition does not match is not registered. The bean is named as a component scan would name it (`createOrderHandler` for `CreateOrderHandler`); when another bean definition already uses that name, startup fails with an `IllegalStateException` naming both classes. `@Scope`, `@Lazy`, `@Primary` and `@DependsOn` on the handler class are honoured.
 

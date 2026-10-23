@@ -108,7 +108,7 @@ Implements `CommandBus`. Sends commands to the commands topic.
 
 - `dispatch(command)` -- publishes the record and returns once the send has completed; no answer is expected
 - `dispatchAndWait(command)` -- request/reply in `WAIT` mode: returns when the handler has finished and rethrows its failure
-- `dispatchAndReceive(command)` / `dispatchAndReceive(command, responseType)` -- request/reply in `REPLY` mode: returns the handler's result
+- `dispatchAndReceive(command)` / `dispatchAndReceive(command, resultType)` -- request/reply in `REPLY` mode: returns the handler's result
 
 ### KafkaEventBus
 
@@ -120,7 +120,7 @@ Implements `EventBus`. Publishes events to the events topic.
 
 ### KafkaQueryBus
 
-Implements `QueryBus`. `ask(query)` and `ask(query, responseType)` use request/reply and return the handler's result.
+Implements `QueryBus`. `ask(query)` and `ask(query, resultType)` use request/reply and return the handler's result.
 
 ### KafkaMessagePublisher
 
@@ -142,7 +142,7 @@ On the receiving side the consumer publishes the reply to the topic named in `cq
 
 | Outcome | Reply | What the caller gets |
 |---|---|---|
-| Handler returns a result (`REPLY`) | Serialized result with its payload type | The result, deserialized with `responseType` when given, otherwise with the payload type header |
+| Handler returns a result (`REPLY`) | Serialized result with its payload type | The result, deserialized with the `ResultType` when given, otherwise with the payload type header |
 | Handler returns `null` (`REPLY`) | Empty body, no payload type | `null` |
 | Handler finishes (`WAIT`) | Empty string | Returns normally |
 | Handler throws | Error reply (`cqrs.error=true`) | `RuntimeException("Remote handler error: <message>")` |
@@ -150,20 +150,18 @@ On the receiving side the consumer publishes the reply to the topic named in `cq
 
 ### Generic results
 
-The reply's `cqrs.payload.type` header names the runtime class of the result (`payload.getClass()`), which says nothing about its type arguments. Without a `responseType` the caller deserializes the reply as that class, so:
+The reply's `cqrs.payload.type` header names the runtime class of the result (`payload.getClass()`), which says nothing about its type arguments. Without a `ResultType` the caller deserializes the reply as that class, so:
 
 - A result whose class describes it fully (a record, a POJO, `String`, a boxed primitive) comes back as it was sent.
 - A generic result comes back with untyped content: a `List<OrderDto>` is a list of `LinkedHashMap`, a `Result<OrderDto>` wrapper holds a `LinkedHashMap`. A list built with `List.of(...)` or `Stream.toList()` is named by its JDK-internal class (`java.util.ImmutableCollections$ListN`) and is read back as a list of maps as well.
 
-Pass a `ParameterizedTypeReference` to get the element types back; it is used instead of the payload type header:
+Pass a `ResultType` to get the element types back; it is used instead of the payload type header:
 
 ```java
-List<OrderDto> orders =
-    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+List<OrderDto> orders = queryBus.ask(new ListOrders(), new ResultType<List<OrderDto>>() {});
 
 Result<OrderDto> placed =
-    commandBus.dispatchAndReceive(
-        new PlaceOrder("o-1"), new ParameterizedTypeReference<Result<OrderDto>>() {});
+    commandBus.dispatchAndReceive(new PlaceOrder("o-1"), new ResultType<Result<OrderDto>>() {});
 ```
 
 The local buses do not need it; they return the handler's object as it is.

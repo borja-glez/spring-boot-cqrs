@@ -26,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
@@ -147,43 +148,65 @@ class KafkaCommandBusTest {
   }
 
   @Test
-  void dispatchAndReceiveWithTypeShouldPassTypeReference() throws Exception {
+  void dispatchAndReceiveWithNullResultTypeShouldThrowWithoutSending() {
     TestCommand command = new TestCommand("test");
-    ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
+
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resultType must not be null");
+    verifyNoInteractions(publisher, requestReplyClient);
+  }
+
+  @Test
+  void dispatchAndReceiveWithResultTypeShouldPassTypeReference() throws Exception {
+    TestCommand command = new TestCommand("test");
+    ResultType<String> resultType = new ResultType<String>() {};
     when(requestReplyClient.sendAndReceive(
-            null, "cqrs.commands", command, responseType, KafkaRequestMode.REPLY))
+            null,
+            "cqrs.commands",
+            command,
+            ParameterizedTypeReference.forType(String.class),
+            KafkaRequestMode.REPLY))
         .thenReturn("typed");
 
-    String result = commandBus.dispatchAndReceive(command, responseType);
+    String result = commandBus.dispatchAndReceive(command, resultType);
 
     assertThat(result).isEqualTo("typed");
   }
 
   @Test
-  void dispatchAndReceiveWithTypeShouldWrapCheckedExceptions() throws Exception {
+  void dispatchAndReceiveWithResultTypeShouldWrapCheckedExceptions() throws Exception {
     TestCommand command = new TestCommand("test");
-    ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(requestReplyClient.sendAndReceive(
-            null, "cqrs.commands", command, responseType, KafkaRequestMode.REPLY))
+            null,
+            "cqrs.commands",
+            command,
+            ParameterizedTypeReference.forType(String.class),
+            KafkaRequestMode.REPLY))
         .thenAnswer(
             invocation -> {
               throw new Exception("boom");
             });
 
-    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, responseType))
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, resultType))
         .isInstanceOf(CommandHandlerExecutionException.class)
         .hasRootCauseMessage("boom");
   }
 
   @Test
-  void dispatchAndReceiveWithTypeShouldRethrowRuntimeExceptions() throws Exception {
+  void dispatchAndReceiveWithResultTypeShouldRethrowRuntimeExceptions() throws Exception {
     TestCommand command = new TestCommand("test");
-    ParameterizedTypeReference<String> responseType = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(requestReplyClient.sendAndReceive(
-            null, "cqrs.commands", command, responseType, KafkaRequestMode.REPLY))
+            null,
+            "cqrs.commands",
+            command,
+            ParameterizedTypeReference.forType(String.class),
+            KafkaRequestMode.REPLY))
         .thenThrow(new IllegalStateException("boom"));
 
-    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, responseType))
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, resultType))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("boom");
   }
@@ -211,7 +234,7 @@ class KafkaCommandBusTest {
     bus.dispatch(command);
     bus.dispatchAndWait(command);
     String reply = bus.dispatchAndReceive(command);
-    String typed = bus.dispatchAndReceive(command, new ParameterizedTypeReference<String>() {});
+    String typed = bus.dispatchAndReceive(command, new ResultType<String>() {});
 
     assertThat(reply).isEqualTo("reply");
     assertThat(typed).isEqualTo("reply");

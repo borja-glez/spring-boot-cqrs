@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":spring-boot-cqrs-api"))
     api(libs.spring.context)
     implementation(libs.spring.tx)
 

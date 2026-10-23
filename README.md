@@ -20,7 +20,7 @@ Production-grade, GraalVM-compatible CQRS library for Spring Boot 3 and Spring B
 - **Message context propagation** with auto-generated correlation IDs, SLF4J MDC mirroring, and transport header propagation across RabbitMQ/Kafka
 - **Actuator endpoints** (`/actuator/cqrs` + `info` contributor) exposing handlers, middlewares and message types when `spring-boot-starter-actuator` is present
 - **Test support module** with spy buses, in-memory buses, AssertJ assertions, and a `@CqrsTest` slice annotation
-- **Jackson-based serialization** SPI for message transport, including generic `ParameterizedTypeReference` support for distributed request/reply (core is Jackson-free; each starter brings the right version)
+- **Jackson-based serialization** SPI for message transport, including generic `ResultType` support for distributed request/reply (core is Jackson-free; each starter brings the right version)
 - **AggregateRoot** base class with domain event recording
 - **Spring Boot 3 and 4 support** via dedicated starter modules
 - **100% JaCoCo coverage** (instructions + branches) enforced on every build
@@ -133,7 +133,8 @@ That is all you need. The starter auto-configures the bus, discovers your handle
 
 | Module | Description |
 |---|---|
-| `spring-boot-cqrs-core` | Bus interfaces, base types, annotations, middleware, serialization SPI, AOT support |
+| `spring-boot-cqrs-api` | Framework-free API: messages, bus interfaces, `ResultType` and handler annotations. It has no dependencies |
+| `spring-boot-cqrs-core` | Spring bus implementations, handler discovery, middleware, serialization SPI, AOT support; brings in `spring-boot-cqrs-api` |
 | `spring-boot-cqrs-boot3-starter` | Spring Boot 3 auto-configuration |
 | `spring-boot-cqrs-boot4-starter` | Spring Boot 4 auto-configuration |
 | `spring-boot-cqrs-kafka` | Distributed messaging adapter for Kafka with request/reply support and configurable partition keys |
@@ -143,6 +144,12 @@ That is all you need. The starter auto-configures the bus, discovers your handle
 | `examples` | Runnable sample applications |
 
 Most applications only need the **boot3-starter** or **boot4-starter** (pick the one matching your Spring Boot version). The core module does not depend on Jackson at runtime -- each starter brings the correct Jackson version for its Spring Boot generation. Add the **rabbitmq** or **kafka** module when you need inter-service messaging.
+
+A module that only declares messages and handlers, or dispatches through the bus interfaces, such as a domain or application module kept free of Spring, can depend on the **api** module alone (from 0.6.0). Its types keep the `com.borjaglez.cqrs` packages, and the starters bring it in:
+
+```kotlin
+implementation("com.borjaglez.cqrs:spring-boot-cqrs-api:0.6.0")
+```
 
 ## Usage
 
@@ -475,7 +482,7 @@ cqrs:
 
 The Kafka event bus throws when the broker does not acknowledge an event; it does not fall back to the local event bus. `publish(List<Event>)` stops at the first failure. For reliable publication, use an outbox (see [Transactional event publishing](#transactional-event-publishing)).
 
-Generic results such as `List<OrderDto>` need a `ParameterizedTypeReference`; see [Generic results over RabbitMQ and Kafka](#generic-results-over-rabbitmq-and-kafka).
+Generic results such as `List<OrderDto>` need a `ResultType`; see [Generic results over RabbitMQ and Kafka](#generic-results-over-rabbitmq-and-kafka).
 
 Replies are read from the per-application reply topic (`<prefix>.<spring.application.name>.replies`). Each instance consumes it with its own consumer group (`<appName>.cqrs.replies.<random>`), so every instance sees every reply and keeps the ones it is waiting for. On startup the reply consumer starts at the instance start time instead of the beginning of the topic, so replies from previous runs are not read again; `spring.kafka.consumer.auto-offset-reset` keeps applying to the command, event and query consumers. Groups left by previous starts have no members and expire in the broker after `offsets.retention.minutes` (seven days by default). No configuration is needed.
 
@@ -502,7 +509,7 @@ See [Partition Keys](docs/kafka-adapter.md#partition-keys) for details.
 
 ### Generic results over RabbitMQ and Kafka
 
-A remote reply carries only the runtime class of the handler's result, and the requester rebuilds the result from that erased class. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) come back as they were sent. A generic result (a collection, a map, a generic wrapper such as `Page<OrderDto>`) comes back with untyped content, `LinkedHashMap` instead of `OrderDto`, unless the caller passes a `ParameterizedTypeReference`:
+A remote reply carries only the runtime class of the handler's result, and the requester rebuilds the result from that erased class. Results whose class describes them fully (records, POJOs, `String`, boxed primitives) come back as they were sent. A generic result (a collection, a map, a generic wrapper such as `Page<OrderDto>`) comes back with untyped content, `LinkedHashMap` instead of `OrderDto`, unless the caller passes a `ResultType`:
 
 ```java
 @QueryHandler
@@ -514,19 +521,17 @@ class OrderQueries {
 }
 
 // Requester, over RabbitMQ or Kafka
-List<OrderDto> orders =
-    queryBus.ask(new ListOrders(), new ParameterizedTypeReference<List<OrderDto>>() {});
+List<OrderDto> orders = queryBus.ask(new ListOrders(), new ResultType<List<OrderDto>>() {});
 
 Result<OrderDto> placed =
-    commandBus.dispatchAndReceive(
-        new PlaceOrder("o-1"), new ParameterizedTypeReference<Result<OrderDto>>() {});
+    commandBus.dispatchAndReceive(new PlaceOrder("o-1"), new ResultType<Result<OrderDto>>() {});
 
-// Without the type reference the elements are maps: untyped.get(0) is a LinkedHashMap,
+// Without the result type the elements are maps: untyped.get(0) is a LinkedHashMap,
 // and using it as an OrderDto fails with a ClassCastException.
 List<OrderDto> untyped = queryBus.ask(new ListOrders());
 ```
 
-The overloads are `QueryBus.ask(Query, ParameterizedTypeReference<R>)` and `CommandBus.dispatchAndReceive(Command, ParameterizedTypeReference<R>)`. The local buses return the handler's object as it is and do not need them, so passing the type reference keeps the same call working when a bus moves from local to remote.
+The overloads are `QueryBus.ask(Query, ResultType<R>)` and `CommandBus.dispatchAndReceive(Command, ResultType<R>)`. `ResultType` (`com.borjaglez.cqrs.ResultType`) captures the type argument of the anonymous subclass, like Spring's `ParameterizedTypeReference`, without depending on Spring; `ResultType.of(type)` wraps a `java.lang.reflect.Type` built at runtime. The local buses return the handler's object as it is and do not need it, so passing the result type keeps the same call working when a bus moves from local to remote.
 
 ### Configuration Reference
 
@@ -648,7 +653,7 @@ Build a single module:
 Run a single test class:
 
 ```bash
-./gradlew :spring-boot-cqrs-core:test --tests "com.borjaglez.cqrs.command.CommandTest"
+./gradlew :spring-boot-cqrs-api:test --tests "com.borjaglez.cqrs.command.CommandTest"
 ```
 
 The library is compiled for Java 21. To run the tests on a newer JDK (compilation stays on

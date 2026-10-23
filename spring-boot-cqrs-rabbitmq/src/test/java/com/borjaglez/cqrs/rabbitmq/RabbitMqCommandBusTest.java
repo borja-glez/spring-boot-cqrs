@@ -27,6 +27,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.CommandHandlerExecutionException;
 import com.borjaglez.cqrs.context.ContextPropagationMiddleware;
 import com.borjaglez.cqrs.context.MessageContext;
@@ -158,50 +159,72 @@ class RabbitMqCommandBusTest {
   }
 
   @Test
-  void dispatchAndReceiveWithTypeShouldPassTypeToPublisher() {
+  void dispatchAndReceiveWithNullResultTypeShouldThrowWithoutPublishing() {
     TestCommand command = new TestCommand("test-data");
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("resultType must not be null");
+    verifyNoInteractions(publisher);
+  }
+
+  @Test
+  void dispatchAndReceiveWithResultTypeShouldPassTypeToPublisher() {
+    TestCommand command = new TestCommand("test-data");
+    ResultType<String> resultType = new ResultType<String>() {};
     when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
     when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
     when(publisher.publishAndReceive(
-            "cqrs.commands", "test.order.create", command, "command_reply", typeRef))
+            "cqrs.commands",
+            "test.order.create",
+            command,
+            "command_reply",
+            ParameterizedTypeReference.forType(String.class)))
         .thenReturn("typed-result");
 
-    String result = commandBus.dispatchAndReceive(command, typeRef);
+    String result = commandBus.dispatchAndReceive(command, resultType);
 
     assertThat(result).isEqualTo("typed-result");
   }
 
   @Test
-  void dispatchAndReceiveWithTypeShouldRethrowRuntimeException() {
+  void dispatchAndReceiveWithResultTypeShouldRethrowRuntimeException() {
     TestCommand command = new TestCommand("test-data");
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
     when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
     when(publisher.publishAndReceive(
-            "cqrs.commands", "test.order.create", command, "command_reply", typeRef))
+            "cqrs.commands",
+            "test.order.create",
+            command,
+            "command_reply",
+            ParameterizedTypeReference.forType(String.class)))
         .thenThrow(new RuntimeException("remote error"));
 
-    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, typeRef))
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, resultType))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("remote error");
   }
 
   @Test
-  void dispatchAndReceiveWithTypeShouldWrapCheckedException() {
+  void dispatchAndReceiveWithResultTypeShouldWrapCheckedException() {
     TestCommand command = new TestCommand("test-data");
-    ParameterizedTypeReference<String> typeRef = new ParameterizedTypeReference<String>() {};
+    ResultType<String> resultType = new ResultType<String>() {};
     when(rabbitNaming.exchange("commands")).thenReturn("cqrs.commands");
     when(messageNaming.commandName(TestCommand.class)).thenReturn("test.order.create");
     Exception checkedException = new Exception("checked error");
     when(publisher.publishAndReceive(
-            "cqrs.commands", "test.order.create", command, "command_reply", typeRef))
+            "cqrs.commands",
+            "test.order.create",
+            command,
+            "command_reply",
+            ParameterizedTypeReference.forType(String.class)))
         .thenAnswer(
             invocation -> {
               throw checkedException;
             });
 
-    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, typeRef))
+    assertThatThrownBy(() -> commandBus.dispatchAndReceive(command, resultType))
         .isInstanceOf(CommandHandlerExecutionException.class)
         .hasCause(checkedException);
   }
@@ -251,8 +274,7 @@ class RabbitMqCommandBusTest {
 
     bus.dispatchAndWait(command);
     String reply = bus.dispatchAndReceive(command);
-    String typedReply =
-        bus.dispatchAndReceive(command, new ParameterizedTypeReference<String>() {});
+    String typedReply = bus.dispatchAndReceive(command, new ResultType<String>() {});
 
     assertThat(reply).isEqualTo("reply");
     assertThat(typedReply).isEqualTo("typed-reply");

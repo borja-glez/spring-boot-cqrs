@@ -11,13 +11,11 @@ import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 
 import com.borjaglez.cqrs.command.CommandBus;
-import com.borjaglez.cqrs.command.annotation.CommandHandler;
 import com.borjaglez.cqrs.fixtures.scan.ScannedCommand;
 import com.borjaglez.cqrs.fixtures.scan.application.ImplicitComponentScanConfiguration;
 import com.borjaglez.cqrs.fixtures.scan.application.ScannedCommandHandler;
@@ -129,7 +127,7 @@ class CqrsHandlersAutoConfigurationTest {
 
   @Test
   void skipsHandlerSwitchedOffByItsCondition() {
-    // The application's own scan registers the handler, then removes it as its condition fails.
+    // The application's scan covers the handler's package, and its condition fails.
     contextRunner
         .withBean(ConditionalCommandHandler.OVERRIDE, String.class, () -> "override")
         .withUserConfiguration(ConditionalHandlerConfiguration.class)
@@ -178,11 +176,11 @@ class CqrsHandlersAutoConfigurationTest {
     }
   }
 
-  /** The user's scan leaves command handlers out, so only the CQRS handler scan registers them. */
+  /**
+   * The user's scan does not register handlers, which are not components; the handler scan does.
+   */
   @Configuration(proxyBeanMethods = false)
-  @ComponentScan(
-      basePackages = "com.borjaglez.cqrs.fixtures.scan.componentscan",
-      excludeFilters = @Filter(CommandHandler.class))
+  @ComponentScan(basePackages = "com.borjaglez.cqrs.fixtures.scan.componentscan")
   static class ComponentScanConfiguration {}
 
   @Configuration(proxyBeanMethods = false)

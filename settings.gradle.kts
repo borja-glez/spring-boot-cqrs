@@ -18,6 +18,7 @@ dependencyResolutionManagement {
 rootProject.name = "spring-boot-cqrs"
 
 include(
+    ":spring-boot-cqrs-api",
     ":spring-boot-cqrs-core",
     ":spring-boot-cqrs-kafka",
     ":spring-boot-cqrs-rabbitmq",

@@ -9,8 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.Command;
 import com.borjaglez.cqrs.command.CommandBus;
 import com.borjaglez.cqrs.test.assertion.CommandBusAssert;
@@ -56,11 +56,11 @@ class SpyCommandBusTest {
   }
 
   @Test
-  void dispatchAndReceiveWithTypeReferenceDelegates() {
+  void dispatchAndReceiveWithResultTypeDelegates() {
     CommandBus delegate = mock(CommandBus.class);
     SpyCommandBus spy = new SpyCommandBus(delegate);
     TestCommand command = new TestCommand("a");
-    ParameterizedTypeReference<String> ref = new ParameterizedTypeReference<String>() {};
+    ResultType<String> ref = new ResultType<String>() {};
     when(delegate.<String>dispatchAndReceive(command, ref)).thenReturn("v");
 
     String result = spy.dispatchAndReceive(command, ref);

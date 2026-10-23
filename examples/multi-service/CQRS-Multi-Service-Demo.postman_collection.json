@@ -368,8 +368,8 @@
       ]
     },
     {
-      "name": "11. Typed queries (ParameterizedTypeReference)",
-      "description": "Demonstrates typed bus methods using ParameterizedTypeReference.\nThese endpoints use the overloaded ask() and dispatchAndReceive() methods that accept a ParameterizedTypeReference<R> parameter, ensuring correct generic type deserialization over RabbitMQ.",
+      "name": "11. Typed queries (ResultType)",
+      "description": "Demonstrates typed bus methods using ResultType.\nThese endpoints use the overloaded ask() and dispatchAndReceive() methods that accept a ResultType<R> parameter, ensuring correct generic type deserialization over RabbitMQ.",
       "item": [
         {
           "name": "Get all orders (typed local query)",

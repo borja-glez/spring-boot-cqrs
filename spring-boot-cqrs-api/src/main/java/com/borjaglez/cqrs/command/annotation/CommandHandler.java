@@ -6,11 +6,15 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import org.springframework.stereotype.Service;
-
+/**
+ * Marks a class whose {@link HandleCommand @HandleCommand} methods handle commands.
+ *
+ * <p>It is not a Spring stereotype. The Spring Boot starters register the handler classes found in
+ * the application packages; without Spring Boot, use {@code @EnableCqrsHandlers} or declare the
+ * handler as a bean.
+ */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@Service
 @Documented
 public @interface CommandHandler {
 

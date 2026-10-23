@@ -2,7 +2,6 @@ package com.borjaglez.cqrs.example.rabbitmq.controller;
 
 import java.util.List;
 
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.borjaglez.cqrs.ResultType;
 import com.borjaglez.cqrs.command.CommandBus;
 import com.borjaglez.cqrs.example.rabbitmq.command.ConfirmOrderCommand;
 import com.borjaglez.cqrs.example.rabbitmq.command.CreateOrderCommand;
@@ -67,9 +67,8 @@ public class OrderController {
 
   @GetMapping("/typed")
   public ResponseEntity<List<Order>> getAllOrdersTyped() {
-    // Typed query: ParameterizedTypeReference preserves generic type for deserialization
-    List<Order> orders =
-        queryBus.ask(new GetAllOrdersQuery(), new ParameterizedTypeReference<List<Order>>() {});
+    // Typed query: ResultType preserves the generic type for deserialization
+    List<Order> orders = queryBus.ask(new GetAllOrdersQuery(), new ResultType<List<Order>>() {});
     return ResponseEntity.ok(orders);
   }
 
