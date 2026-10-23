@@ -13,4 +13,5 @@ dependencies {
     implementation("io.freefair.gradle:lombok-plugin:9.2.0")
     implementation("com.diffplug.spotless:spotless-plugin-gradle:8.4.0")
     implementation("com.vanniktech:gradle-maven-publish-plugin:0.36.0")
+    implementation("info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.19.0")
 }
