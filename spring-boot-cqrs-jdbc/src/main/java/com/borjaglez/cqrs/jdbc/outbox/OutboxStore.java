@@ -38,6 +38,7 @@ public class OutboxStore {
   private final String readFailedSql;
   private final String publishFailedSql;
   private final String deleteSql;
+  private final String statsSql;
 
   public OutboxStore(DataSource dataSource, String tableName) {
     this(dataSource, tableName, Clock.systemUTC());
@@ -61,6 +62,7 @@ public class OutboxStore {
             + " SET attempts = ?, read_failures = ?, last_error = ?, failed_at = ? WHERE id = ?";
     this.publishFailedSql = "UPDATE " + table + " SET attempts = ?, last_error = ? WHERE id = ?";
     this.deleteSql = "DELETE FROM " + table + " WHERE published_at < ?";
+    this.statsSql = statsSql(table);
   }
 
   public void insert(
@@ -158,6 +160,34 @@ public class OutboxStore {
   /** Deletes the rows published before {@code cutoff}; returns how many. */
   public int deletePublishedBefore(Instant cutoff) {
     return jdbc.update(deleteSql, Timestamp.from(cutoff));
+  }
+
+  /**
+   * Set-aside rows never have a {@code published_at}, so the filter keeps the query to the rows
+   * that are not published yet: the PostgreSQL {@code _unpublished} partial index and the H2 {@code
+   * (published_at, failed_at, id)} index serve it.
+   */
+  static String statsSql(String table) {
+    return "SELECT COALESCE(SUM(CASE WHEN failed_at IS NULL THEN 1 ELSE 0 END), 0) AS pending,"
+        + " COALESCE(SUM(CASE WHEN failed_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS set_aside,"
+        + " MIN(CASE WHEN failed_at IS NULL THEN created_at END) AS oldest_pending FROM "
+        + table
+        + " WHERE published_at IS NULL";
+  }
+
+  /**
+   * Counts the pending and the set-aside rows and finds the oldest pending one, in a single query.
+   */
+  public OutboxStats stats() {
+    return jdbc.queryForObject(
+        statsSql,
+        (rs, rowNum) -> {
+          Timestamp oldest = rs.getTimestamp("oldest_pending");
+          return new OutboxStats(
+              rs.getLong("pending"),
+              rs.getLong("set_aside"),
+              oldest == null ? null : oldest.toInstant());
+        });
   }
 
   private Timestamp now() {

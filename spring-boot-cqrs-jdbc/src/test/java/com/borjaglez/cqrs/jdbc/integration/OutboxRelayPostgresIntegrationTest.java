@@ -2,6 +2,10 @@ package com.borjaglez.cqrs.jdbc.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Method;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -35,6 +40,7 @@ import com.borjaglez.cqrs.jdbc.outbox.OutboxEventBus;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxEventTypeResolver;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxRelay;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxSchemaInitializer;
+import com.borjaglez.cqrs.jdbc.outbox.OutboxStats;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxStore;
 import com.borjaglez.cqrs.jdbc.outbox.OutboxTracing;
 import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
@@ -187,5 +193,62 @@ class OutboxRelayPostgresIntegrationTest {
                     + " AND indexname IN ('events_outbox_pending', 'events_outbox_published')",
                 Integer.class))
         .isEqualTo(2);
+  }
+
+  @Test
+  void statsCountsPendingAndSetAsideRowsInOneQuery() {
+    OutboxStore store = new OutboxStore(dataSource, OutboxStore.DEFAULT_TABLE_NAME);
+    OutboxEventBus outbox = new OutboxEventBus(store, serializer, naming, codec);
+    TransactionTemplate tx = new TransactionTemplate(transactionManager);
+    for (int i = 0; i < 3; i++) {
+      String orderId = "o-" + i;
+      tx.executeWithoutResult(s -> outbox.publish(new TestOrderPlaced(orderId)));
+    }
+    jdbc.update(
+        "UPDATE cqrs_outbox SET failed_at = now() WHERE id = (SELECT MIN(id) FROM cqrs_outbox)");
+
+    OutboxStats stats = store.stats();
+
+    assertThat(stats.pending()).isEqualTo(2);
+    assertThat(stats.setAside()).isEqualTo(1);
+    assertThat(stats.oldestPendingCreatedAt()).isNotNull();
+  }
+
+  @Test
+  void theStatsQueryCanUseTheUnpublishedIndex() throws Exception {
+    OutboxStore store = new OutboxStore(dataSource, OutboxStore.DEFAULT_TABLE_NAME);
+    for (int i = 0; i < 300; i++) {
+      store.insert("p-" + i, "order-placed", "com.example.OrderPlaced", new byte[] {1}, null);
+    }
+    jdbc.update("UPDATE cqrs_outbox SET published_at = now() WHERE id % 10 <> 0");
+    jdbc.update("UPDATE cqrs_outbox SET failed_at = now() WHERE id % 30 = 0");
+    jdbc.execute("ANALYZE cqrs_outbox");
+    Method statsSql = OutboxStore.class.getDeclaredMethod("statsSql", String.class);
+    statsSql.setAccessible(true);
+    String sql = (String) statsSql.invoke(null, OutboxStore.DEFAULT_TABLE_NAME);
+
+    List<String> plan =
+        jdbc.execute(
+            (ConnectionCallback<List<String>>)
+                connection -> {
+                  try (Statement statement = connection.createStatement()) {
+                    statement.execute("SET enable_seqscan = off");
+                    List<String> lines = new ArrayList<>();
+                    try (ResultSet rs = statement.executeQuery("EXPLAIN " + sql)) {
+                      while (rs.next()) {
+                        lines.add(rs.getString(1));
+                      }
+                    } finally {
+                      statement.execute("RESET enable_seqscan");
+                    }
+                    return lines;
+                  }
+                });
+
+    assertThat(String.join(" ", plan)).contains("cqrs_outbox_unpublished");
+    OutboxStats stats = store.stats();
+    assertThat(stats.pending()).isEqualTo(20);
+    assertThat(stats.setAside()).isEqualTo(10);
+    assertThat(stats.oldestPendingCreatedAt()).isNotNull();
   }
 }

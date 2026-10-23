@@ -91,6 +91,18 @@ public class CqrsJdbcOutboxAutoConfiguration {
     }
 
     @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "io.micrometer.core.instrument.binder.MeterBinder")
+    @ConditionalOnBooleanProperty(name = "cqrs.outbox.metrics.enabled", matchIfMissing = true)
+    static class MetricsConfiguration {
+
+      @Bean
+      @ConditionalOnMissingBean
+      OutboxMetrics outboxMetrics(OutboxStore store) {
+        return new OutboxMetrics(store, Clock.systemUTC());
+      }
+    }
+
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnBooleanProperty(name = "cqrs.outbox.relay.enabled", matchIfMissing = true)
     static class RelayConfiguration {
 
@@ -104,7 +116,8 @@ public class CqrsJdbcOutboxAutoConfiguration {
           ListableBeanFactory beanFactory,
           PlatformTransactionManager transactionManager,
           OutboxProperties properties,
-          Environment environment) {
+          Environment environment,
+          ObjectProvider<OutboxRelayListener> listener) {
         OutboxProperties.Relay relay = properties.getRelay();
         Map<String, EventBus> buses = beanFactory.getBeansOfType(EventBus.class);
         String targetName = OutboxTargetBus.resolve(buses, relay.getEventBus());
@@ -125,7 +138,8 @@ public class CqrsJdbcOutboxAutoConfiguration {
             target,
             transactionManager,
             relay.getBatchSize(),
-            relay.getMaxAttempts());
+            relay.getMaxAttempts(),
+            OutboxRelayListener.composite(listener.orderedStream().toList()));
       }
 
       @Bean

@@ -9,9 +9,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -389,5 +392,127 @@ class OutboxRelayTest {
     assertThatThrownBy(() -> relay(target, 1, 0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("max-attempts");
+  }
+
+  private static final class RecordingListener implements OutboxRelayListener {
+    private final List<String> calls = new CopyOnWriteArrayList<>();
+    private final Supplier<Long> unpublishedRows;
+
+    RecordingListener(Supplier<Long> unpublishedRows) {
+      this.unpublishedRows = unpublishedRows;
+    }
+
+    @Override
+    public void published(int count) {
+      calls.add("published:" + count + ":unpublished=" + unpublishedRows.get());
+    }
+
+    @Override
+    public void publishFailed() {
+      calls.add("publishFailed");
+    }
+
+    @Override
+    public void setAside(int count) {
+      calls.add("setAside:" + count);
+    }
+  }
+
+  private RecordingListener recording() {
+    return new RecordingListener(
+        () ->
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM cqrs_outbox WHERE published_at IS NULL", Long.class));
+  }
+
+  private OutboxRelay relay(EventBus bus, int batchSize, int maxAttempts, OutboxRelayListener l) {
+    return new OutboxRelay(
+        store, resolver, serializer, codec, bus, transactionManager, batchSize, maxAttempts, l);
+  }
+
+  @Test
+  void listenerIsNotifiedAfterCommit() {
+    publishInTransaction("o-1");
+    publishInTransaction("o-2");
+    RecordingListener listener = recording();
+
+    relay(target, 10, 3, listener).relayBatch();
+
+    // The listener reads on its own connection: zero unpublished rows means the batch committed.
+    assertThat(listener.calls).containsExactly("published:2:unpublished=0");
+  }
+
+  @Test
+  void listenerIsNotNotifiedWhenTheBatchRollsBack() {
+    publishInTransaction("o-1");
+    publishInTransaction("o-2");
+    EventBus failing = mock(EventBus.class);
+    doNothing().doThrow(new AssertionError("fatal")).when(failing).publish(any(Event.class));
+    RecordingListener listener = recording();
+
+    assertThatThrownBy(() -> relay(failing, 10, 3, listener).relayBatch())
+        .isInstanceOf(AssertionError.class);
+
+    assertThat(listener.calls).isEmpty();
+  }
+
+  @Test
+  void publishFailureIsReported() {
+    publishInTransaction("o-1");
+    publishInTransaction("o-2");
+    target.failNext(new IllegalStateException("broker down"));
+    RecordingListener listener = recording();
+
+    relay(target, 10, 3, listener).relayBatch();
+
+    assertThat(listener.calls).containsExactly("publishFailed");
+  }
+
+  @Test
+  void rowsPublishedBeforeAFailureAreReportedWithTheFailure() {
+    publishInTransaction("o-1");
+    publishInTransaction("o-2");
+    EventBus failSecond = mock(EventBus.class);
+    doNothing()
+        .doThrow(new IllegalStateException("down"))
+        .when(failSecond)
+        .publish(any(Event.class));
+    RecordingListener listener = recording();
+
+    relay(failSecond, 10, 3, listener).relayBatch();
+
+    assertThat(listener.calls).containsExactly("published:1:unpublished=1", "publishFailed");
+  }
+
+  @Test
+  void setAsideRowsAreReported() {
+    TestOrderPlaced event = publishInTransaction("o-1");
+    jdbc.update(
+        "UPDATE cqrs_outbox SET payload = ? WHERE event_id = ?",
+        new byte[] {1, 2, 3},
+        event.getEventId());
+    RecordingListener listener = recording();
+
+    relay(target, 10, 1, listener).relayBatch();
+
+    assertThat(listener.calls).containsExactly("setAside:1");
+  }
+
+  @Test
+  void anEmptyBatchReportsNothing() {
+    RecordingListener listener = recording();
+
+    relay(target, 10, 1, listener).relayBatch();
+
+    assertThat(listener.calls).isEmpty();
+  }
+
+  @Test
+  void theNoopListenerAcceptsEveryCallback() {
+    OutboxRelayListener noop = OutboxRelayListener.noop();
+
+    noop.published(1);
+    noop.publishFailed();
+    noop.setAside(1);
   }
 }

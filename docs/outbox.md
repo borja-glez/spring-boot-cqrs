@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS cqrs_outbox (
 );
 CREATE INDEX IF NOT EXISTS cqrs_outbox_pending ON cqrs_outbox (id) WHERE published_at IS NULL AND failed_at IS NULL;
 CREATE INDEX IF NOT EXISTS cqrs_outbox_published ON cqrs_outbox (published_at) WHERE published_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS cqrs_outbox_unpublished ON cqrs_outbox (created_at) WHERE published_at IS NULL;
 ```
 
 `event_id` holds up to 64 characters: publishing an event whose custom event id is longer fails
@@ -187,6 +188,25 @@ transaction is stored with the row and the relay publishes inside a `cqrs.outbox
 continues it, so the broker send and the consumer stay in the original trace (enable
 `spring.kafka.template.observation-enabled` for Kafka headers).
 
+## Metrics
+
+With Micrometer on the classpath the outbox exposes these meters (turn them off with
+`cqrs.outbox.metrics.enabled=false`):
+
+| Meter | Type | Description |
+|---|---|---|
+| `cqrs.outbox.pending` | Gauge | Rows waiting to be relayed (not published, not set aside) |
+| `cqrs.outbox.set.aside` | Gauge | Rows set aside after `cqrs.outbox.relay.max-attempts` failed reads |
+| `cqrs.outbox.oldest.pending.age` | TimeGauge (seconds) | Age of the oldest pending row; 0 without pending rows |
+| `cqrs.outbox.published` | Counter | Rows published by this instance |
+| `cqrs.outbox.publish.failures` | Counter | Failed attempts of the target bus to publish a row |
+
+The gauges read the table with a single query over the unpublished rows only, reused for one second, so a scrape costs one read. On PostgreSQL that query is served by the `cqrs_outbox_unpublished` partial index (rows set aside are not in `cqrs_outbox_pending`); if you created the schema yourself before this index existed, add it with the DDL shown in the Schema section. H2 needs nothing extra: its `(published_at, failed_at, id)` index already covers the filter.
+They describe the whole table, shared by every instance; the counters only count what this
+instance relayed, and only after the batch committed. A growing `pending` or `oldest.pending.age`
+means the relay is not keeping up or the broker is down; `set.aside` above zero needs a look at
+`last_error` (see "Rows that cannot be read").
+
 ## Native images
 
 List the packages of outbox events in `cqrs.aot.message-packages`: their binding hints and the
@@ -203,6 +223,7 @@ logical-name index (`META-INF/cqrs/outbox-event-names.properties`) are generated
 | `cqrs.outbox.relay.interval` | `1s` | Delay between two relay runs |
 | `cqrs.outbox.relay.batch-size` | `100` | Rows relayed per transaction |
 | `cqrs.outbox.relay.max-attempts` | `10` | Failed reads (`read_failures`) after which an unreadable row is set aside; bus failures never set a row aside |
+| `cqrs.outbox.metrics.enabled` | `true` | Expose the outbox meters when Micrometer is present |
 | `cqrs.jdbc.outbox.table-name` | `cqrs_outbox` | Outbox table; may be schema-qualified |
 | `cqrs.jdbc.outbox.cleanup-enabled` | `true` | Delete published rows older than the retention |
 | `cqrs.jdbc.outbox.cleanup-interval` | `1h` | Delay between two cleanups |

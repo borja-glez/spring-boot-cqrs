@@ -10,6 +10,7 @@ dependencies {
     api(project(":spring-boot-cqrs-core"))
     api(libs.spring.boot.autoconfigure)
     api(libs.spring.jdbc)
+    compileOnly(libs.micrometer.core)
     compileOnly(libs.micrometer.tracing)
 
     annotationProcessor(libs.spring.boot.configuration.processor)
@@ -22,6 +23,7 @@ dependencies {
     testImplementation(project(":spring-boot-cqrs-boot3-starter"))
     testImplementation(project(":spring-boot-cqrs-rabbitmq"))
     testImplementation(project(":spring-boot-cqrs-kafka"))
+    testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.tracing)
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.datatype.jsr310)

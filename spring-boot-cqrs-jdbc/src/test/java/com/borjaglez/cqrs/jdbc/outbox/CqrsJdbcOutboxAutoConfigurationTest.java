@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +34,8 @@ import com.borjaglez.cqrs.rabbitmq.RabbitMqEventBus;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqNamingStrategy;
 import com.borjaglez.cqrs.rabbitmq.infrastructure.RabbitMqPublisher;
 
+import io.micrometer.core.instrument.binder.MeterBinder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
 
@@ -275,6 +279,118 @@ class CqrsJdbcOutboxAutoConfigurationTest {
             context -> {
               assertThat(context).hasNotFailed();
               assertThat(context.getBean(OutboxTracing.class)).isSameAs(OutboxTracing.noop());
+            });
+  }
+
+  @Test
+  void metricsBeanWhenMicrometerPresent() {
+    enabled.run(
+        context -> {
+          assertThat(context).hasSingleBean(OutboxMetrics.class);
+          SimpleMeterRegistry registry = new SimpleMeterRegistry();
+          context.getBean(OutboxMetrics.class).bindTo(registry);
+          assertThat(registry.get("cqrs.outbox.pending").gauge().value()).isZero();
+        });
+  }
+
+  @Test
+  void theRelayReportsToTheMetrics() {
+    enabled.run(
+        context -> {
+          context.getBean(OutboxRelayScheduler.class).stop();
+          SimpleMeterRegistry registry = new SimpleMeterRegistry();
+          context.getBean(OutboxMetrics.class).bindTo(registry);
+          new TransactionTemplate(context.getBean(PlatformTransactionManager.class))
+              .executeWithoutResult(
+                  s -> context.getBean(OutboxEventBus.class).publish(new TestOrderPlaced("o-1")));
+
+          context.getBean(OutboxRelay.class).relayBatch();
+
+          assertThat(registry.get("cqrs.outbox.published").counter().count()).isEqualTo(1);
+        });
+  }
+
+  @Test
+  void noMetricsWhenDisabled() {
+    enabled
+        .withPropertyValues("cqrs.outbox.metrics.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(OutboxMetrics.class));
+  }
+
+  @Test
+  void noMetricsWithoutMicrometerOnTheClasspath() {
+    enabled
+        .withClassLoader(new FilteredClassLoader(MeterBinder.class))
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).doesNotHaveBean(OutboxMetrics.class);
+            });
+  }
+
+  @Test
+  void aCustomListenerAndTheMetricsBothReceiveTheOutcomes() {
+    List<Integer> custom = new ArrayList<>();
+    enabled
+        .withBean(
+            "customListener",
+            OutboxRelayListener.class,
+            () ->
+                new OutboxRelayListener() {
+                  @Override
+                  public void published(int count) {
+                    custom.add(count);
+                  }
+                })
+        .run(
+            context -> {
+              context.getBean(OutboxRelayScheduler.class).stop();
+              SimpleMeterRegistry registry = new SimpleMeterRegistry();
+              context.getBean(OutboxMetrics.class).bindTo(registry);
+              new TransactionTemplate(context.getBean(PlatformTransactionManager.class))
+                  .executeWithoutResult(
+                      s ->
+                          context
+                              .getBean(OutboxEventBus.class)
+                              .publish(new TestOrderPlaced("o-1")));
+
+              OutboxRelay.BatchResult result = context.getBean(OutboxRelay.class).relayBatch();
+
+              assertThat(result.published()).isEqualTo(1);
+              assertThat(custom).containsExactly(1);
+              assertThat(registry.get("cqrs.outbox.published").counter().count()).isEqualTo(1);
+            });
+  }
+
+  @Test
+  void aThrowingListenerDoesNotHideTheResultNorTheMetrics() {
+    enabled
+        .withBean(
+            "throwingListener",
+            OutboxRelayListener.class,
+            () ->
+                new OutboxRelayListener() {
+                  @Override
+                  public void published(int count) {
+                    throw new IllegalStateException("listener down");
+                  }
+                })
+        .run(
+            context -> {
+              context.getBean(OutboxRelayScheduler.class).stop();
+              SimpleMeterRegistry registry = new SimpleMeterRegistry();
+              context.getBean(OutboxMetrics.class).bindTo(registry);
+              new TransactionTemplate(context.getBean(PlatformTransactionManager.class))
+                  .executeWithoutResult(
+                      s ->
+                          context
+                              .getBean(OutboxEventBus.class)
+                              .publish(new TestOrderPlaced("o-1")));
+
+              OutboxRelay.BatchResult result = context.getBean(OutboxRelay.class).relayBatch();
+
+              assertThat(result.published()).isEqualTo(1);
+              assertThat(registry.get("cqrs.outbox.published").counter().count()).isEqualTo(1);
             });
   }
 }
