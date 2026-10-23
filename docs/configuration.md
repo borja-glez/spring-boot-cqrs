@@ -8,6 +8,7 @@ All configuration properties use the `cqrs.*` prefix and are managed through Spr
 - [Context Propagation Properties](#context-propagation-properties)
 - [Tracing Properties](#tracing-properties)
 - [Retry Properties](#retry-properties)
+- [Transactions Properties](#transactions-properties)
 - [Idempotency Properties](#idempotency-properties)
 - [Actuator Endpoints](#actuator-endpoints)
 - [Kafka Properties](#kafka-properties)
@@ -31,6 +32,8 @@ Defined in `CqrsProperties` (`cqrs.*`):
 | `cqrs.context.header-prefix` | `String` | `"cqrs.context."` | Prefix applied to transport headers (RabbitMQ + Kafka) when serializing/deserializing the context across services. |
 | `cqrs.tracing.enabled` | `boolean` | `true` | Enables the `TracingMiddleware` (wraps each dispatch in a Micrometer `Observation`). Requires an `ObservationRegistry` bean (provided by Spring Boot Actuator). |
 | `cqrs.tracing.observation-name` | `String` | `"cqrs.bus.handle"` | Name of the observation/span created around each bus dispatch. |
+| `cqrs.transactions.enabled` | `boolean` | `false` | Registers the `TransactionMiddleware`, which runs handlers in a transaction. Opt-in; needs a single `PlatformTransactionManager`. |
+| `cqrs.transactions.queries` | `read-only` \| `read-write` \| `none` | `read-only` | How queries run: in a read-only transaction, in a read-write one, or with no transaction opened by the middleware (a query asked inside an outer transaction still takes part in it). Commands and events always run in a transaction. |
 | `cqrs.retry.enabled` | `boolean` | `false` | Registers the `RetryMiddleware` for commands and queries. Opt-in. |
 | `cqrs.retry.max-attempts` | `int` | `3` | Total attempts, the first one included; `1` disables retries. |
 | `cqrs.retry.backoff.strategy` | `fixed` \| `exponential` \| `exponential-jitter` | `exponential-jitter` | Delay between attempts. |
@@ -171,6 +174,17 @@ The default non-retriable exceptions are `java.lang.IllegalArgumentException`, `
 Invalid values fail startup with an `InvalidConfigurationPropertyValueException` naming the property: `max-attempts` below 1, a negative delay, `multiplier` below 1, `jitter-factor` outside `[0, 1]`, or an exception class name that cannot be loaded or is not a `Throwable`.
 
 With RabbitMQ or Kafka the middleware runs in the consumer, not on the sender, before the transport retry: the attempts multiply (`cqrs.retry.max-attempts` x `cqrs.rabbitmq.retry.max-attempts`, or x `cqrs.kafka.error-handling.max-attempts`, handler runs before dead-lettering). Per-type policies and the transaction caveat are described in [middleware.md](middleware.md#retrymiddleware).
+
+## Transactions Properties
+
+```yaml
+cqrs:
+  transactions:
+    enabled: true     # opt-in
+    queries: read-only  # read-only | read-write | none
+```
+
+The `TransactionMiddleware` is registered when `enabled` is `true`, the application has a single `PlatformTransactionManager` (or a `@Primary` one) and defines no `TransactionMiddleware` of its own. It runs inside the retry middleware, so every attempt has its own transaction. See [middleware.md](middleware.md#transactionmiddleware).
 
 ## Idempotency Properties
 
@@ -352,6 +366,9 @@ cqrs:
       strategy: exponential-jitter
       initial-delay: 100ms
       max-delay: 2s
+  transactions:
+    enabled: false
+    queries: read-only               # read-only | read-write | none
   idempotency:
     store: jdbc                      # jdbc | in-memory; unset = jdbc when available
     retention: 7d

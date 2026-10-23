@@ -7,7 +7,7 @@ plugins {
 dependencies {
     api(project(":spring-boot-cqrs-api"))
     api(libs.spring.context)
-    implementation(libs.spring.tx)
+    api(libs.spring.tx)
 
     api(libs.jakarta.validation.api)
     compileOnly(libs.micrometer.core)

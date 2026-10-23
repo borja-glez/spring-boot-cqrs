@@ -57,6 +57,16 @@ implementation("com.borjaglez:spring-boot-cqrs-jdbc:<version>")
   checks only apply to handler beans (classes annotated `@CommandHandler`, `@EventHandler` or
   `@QueryHandler`); elsewhere the annotation is ignored.
 
+### Handlers without `@Transactional`
+
+The JDBC store already opens a transaction around the marker and the handler, so an `@Idempotent`
+handler needs no `@Transactional` for the marker to commit or roll back with its database work.
+What `cqrs.transactions.enabled=true` adds is the
+[`TransactionMiddleware`](middleware.md#transactionmiddleware): it opens the transaction around the
+whole dispatch, and the marker joins it. That transaction also covers inner middleware, the work of
+handlers that are not `@Idempotent` (a hexagonal handler with no Spring annotations is transactional
+too), and every handler of an event.
+
 ## Stores and guarantees
 
 | Store | Guarantee |
