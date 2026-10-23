@@ -9,6 +9,14 @@ The project is split into a framework-free API, a core with the Spring implement
 
 All library code lives under the `com.borjaglez.cqrs` package hierarchy. The API and the core share packages (`com.borjaglez.cqrs.command`, `com.borjaglez.cqrs.event`, ...), which works on the classpath but not as named JPMS modules, so neither declares an `Automatic-Module-Name`.
 
+Because the API has no dependencies, the domain and use cases of an application can depend on it alone while the Spring buses, the starters and the adapters stay in the infrastructure. [Hexagonal Architecture](hexagonal.md) shows a complete layout.
+
+## Dispatch pipeline
+
+<p align="center"><img src="assets/diagrams/dispatch-pipeline.svg" alt="Where middleware runs. The in-process and broker buses run, in order, the middleware whose phases match. A local dispatch goes from the caller through SpringCommandBus, SpringQueryBus or springEventBus and the LOCAL middleware to the handler. A remote dispatch runs the OUTBOUND middleware in the sending process and publishes; the consumer of the receiving process rehydrates the message context from the headers and runs the INBOUND middleware before the handler. A table lists the built-in middleware in order with their phases: ContextPropagationMiddleware (HIGHEST_PRECEDENCE, all phases), TracingMiddleware (HIGHEST_PRECEDENCE + 10), RetryMiddleware (LOWEST_PRECEDENCE - 100), TransactionMiddleware (LOWEST_PRECEDENCE - 50), CommandValidationInterceptor (no @Order, all phases), MicrometerBusObservability (no @Order), and your own middleware sorted among them by its order; the chain ends in the registry, which calls the handler through IdempotentInvoker when it is @Idempotent. Without an outer transaction, every retry attempt runs in its own transaction." width="100%"></p>
+
+The in-process buses and the RabbitMQ and Kafka buses receive all the `BusMiddleware` beans, in order (`@Order` or `Ordered`), and run those whose `phases()` contain their `DispatchPhase`: `LOCAL` in the in-process buses, `OUTBOUND` on the sending side of the RabbitMQ and Kafka buses before the message is published, and `INBOUND` in their consumers before the handler. `OutboxEventBus` runs none: the outbound chain runs when the outbox relay publishes the event through a broker bus. At the end of a `LOCAL` or `INBOUND` chain the registry invokes the handler, through `IdempotentInvoker` when the handler is `@Idempotent`. The opt-in `TransactionMiddleware` is ordered inside the opt-in `RetryMiddleware`, so every retry attempt runs in its own transaction unless the dispatch joins an outer one. See [Middleware](middleware.md#middleware-on-remote-buses).
+
 ## Design goals
 
 - The API has no dependencies at all; the core is framework-agnostic -- no Spring Boot dependencies at runtime.
