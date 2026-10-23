@@ -25,18 +25,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.networknt.schema.AbsoluteIri;
-import com.networknt.schema.AnnotationKeyword;
-import com.networknt.schema.JsonMetaSchema;
-import com.networknt.schema.JsonNodePath;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaException;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.PathType;
-import com.networknt.schema.RefValidator;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaException;
 import com.networknt.schema.SchemaLocation;
-import com.networknt.schema.SchemaValidatorsConfig;
-import com.networknt.schema.ValidationMessage;
-import com.networknt.schema.resource.DefaultSchemaLoader;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SchemaRegistryConfig;
+import com.networknt.schema.dialect.DefaultDialectRegistry;
+import com.networknt.schema.dialect.Dialect;
+import com.networknt.schema.dialect.Dialects;
+import com.networknt.schema.keyword.AnnotationKeyword;
+import com.networknt.schema.keyword.RefValidator;
+import com.networknt.schema.path.NodePath;
+import com.networknt.schema.path.PathType;
 import com.networknt.schema.resource.SchemaLoader;
 
 /**
@@ -56,7 +56,9 @@ import com.networknt.schema.resource.SchemaLoader;
 public final class AsyncApiContract {
 
   private static final ObjectMapper YAML = new YAMLMapper();
-  private static final SchemaLoader LOADER = new DefaultSchemaLoader(List.of(), List.of());
+  // Reads classpath resources and any URL (files, http): json-schema-validator 2.x only reads the
+  // classpath unless remote resources are enabled.
+  private static final SchemaLoader LOADER = SchemaLoader.getRemoteFetcher();
 
   private static final JsonPointer OPERATIONS = JsonPointer.compile("/operations");
   private static final JsonPointer MESSAGES = JsonPointer.compile("/messages");
@@ -73,32 +75,32 @@ public final class AsyncApiContract {
   private static final String ASYNCAPI_SCHEMA_FORMAT = "application/vnd.aai.asyncapi";
   private static final Pattern JSON_SCHEMA_FORMAT =
       Pattern.compile("application/schema\\+(?:json|yaml);version=(.+)");
-  private static final Map<String, JsonMetaSchema> DIALECTS =
+  private static final Map<String, Dialect> DIALECTS =
       Map.of(
-          "draft-04", JsonMetaSchema.getV4(),
-          "draft-06", JsonMetaSchema.getV6(),
-          "draft-07", JsonMetaSchema.getV7(),
-          "2019-09", JsonMetaSchema.getV201909(),
-          "2020-12", JsonMetaSchema.getV202012());
+          "draft-04", Dialects.getDraft4(),
+          "draft-06", Dialects.getDraft6(),
+          "draft-07", Dialects.getDraft7(),
+          "2019-09", Dialects.getDraft201909(),
+          "2020-12", Dialects.getDraft202012());
   // The document is read as a schema too, so its AsyncAPI fields are unknown keywords: keep them as
   // annotations without the warning the validator logs for each one.
-  private static final List<JsonMetaSchema> QUIET_DIALECTS =
+  private static final List<Dialect> QUIET_DIALECTS =
       DIALECTS.values().stream()
           .map(
               dialect ->
-                  JsonMetaSchema.builder(dialect)
+                  Dialect.builder(dialect)
                       .unknownKeywordFactory((keyword, context) -> new AnnotationKeyword(keyword))
                       .build())
           .toList();
   // English messages whatever the default locale, with instance paths such as $.total.currency.
-  private static final SchemaValidatorsConfig CONFIG =
-      SchemaValidatorsConfig.builder().locale(Locale.ENGLISH).pathType(PathType.JSON_PATH).build();
+  private static final SchemaRegistryConfig CONFIG =
+      SchemaRegistryConfig.builder().locale(Locale.ENGLISH).pathType(PathType.JSON_PATH).build();
 
   private final String location;
   private final JsonNode document;
   private final List<ContractMessage> messages;
   private final Map<String, Set<Payload>> payloads = new HashMap<>();
-  private final Map<String, JsonSchema> documentSchemas = new ConcurrentHashMap<>();
+  private final Map<String, Schema> documentSchemas = new ConcurrentHashMap<>();
 
   private AsyncApiContract(String location, JsonNode document) {
     this.location = location;
@@ -161,10 +163,14 @@ public final class AsyncApiContract {
 
   /** Validates a payload against every payload schema the contract declares for the name. */
   List<String> payloadViolations(String name, JsonNode payload) {
+    // json-schema-validator 2.x no longer starts the message with the instance location.
     return check(
         name,
         schema ->
-            schema.validate(payload).stream().map(ValidationMessage::getMessage).sorted().toList());
+            schema.validate(payload).stream()
+                .map(error -> error.getInstanceLocation() + ": " + error.getMessage())
+                .sorted()
+                .toList());
   }
 
   /** Reports the object payload schemas of the name that do not reject unknown properties. */
@@ -178,7 +184,7 @@ public final class AsyncApiContract {
   }
 
   private static AsyncApiContract read(String location) {
-    try (InputStream input = LOADER.getSchema(AbsoluteIri.of(location)).getInputStream()) {
+    try (InputStream input = LOADER.getSchemaResource(AbsoluteIri.of(location)).getInputStream()) {
       return new AsyncApiContract(location, YAML.readTree(input));
     } catch (IOException e) {
       throw new IllegalArgumentException("Cannot read the AsyncAPI document " + location, e);
@@ -322,10 +328,10 @@ public final class AsyncApiContract {
     }
   }
 
-  private List<String> check(String name, Function<JsonSchema, List<String>> check) {
+  private List<String> check(String name, Function<Schema, List<String>> check) {
     List<String> violations = new ArrayList<>();
     for (Payload payload : payloads.getOrDefault(name, Set.of())) {
-      Optional<JsonMetaSchema> dialect = dialect(payload.schemaFormat());
+      Optional<Dialect> dialect = dialect(payload.schemaFormat());
       if (dialect.isEmpty()) {
         violations.add(
             "the payload schema format '" + payload.schemaFormat() + "' is not JSON Schema");
@@ -333,7 +339,7 @@ public final class AsyncApiContract {
       }
       try {
         violations.addAll(check.apply(schema(payload.pointer(), dialect.get())));
-      } catch (JsonSchemaException e) {
+      } catch (SchemaException e) {
         violations.add(
             "cannot load the payload schema at #" + payload.pointer() + ": " + e.getMessage());
       }
@@ -341,26 +347,29 @@ public final class AsyncApiContract {
     return violations;
   }
 
-  private JsonSchema schema(JsonPointer pointer, JsonMetaSchema dialect) {
+  private Schema schema(JsonPointer pointer, Dialect dialect) {
     // The whole document is the schema resource, so that a payload can reference its components
-    // and its relative references resolve against the document location.
-    JsonSchema root =
+    // and its relative references resolve against the document location. A schema file that
+    // declares $schema is read with that dialect instead of the default one.
+    Schema root =
         documentSchemas.computeIfAbsent(
-            dialect.getIri(),
-            iri ->
-                JsonSchemaFactory.builder()
-                    .defaultMetaSchemaIri(iri)
-                    .metaSchemas(QUIET_DIALECTS)
+            dialect.getId(),
+            id ->
+                SchemaRegistry.builder()
+                    .defaultDialectId(id)
+                    .dialectRegistry(new DefaultDialectRegistry(QUIET_DIALECTS))
+                    .schemaLoader(LOADER)
+                    .schemaRegistryConfig(CONFIG)
                     .build()
-                    .getSchema(SchemaLocation.of(location), document, CONFIG));
-    JsonNodePath fragment = new JsonNodePath(PathType.JSON_POINTER);
+                    .getSchema(SchemaLocation.of(location), document));
+    NodePath fragment = new NodePath(PathType.JSON_POINTER);
     for (JsonPointer segment = pointer; !segment.matches(); segment = segment.tail()) {
       fragment = fragment.append(segment.getMatchingProperty());
     }
     return root.getRefSchema(fragment);
   }
 
-  private static Optional<JsonMetaSchema> dialect(String schemaFormat) {
+  private static Optional<Dialect> dialect(String schemaFormat) {
     String format = schemaFormat.replace(" ", "").toLowerCase(Locale.ROOT);
     if (format.startsWith(ASYNCAPI_SCHEMA_FORMAT)) {
       return Optional.of(DIALECTS.get("draft-07"));
@@ -371,8 +380,8 @@ public final class AsyncApiContract {
         : Optional.empty();
   }
 
-  private static JsonSchema dereference(JsonSchema schema) {
-    JsonSchema current = schema;
+  private static Schema dereference(Schema schema) {
+    Schema current = schema;
     while (current.getSchemaNode().has("$ref")) {
       current =
           current.getValidators().stream()

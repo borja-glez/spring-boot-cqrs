@@ -35,10 +35,35 @@ testImplementation("com.borjaglez.cqrs:spring-boot-cqrs-asyncapi-test:0.6.0")
 ```
 
 The module reads the document and validates payloads with
-[networknt json-schema-validator](https://github.com/networknt/json-schema-validator) 1.x, which
-uses Jackson 2 internally. Jackson is not part of its API: the verifier only sees the bytes your
-`MessageSerializer` produces. It does not depend on Spring Boot, and failures are plain
-`AssertionError`s, so it works with any test framework.
+[networknt json-schema-validator](https://github.com/networknt/json-schema-validator) 2.x, the line
+that uses Jackson 2 internally. Jackson is not part of its API: the verifier only sees the bytes
+your `MessageSerializer` produces, so a Boot 4 application that serializes with Jackson 3 is
+verified the same way. It does not depend on Spring Boot, and failures are plain `AssertionError`s,
+so it works with any test framework.
+
+**json-schema-validator on the test classpath.** The module needs json-schema-validator 2.x on the
+test classpath (it is built against 2.0.8), and it shares it with other 2.x users, such as
+Atlassian's `openapi-request-validator` 3.x for REST contracts. The 1.x line and the 3.x line (the
+Jackson 3 one) have a different API: when a build resolves one of them, the verifier fails with a
+`NoClassDefFoundError` or a `NoSuchMethodError` from `com.networknt.schema`. Check the version the
+tests get:
+
+```bash
+./gradlew dependencyInsight --configuration testRuntimeClasspath --dependency com.networknt:json-schema-validator
+mvn dependency:tree -Dincludes=com.networknt:json-schema-validator
+```
+
+When it is not 2.x, align it. With Gradle, pin it for the tests:
+
+```kotlin
+testImplementation("com.networknt:json-schema-validator") {
+    version { strictly("2.0.8") }
+}
+```
+
+With Maven, declare `com.networknt:json-schema-validator` 2.0.8 with `<scope>test</scope>` in the
+project: the nearest declaration wins. A tool that only works with json-schema-validator 1.x or 3.x
+cannot share the test classpath with the module; keep its tests in another module.
 
 ## Naming messages in the contract
 
