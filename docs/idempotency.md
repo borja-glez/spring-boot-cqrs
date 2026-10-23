@@ -67,6 +67,16 @@ whole dispatch, and the marker joins it. That transaction also covers inner midd
 handlers that are not `@Idempotent` (a hexagonal handler with no Spring annotations is transactional
 too), and every handler of an event.
 
+An event published inside a transaction is, with `cqrs.events.transactional=true` (the default),
+delivered after that transaction commits, while it is still bound to the thread. The middleware runs
+such an event in a new transaction, so the markers and the work of its handlers commit or roll back
+together, apart from the transaction that published it. Without the middleware, the store's
+transaction (`REQUIRED`) and a handler's own `@Transactional` join the committed transaction, which
+never commits again: depending on the transaction manager and on the auto-commit setting of the
+connection pool, the work and the marker are lost, or kept even when the handler fails. Enable the
+middleware for such handlers, or set `cqrs.events.transactional=false` to run the event in the
+publishing transaction.
+
 ## Stores and guarantees
 
 | Store | Guarantee |
