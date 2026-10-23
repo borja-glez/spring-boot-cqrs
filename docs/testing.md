@@ -194,15 +194,27 @@ dependency of `spring-boot-cqrs-test`, so add it to your own test classpath
 |---|---|
 | `handlersDoNotDependOnSpring()` | `@CommandHandler`/`@QueryHandler`/`@EventHandler` classes do not depend on `org.springframework..` |
 | `handlerMethodsAreInHandlerClasses()` | `@HandleCommand`/`@HandleQuery`/`@HandleEvent` methods live in classes with the matching class annotation |
-| `messagesAreAnnotatedWithCqrsMessage()` | concrete `Command`/`Query`/`Event` classes carry `@CqrsMessage` |
-| `messagesHaveANoArgConstructor()` | concrete messages have a no-arg constructor |
-| `messagesDoNotDependOnFrameworks()` | concrete messages do not depend on Spring, Jackson databind (2 and 3), JPA or Hibernate; Jackson annotations are allowed |
+| `messagesDoNotDependOnFrameworks()` | concrete `Command`/`Query`/`Event` classes do not depend on Spring, Jackson databind (2 and 3), JPA or Hibernate; Jackson annotations are allowed |
+| `messagesAreAnnotatedWithCqrsMessage()` | messages that cross a service boundary carry `@CqrsMessage` |
+| `messagesHaveANoArgConstructor()` | messages that cross a service boundary have a no-arg constructor |
+
+The last two rules are for the messages other services send or receive: the
+transport adapters route them by the name `@CqrsMessage` gives them, and
+deserializers create them through a constructor without arguments. Messages
+handled inside the application need neither, because the in-process buses
+dispatch by Java type and never serialize them (see
+[Message names and `@CqrsMessage`](../README.md#message-names-and-cqrsmessage)),
+so they can stay immutable and unannotated. Keep the boundary messages in a
+package or module of their own and give it a test class of its own; apply the
+handler rules and `messagesDoNotDependOnFrameworks()` to the whole application.
+[Protecting the boundaries](hexagonal.md#protecting-the-boundaries) shows the
+same split in a hexagonal layout.
 
 "Messages" are concrete classes only; abstract base classes are ignored. The
 rules fail when no matching class is found, so a wrong package is not a silent
 pass. A module with handlers but no messages is the realistic case where this
 gets in the way. Opt out for a single rule with
-`CqrsArchitectureRules.messagesHaveANoArgConstructor().allowEmptyShould(true)`,
+`CqrsArchitectureRules.messagesDoNotDependOnFrameworks().allowEmptyShould(true)`,
 or globally with `archRule.failOnEmptyShould=false` in
 `archunit.properties` on the test classpath.
 
@@ -215,6 +227,13 @@ class CqrsArchitectureTest {
 
     @ArchTest
     static final ArchRule handleMethodsPlacement = CqrsArchitectureRules.handlerMethodsAreInHandlerClasses();
+
+    @ArchTest
+    static final ArchRule messagesAreFrameworkFree = CqrsArchitectureRules.messagesDoNotDependOnFrameworks();
+}
+
+@AnalyzeClasses(packages = "com.example.contracts", importOptions = ImportOption.DoNotIncludeTests.class)
+class ContractsArchitectureTest {
 
     @ArchTest
     static final ArchRule messagesAreAnnotated = CqrsArchitectureRules.messagesAreAnnotatedWithCqrsMessage();
