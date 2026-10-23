@@ -65,6 +65,13 @@ With Maven, declare `com.networknt:json-schema-validator` 2.0.8 with `<scope>tes
 project: the nearest declaration wins. A tool that only works with json-schema-validator 1.x or 3.x
 cannot share the test classpath with the module; keep its tests in another module.
 
+**Jackson 2 version.** json-schema-validator 2.0.8 depends on Jackson 2.22.x and works with Jackson
+2.15 or later. Maven, and Gradle with the Spring dependency-management plugin, keep the Jackson
+version of the Spring Boot BOM. A Gradle build that imports the BOM with `platform(...)`, or uses
+no BOM, gets Jackson 2.22.x on the test runtime classpath; to test with the application's Jackson
+version, import the BOM with `enforcedPlatform(...)` or apply the Spring dependency-management
+plugin.
+
 ## Naming messages in the contract
 
 The `name` of every AsyncAPI Message Object is the **logical name** of the message, the one

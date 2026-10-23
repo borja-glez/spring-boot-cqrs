@@ -28,6 +28,8 @@ import com.borjaglez.cqrs.naming.DefaultMessageNamingStrategy;
 class JsonSchemaValidatorClasspathTest {
 
   private static final String PLACE_ORDER = "shop.orders.1.command.order.place-order";
+  private static final String POM_PROPERTIES =
+      "/META-INF/maven/com.networknt/json-schema-validator/pom.properties";
   private static final String ORDERS_API =
       """
       openapi: 3.0.3
@@ -59,10 +61,8 @@ class JsonSchemaValidatorClasspathTest {
   @Test
   void resolvesJsonSchemaValidator2() throws IOException {
     Properties pom = new Properties();
-    try (InputStream input =
-        getClass()
-            .getResourceAsStream(
-                "/META-INF/maven/com.networknt/json-schema-validator/pom.properties")) {
+    try (InputStream input = getClass().getResourceAsStream(POM_PROPERTIES)) {
+      assertThat(input).as("%s on the test classpath", POM_PROPERTIES).isNotNull();
       pom.load(input);
     }
 
