@@ -33,6 +33,12 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
  * <p>"Messages" are the concrete classes assignable to {@link Command}, {@link Query} or {@link
  * Event}; the abstract base classes themselves are never reported. ArchUnit is a {@code
  * compileOnly} dependency of this module: add it to your own test classpath.
+ *
+ * <p>{@link #messagesAreAnnotatedWithCqrsMessage()} and {@link #messagesHaveANoArgConstructor()}
+ * are for the messages that cross a service boundary: apply them to the package or module that
+ * holds those messages. Messages handled inside the application need neither a {@link CqrsMessage}
+ * nor a no-arg constructor, because the in-process buses dispatch them by Java type and never
+ * serialize them.
  */
 public final class CqrsArchitectureRules {
 
@@ -119,7 +125,10 @@ public final class CqrsArchitectureRules {
         .because("handler methods are only discovered on classes with the handler annotation");
   }
 
-  /** Every concrete message needs {@link CqrsMessage} to get a stable routing identity. */
+  /**
+   * Messages that cross a service boundary need {@link CqrsMessage}: the transport adapters route
+   * them by the name it gives them. Apply it to the package or module of those messages.
+   */
   public static ArchRule messagesAreAnnotatedWithCqrsMessage() {
     return classes()
         .that(CONCRETE_MESSAGES)
@@ -128,7 +137,10 @@ public final class CqrsArchitectureRules {
         .because("transport adapters derive routing keys from @CqrsMessage");
   }
 
-  /** Concrete messages need a constructor without arguments. */
+  /**
+   * Messages that cross a service boundary need a constructor without arguments: deserializers
+   * create them through it. Apply it to the package or module of those messages.
+   */
   public static ArchRule messagesHaveANoArgConstructor() {
     return classes()
         .that(CONCRETE_MESSAGES)
