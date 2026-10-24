@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are marked with **BREAKING:**; [docs/upgrading.md](docs/upgrading.md)
 explains how to migrate.
+## [0.6.0] - 2026-10-24
+
+### Added
+- Verify messages against an AsyncAPI contract (#138) (0c7fa62)
+- Add reusable ArchUnit rules for CQRS code (#137) (030affe)
+- Expose outbox metrics (#136) (135e6c1)
+- Run handlers in a transaction from an opt-in middleware (#135) (a83951d)
+- **BREAKING:** Move the public API to a framework-free spring-boot-cqrs-api module (#134) (4cb86a1)
+- Register handler classes found in the application packages (#133) (f4af2f5)
+
+### Documentation
+- Apply the boundary message rules to the contracts only (#158) (43276d1)
+- Add a hexagonal architecture guide and diagrams (#149) (e4bf153)
+
+### Fixed
+- Build the AsyncAPI verifier against json-schema-validator 2.x (#156) (198cee3)
+- Pre-release fixes from the 0.6.0 review (#154) (92d4afc)
+- Store idempotency markers of events delivered after commit in their own transaction (#148) (ba47ad5)
+- Run events delivered after commit in their own transaction (#145) (4651a98)
+- Scan handlers after every auto-configuration package is known and report scanned handlers (#144) (dfd8c5b)
+
+### Testing
+- Enforce module boundaries with ArchUnit (#139) (2e45a4a)
+
+### Build
+- Add a PIT mutation testing report (#140) (080dec7)
 ## [0.5.0] - 2026-10-03
 
 ### Added
